@@ -23,10 +23,11 @@ it('offers configuration initialization and GitHub release workflows', function 
     ]);
 });
 
-it('runs the GitHub release command selected from the menu', function () {
+it('rejects non-interactive execution and explains how to run a workflow directly', function () {
     $this->artisan('maintainer', ['--no-interaction' => true])
-        ->expectsOutputToContain('__  __')
-        ->assertSuccessful();
+        ->expectsOutputToContain('The maintainer command requires interactive input.')
+        ->assertFailed();
 
-    $this->assertCommandCalled('release:create');
+    $this->assertCommandNotCalled('release:create');
+    $this->assertCommandNotCalled('init');
 });

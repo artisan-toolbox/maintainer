@@ -135,6 +135,8 @@ The menu lists the available maintenance workflows. It can create the Maintainer
 
 The interactive menu displays a Maintainer ASCII art banner before presenting the available workflows.
 
+The menu requires interactive input. In non-interactive environments, run `release:create` directly to create a GitHub release or `init` to create the configuration file.
+
 Create a new GitHub release for the project:
 
 ```bash

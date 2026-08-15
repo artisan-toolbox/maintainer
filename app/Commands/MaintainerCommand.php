@@ -27,6 +27,12 @@ final class MaintainerCommand extends Command
      */
     public function handle(MaintainerBanner $banner): int
     {
+        if (! $this->input->isInteractive()) {
+            $this->error('The maintainer command requires interactive input. Run release:create for a GitHub release or init to create the configuration file.');
+
+            return self::FAILURE;
+        }
+
         $this->newLine();
         $this->line($banner->render());
         $this->newLine();
