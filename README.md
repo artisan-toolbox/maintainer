@@ -131,7 +131,9 @@ Open the interactive menu:
 vendor/bin/maintainer
 ```
 
-The menu lists the available maintenance workflows. Its first option creates a new GitHub release by running the `release:create` command.
+The menu lists the available maintenance workflows. It can create the Maintainer configuration file by running `init` or create a new GitHub release by running `release:create`.
+
+The interactive menu displays a Maintainer ASCII art banner before presenting the available workflows.
 
 Create a new GitHub release for the project:
 

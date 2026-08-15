@@ -2,10 +2,12 @@
 
 namespace App\Commands;
 
+use App\Support\MaintainerBanner;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use LaravelZero\Framework\Commands\Command;
 use LogicException;
+
 use function Laravel\Prompts\select;
 
 #[Signature('maintainer')]
@@ -13,20 +15,31 @@ use function Laravel\Prompts\select;
 final class MaintainerCommand extends Command
 {
     /**
+     * @var array<string, string>
+     */
+    private const array WORKFLOWS = [
+        'release:create' => 'Create a new GitHub release',
+        'init' => 'Create the Maintainer configuration file',
+    ];
+
+    /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(MaintainerBanner $banner): int
     {
+        $this->newLine();
+        $this->line($banner->render());
+        $this->newLine();
+
         $command = select(
             label: 'Which workflow would you like to run?',
-            options: [
-                'release:create' => 'Create a new GitHub release',
-            ],
+            options: self::WORKFLOWS,
             default: 'release:create',
         );
 
         return match ($command) {
             'release:create' => $this->call('release:create'),
+            'init' => $this->call('init'),
             default => throw new LogicException('The selected Maintainer workflow is not supported.'),
         };
     }
