@@ -2,27 +2,16 @@
 
 namespace App\Commands;
 
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Scheduling\Schedule;
 use LaravelZero\Framework\Commands\Command;
-
 use function Termwind\render;
 
+#[Signature('inspire {name=Artisan}')]
+#[Description('Display an inspiring quote')]
 class InspireCommand extends Command
 {
-    /**
-     * The signature of the command.
-     *
-     * @var string
-     */
-    protected $signature = 'inspire {name=Artisan}';
-
-    /**
-     * The description of the command.
-     *
-     * @var string
-     */
-    protected $description = 'Display an inspiring quote';
-
     /**
      * Execute the console command.
      */

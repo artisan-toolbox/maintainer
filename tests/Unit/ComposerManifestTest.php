@@ -14,6 +14,7 @@ it('exports only the public Maintainer namespace to consumers', function () {
             'App\\Commands\\',
             'App\\Foundation\\',
             'App\\Providers\\',
+            'App\\Support\\',
             'Database\\Factories\\',
             'Database\\Seeders\\',
             'Tests\\',

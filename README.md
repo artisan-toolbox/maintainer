@@ -49,6 +49,59 @@ vendor/bin/maintainer list
 
 The PHAR contains Maintainer's runtime dependencies, so they remain isolated from the dependencies of the project being maintained.
 
+## Configuration
+
+Create a `maintainer.json` configuration file in the root directory of the package or application being maintained:
+
+```bash
+vendor/bin/maintainer init
+```
+
+Maintainer resolves the consuming Composer project's root automatically. The configuration is written beside the root `composer.json` even when the command is invoked from `vendor/bin` or another project subdirectory.
+
+Maintainer does not overwrite an existing configuration file. To intentionally replace it with the default configuration, use:
+
+```bash
+vendor/bin/maintainer init --force
+```
+
+The initial configuration is an empty JSON object. Configuration options will be added as their corresponding workflows are introduced:
+
+```json
+{}
+```
+
+Maintainer commands and services can read configuration values with dot notation and optional defaults:
+
+```php
+$level = maintainer_config('quality.phpstan.level', 8);
+$configuration = maintainer_config();
+
+if (maintainer_config_missing()) {
+    // Ask the user to initialize Maintainer.
+}
+```
+
+For dependency-injected code, use `MaintainerConfiguration` directly:
+
+```php
+use App\Support\MaintainerConfiguration;
+
+final readonly class QualityWorkflow
+{
+    public function __construct(
+        private MaintainerConfiguration $configuration,
+    ) {}
+
+    public function run(): void
+    {
+        $level = $this->configuration->get('quality.phpstan.level', 8);
+    }
+}
+```
+
+Configuration values are cached for the lifetime of the process. Call `refresh()` when a workflow changes `maintainer.json` and needs to read the updated values immediately. Missing files are treated as an empty configuration, while invalid JSON raises an exception with an actionable message.
+
 ## Project Integration
 
 Maintainer exports lightweight PHP contracts through the consuming project's Composer autoloader. Project-specific integrations can implement these contracts without loading the Laravel Zero runtime used by the PHAR:
@@ -115,6 +168,10 @@ The compiled application is written to `builds/maintainer`. This PHAR archive is
 ## Contributing
 
 Contributions should include automated tests for observable behavior and keep the documentation synchronized with any new or changed commands.
+
+### Development Conventions
+
+Prefer native PHP attributes whenever the framework or library provides an attribute equivalent to legacy metadata properties or configuration. For example, console commands should use Laravel's `Signature` and `Description` attributes instead of the `$signature` and `$description` properties. Use the legacy form only when no compatible attribute is available.
 
 ## License
 

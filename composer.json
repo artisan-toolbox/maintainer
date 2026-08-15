@@ -30,6 +30,7 @@
         "php": "^8.5"
     },
     "require-dev": {
+        "laravel/ai": "^v0.10.3",
         "laravel-zero/foundation": "^13.23",
         "laravel-zero/framework": "^13.0",
         "laravel/pint": "^1.30.4",
@@ -42,10 +43,14 @@
         }
     },
     "autoload-dev": {
+        "files": [
+            "app/Support/helpers.php"
+        ],
         "psr-4": {
             "App\\Commands\\": "app/Commands/",
             "App\\Foundation\\": "app/Foundation/",
             "App\\Providers\\": "app/Providers/",
+            "App\\Support\\": "app/Support/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
             "Tests\\": "tests/"
