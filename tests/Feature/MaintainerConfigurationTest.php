@@ -47,7 +47,7 @@ it('reads configuration values using dot notation and defaults', function () {
             }
             JSON.PHP_EOL);
 
-        $configuration = app(MaintainerConfiguration::class);
+        $configuration = resolve(MaintainerConfiguration::class);
 
         expect($configuration->configMissing())->toBeFalse()
             ->and($configuration->get('quality.phpstan.level'))->toBe(8)
@@ -60,17 +60,17 @@ it('reads configuration values using dot notation and defaults', function () {
 });
 
 it('uses attributes to enforce its lifecycle and getter usage', function () {
-    $configuration = app(MaintainerConfiguration::class);
+    $configuration = resolve(MaintainerConfiguration::class);
     $reflection = new ReflectionClass(MaintainerConfiguration::class);
 
-    expect(app(MaintainerConfiguration::class))->toBe($configuration)
+    expect(resolve(MaintainerConfiguration::class))->toBe($configuration)
         ->and($reflection->getAttributes(Singleton::class))->toHaveCount(1)
         ->and($reflection->getMethod('get')->getAttributes(NoDiscard::class))->toHaveCount(1);
 });
 
 it('treats a missing configuration file as empty', function () {
     withinTemporaryConfigurationProject(function () {
-        $configuration = app(MaintainerConfiguration::class);
+        $configuration = resolve(MaintainerConfiguration::class);
 
         expect($configuration->configMissing())->toBeTrue()
             ->and($configuration->all())->toBe([])
@@ -84,7 +84,7 @@ it('caches values until the configuration is refreshed', function () {
         $path = $directory.'/maintainer.json';
         $files->put($path, "{\"version\": 1}\n");
 
-        $configuration = app(MaintainerConfiguration::class);
+        $configuration = resolve(MaintainerConfiguration::class);
 
         expect($configuration->get('version'))->toBe(1);
 

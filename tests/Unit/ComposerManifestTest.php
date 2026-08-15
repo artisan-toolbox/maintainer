@@ -8,7 +8,10 @@ it('exports only the public Maintainer namespace to consumers', function () {
     );
 
     expect($manifest['autoload']['psr-4'])
-        ->toBe(['ArtisanToolbox\\Maintainer\\Contracts\\' => 'app/Contracts/'])
+        ->toBe([
+            'ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\' => 'app/Versionable/Contracts/',
+            'ArtisanToolbox\\Maintainer\\Versionable\\Attributes\\' => 'app/Versionable/Attributes/',
+        ])
         ->and($manifest['autoload-dev']['psr-4'])
         ->toHaveKeys([
             'App\\Commands\\',

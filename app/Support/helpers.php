@@ -10,7 +10,7 @@ if (! function_exists('maintainer_config')) {
      */
     function maintainer_config(?string $key = null, mixed $default = null): mixed
     {
-        $configuration = app(MaintainerConfiguration::class);
+        $configuration = resolve(MaintainerConfiguration::class);
 
         return $key === null
             ? $configuration->all()
@@ -24,6 +24,6 @@ if (! function_exists('maintainer_config_missing')) {
      */
     function maintainer_config_missing(): bool
     {
-        return app(MaintainerConfiguration::class)->configMissing();
+        return resolve(MaintainerConfiguration::class)->configMissing();
     }
 }

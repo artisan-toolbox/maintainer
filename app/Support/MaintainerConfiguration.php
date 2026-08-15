@@ -67,9 +67,7 @@ final class MaintainerConfiguration
     {
         $projectRoot = $this->projectPath->root();
 
-        if ($projectRoot === null) {
-            throw new RuntimeException('Unable to locate the project root. Run Maintainer inside a Composer project.');
-        }
+        throw_if($projectRoot === null, RuntimeException::class, 'Unable to locate the project root. Run Maintainer inside a Composer project.');
 
         return $projectRoot.DIRECTORY_SEPARATOR.'maintainer.json';
     }
@@ -96,9 +94,7 @@ final class MaintainerConfiguration
             );
         }
 
-        if (! $decoded instanceof stdClass) {
-            throw new RuntimeException('maintainer.json must contain a JSON object.');
-        }
+        throw_unless($decoded instanceof stdClass, RuntimeException::class, 'maintainer.json must contain a JSON object.');
 
         /** @var array<string, mixed> $configuration */
         $configuration = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
