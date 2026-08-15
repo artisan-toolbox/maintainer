@@ -1,7 +1,7 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "artisan-toolbox/maintainer",
-    "description": "A command-line application for maintaining, validating, and releasing Artisan Toolbox packages.",
+    "description": "Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.",
     "keywords": [
         "artisan-toolbox",
         "automation",
@@ -27,14 +27,14 @@
         }
     ],
     "require": {
-        "php": "^8.3",
+        "php": "^8.5",
         "laravel-zero/foundation": "^13.23",
         "laravel-zero/framework": "^13.0"
     },
     "require-dev": {
         "laravel/pint": "^1.30.4",
         "mockery/mockery": "^1.6.12",
-        "pestphp/pest": "^4.7.8 || ^5.0.3"
+        "pestphp/pest": "^5.0.3"
     },
     "autoload": {
         "psr-4": {

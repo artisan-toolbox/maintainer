@@ -1,22 +1,22 @@
 <div align="center">
-    <h1>Artisan Toolbox Maintainer</h1>
+    <h1>Maintainer</h1>
 </div>
 
 <p align="center">
-    A command-line application for maintaining, validating, and releasing Artisan Toolbox packages.
+    Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.
 </p>
 
 ## About
 
-Artisan Toolbox Maintainer provides a single entry point for the repetitive tasks involved in maintaining the projects in the Artisan Toolbox organization.
+Maintainer provides a single entry point for the repetitive tasks involved in keeping Laravel packages and applications healthy and ready for release.
 
 The application is intended to coordinate tasks such as:
 
 - running automated tests, linters, formatters, and static analysis;
-- validating packages before changes are committed or released;
+- validating projects before changes are committed or released;
 - creating consistent commits, tags, changelogs, and GitHub releases;
 - reducing duplicated maintenance scripts across repositories;
-- providing a predictable release workflow for maintainers.
+- providing predictable local and continuous integration workflows for maintainers.
 
 Maintainer is built with [Laravel Zero](https://laravel-zero.com/), a lightweight framework for console applications.
 
@@ -26,12 +26,12 @@ Maintainer is currently under development. Its commands and public behavior may 
 
 ## Requirements
 
-- PHP 8.3 or later
+- PHP 8.5 or later
 - Composer
 - Git
 - GitHub CLI for workflows that interact with GitHub
 
-Additional tools may be required by the package being validated.
+Additional tools may be required by the package or application being validated.
 
 ## Development
 
@@ -81,4 +81,4 @@ Contributions should include automated tests for observable behavior and keep th
 
 ## License
 
-Artisan Toolbox Maintainer is open-sourced software licensed under the MIT license.
+Maintainer is open-sourced software licensed under the MIT license.
