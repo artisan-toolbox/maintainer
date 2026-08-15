@@ -3,6 +3,11 @@
 </div>
 
 <p align="center">
+    <a href="https://packagist.org/packages/artisan-toolbox/maintainer"><img src="https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square" alt="Packagist"></a>
+    <a href="https://github.com/artisan-toolbox/maintainer/actions"><img alt="GitHub Workflow Status (main)" src="https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=main&label=Tests&style=flat-square"></a>
+</p>
+
+<p align="center">
     Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.
 </p>
 
