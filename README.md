@@ -33,6 +33,43 @@ Maintainer is currently under development. Its commands and public behavior may 
 
 Additional tools may be required by the package or application being validated.
 
+## Installation
+
+Install Maintainer as a development dependency in a Laravel package or application:
+
+```bash
+composer require --dev artisan-toolbox/maintainer
+```
+
+Composer exposes the distributed PHAR archive through its vendor binaries directory:
+
+```bash
+vendor/bin/maintainer list
+```
+
+The PHAR contains Maintainer's runtime dependencies, so they remain isolated from the dependencies of the project being maintained.
+
+## Project Integration
+
+Maintainer exports lightweight PHP contracts through the consuming project's Composer autoloader. Project-specific integrations can implement these contracts without loading the Laravel Zero runtime used by the PHAR:
+
+```php
+<?php
+
+namespace App\Maintainer;
+
+use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+
+final class ApplicationVersion implements Versionable
+{
+    // Project-specific behavior will be defined by the contract.
+}
+```
+
+Contract implementations are designed to run within the consuming project and communicate structured data to the isolated Maintainer process. Objects and framework services will not cross the process boundary. The bridge transport that discovers and invokes implementations will be introduced with the first project operation.
+
+Because Maintainer is normally installed as a development dependency, project integrations should also be development-only. If production code implements a Maintainer contract, install the package as a regular dependency so the interface remains available after `composer install --no-dev`.
+
 ## Development
 
 Clone the repository and install its dependencies:
@@ -70,10 +107,10 @@ vendor/bin/pint
 Maintainer can be compiled as a standalone PHAR with Laravel Zero:
 
 ```bash
-php application app:build
+php application app:build maintainer
 ```
 
-The compiled application is written to the `builds` directory.
+The compiled application is written to `builds/maintainer`. This PHAR archive is the executable distributed through Composer as `vendor/bin/maintainer`.
 
 ## Contributing
 
