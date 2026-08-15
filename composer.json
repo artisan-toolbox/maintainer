@@ -30,16 +30,20 @@
         "php": "^8.5"
     },
     "require-dev": {
+        "deployer/deployer": "^v8.0.5",
+        "driftingly/rector-laravel": "^2.5",
         "laravel/ai": "^v0.10.3",
         "laravel-zero/foundation": "^13.23",
         "laravel-zero/framework": "^13.0",
         "laravel/pint": "^1.30.4",
         "mockery/mockery": "^1.6.12",
-        "pestphp/pest": "^5.0.3"
+        "pestphp/pest": "^5.0.3",
+        "rector/rector": "^2.6.2"
     },
     "autoload": {
         "psr-4": {
-            "ArtisanToolbox\\Maintainer\\Contracts\\": "app/Contracts/"
+            "ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\": "app/Versionable/Contracts/",
+            "ArtisanToolbox\\Maintainer\\Versionable\\Attributes\\": "app/Versionable/Attributes/"
         }
     },
     "autoload-dev": {
