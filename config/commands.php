@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\MaintainerCommand;
 use Illuminate\Console\Scheduling\ScheduleFinishCommand;
 use Illuminate\Console\Scheduling\ScheduleListCommand;
 use Illuminate\Console\Scheduling\ScheduleRunCommand;
@@ -22,7 +23,7 @@ return [
     |
     */
 
-    'default' => SummaryCommand::class,
+    'default' => MaintainerCommand::class,
 
     /*
     |--------------------------------------------------------------------------

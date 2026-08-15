@@ -33,10 +33,11 @@
         "deployer/deployer": "^v8.0.5",
         "driftingly/rector-laravel": "^2.5",
         "larastan/larastan": "^v3.10.0",
-        "laravel/ai": "^v0.10.3",
         "laravel-zero/foundation": "^13.23",
         "laravel-zero/framework": "^13.0",
+        "laravel/ai": "^v0.10.3",
         "laravel/pint": "^1.30.4",
+        "laravel/prompts": "^0.3.22",
         "mockery/mockery": "^1.6.12",
         "pestphp/pest": "^5.0.3",
         "rector/rector": "^2.6.2"

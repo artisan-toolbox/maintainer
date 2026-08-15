@@ -123,6 +123,24 @@ Contract implementations are designed to run within the consuming project and co
 
 Because Maintainer is normally installed as a development dependency, project integrations should also be development-only. If production code implements a Maintainer contract, install the package as a regular dependency so the interface remains available after `composer install --no-dev`.
 
+## Commands
+
+Open the interactive menu:
+
+```bash
+vendor/bin/maintainer
+```
+
+The menu lists the available maintenance workflows. Its first option creates a new GitHub release by running the `release:create` command.
+
+Create a new GitHub release for the project:
+
+```bash
+vendor/bin/maintainer release:create
+```
+
+The GitHub release workflow will be introduced incrementally. The command currently provides the entry point without changing the project version, repository, or GitHub releases.
+
 ## Development
 
 Clone the repository and install its dependencies:
