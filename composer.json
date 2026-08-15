@@ -1,0 +1,64 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "artisan-toolbox/maintainer",
+    "description": "A command-line application for maintaining, validating, and releasing Artisan Toolbox packages.",
+    "keywords": [
+        "artisan-toolbox",
+        "automation",
+        "cli",
+        "github-releases",
+        "laravel",
+        "laravel-zero",
+        "maintenance",
+        "quality-assurance"
+    ],
+    "homepage": "https://github.com/artisan-toolbox/maintainer",
+    "type": "project",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/artisan-toolbox/maintainer/issues",
+        "source": "https://github.com/artisan-toolbox/maintainer"
+    },
+    "authors": [
+        {
+            "name": "Allan Mariucci Carvalho",
+            "email": "allan@wss.group",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "laravel-zero/foundation": "^13.23",
+        "laravel-zero/framework": "^13.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.30.4",
+        "mockery/mockery": "^1.6.12",
+        "pestphp/pest": "^4.7.8 || ^5.0.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "bin": [
+        "application"
+    ]
+}
