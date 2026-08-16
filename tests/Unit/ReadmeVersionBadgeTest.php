@@ -40,5 +40,5 @@ it('does nothing when the versionable class does not request a README badge', fu
     $files = new Filesystem;
     $versionable = new VersionableClass('Example\\Version', '/tmp/Version.php', true, '1.0.0');
 
-    expect((new ReadmeVersionBadge($files))->update('/missing', $versionable, '1.0.1'))->toBeFalse();
+    expect(new ReadmeVersionBadge($files)->update('/missing', $versionable, '1.0.1'))->toBeFalse();
 });

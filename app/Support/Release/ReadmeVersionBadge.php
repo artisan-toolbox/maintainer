@@ -27,9 +27,7 @@ final readonly class ReadmeVersionBadge
             self::END,
         ]);
 
-        if (! $this->files->isFile($path)) {
-            throw new RuntimeException('README.md is required when the versionable class implements WithReadmeBadgeVersion.');
-        }
+        throw_unless($this->files->isFile($path), RuntimeException::class, 'README.md is required when the versionable class implements WithReadmeBadgeVersion.');
 
         $contents = $this->files->get($path);
         $pattern = '/'.preg_quote(self::START, '/').'.*?'.preg_quote(self::END, '/').'/s';

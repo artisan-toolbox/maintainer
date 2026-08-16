@@ -14,7 +14,7 @@ use Tests\TestCase;
 uses(TestCase::class);
 
 it('always delegates model selection to the cheapest model attribute', function () {
-    $attributes = (new ReflectionClass(ReleaseVersionAgent::class))->getAttributes(UseCheapestModel::class);
+    $attributes = new ReflectionClass(ReleaseVersionAgent::class)->getAttributes(UseCheapestModel::class);
 
     expect($attributes)->toHaveCount(1);
 });
@@ -41,7 +41,7 @@ it('returns a typed structured recommendation based on the release diff', functi
             'justification' => 'The diff introduces backward-compatible functionality.',
         ]]);
 
-        $recommendation = (new LaravelAiReleaseVersionRecommender(new GitDiffGenerator))->recommend(
+        $recommendation = new LaravelAiReleaseVersionRecommender(new GitDiffGenerator)->recommend(
             'openai',
             $directory,
             new SemanticVersionNumber(1, 0, 0),
@@ -74,7 +74,7 @@ it('rejects a structured recommendation outside the supported release increments
             'justification' => 'An unsupported recommendation.',
         ]]);
 
-        expect(fn () => (new LaravelAiReleaseVersionRecommender(new GitDiffGenerator))->recommend(
+        expect(fn () => new LaravelAiReleaseVersionRecommender(new GitDiffGenerator)->recommend(
             'openai',
             $directory,
             new SemanticVersionNumber(1, 0, 0),

@@ -296,7 +296,7 @@ PHP
             ->assertFailed();
 
         expect($directory.'/callback-change.txt')->not->toBeFile()
-            ->and((new Process(['git', 'status', '--porcelain'], $directory))->mustRun()->getOutput())->toBe('');
+            ->and(new Process(['git', 'status', '--porcelain'], $directory)->mustRun()->getOutput())->toBe('');
     });
 });
 

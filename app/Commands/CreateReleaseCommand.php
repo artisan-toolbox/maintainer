@@ -167,9 +167,7 @@ final class CreateReleaseCommand extends Command
                 'Would you like to review the proposed release diff in your browser before continuing?',
                 true,
             )) {
-                if ($this->call('diff:html', ['base' => $latestVersion->value()]) !== self::SUCCESS) {
-                    throw new RuntimeException('The proposed release diff could not be opened.');
-                }
+                throw_if($this->call('diff:html', ['base' => $latestVersion->value()]) !== self::SUCCESS, RuntimeException::class, 'The proposed release diff could not be opened.');
 
                 pause('Return to this terminal and press enter to continue the release...');
             }
