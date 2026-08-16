@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -44,4 +46,48 @@ expect()->extend('toBeOne', function () {
 function something(): void
 {
     // ..
+}
+
+function withinTemporaryProject(
+    Closure $callback,
+    string $workingDirectory = '.',
+    bool $exposeComposerProxy = true,
+): void {
+    $files = new Filesystem;
+    $originalWorkingDirectory = getcwd();
+    $temporaryDirectory = sys_get_temp_dir()
+        .DIRECTORY_SEPARATOR.'maintainer-'
+        .Str::uuid();
+    $hadComposerAutoloadPath = array_key_exists('_composer_autoload_path', $GLOBALS);
+    $originalComposerAutoloadPath = $GLOBALS['_composer_autoload_path'] ?? null;
+
+    $files->makeDirectory($temporaryDirectory.'/vendor/bin', recursive: true);
+    $files->put($temporaryDirectory.'/composer.json', "{}\n");
+    $files->put($temporaryDirectory.'/vendor/autoload.php', "<?php\n");
+
+    if ($workingDirectory !== '.') {
+        $files->makeDirectory($temporaryDirectory.'/'.$workingDirectory, recursive: true, force: true);
+    }
+
+    if ($exposeComposerProxy) {
+        $GLOBALS['_composer_autoload_path'] = $temporaryDirectory.'/vendor/autoload.php';
+    } else {
+        unset($GLOBALS['_composer_autoload_path']);
+    }
+
+    chdir($temporaryDirectory.'/'.$workingDirectory);
+
+    try {
+        $callback($temporaryDirectory, $files);
+    } finally {
+        chdir($originalWorkingDirectory);
+
+        if ($hadComposerAutoloadPath) {
+            $GLOBALS['_composer_autoload_path'] = $originalComposerAutoloadPath;
+        } else {
+            unset($GLOBALS['_composer_autoload_path']);
+        }
+
+        $files->deleteDirectory($temporaryDirectory);
+    }
 }

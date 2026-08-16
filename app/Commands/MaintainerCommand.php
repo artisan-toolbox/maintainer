@@ -19,6 +19,7 @@ final class MaintainerCommand extends Command
      * @var array<string, string>
      */
     private const array WORKFLOWS = [
+        'quality' => 'Run Pint, Rector, and PHPStan',
         'release:create' => 'Create a new GitHub release',
         'init' => 'Create the Maintainer configuration file',
         'diff:html' => 'View a Git diff in the browser',
@@ -44,6 +45,7 @@ final class MaintainerCommand extends Command
         );
 
         return match ($command) {
+            'quality' => $this->call('quality'),
             'release:create' => $this->call('release:create'),
             'init' => $this->call('init'),
             'diff:html' => $this->call('diff:html'),

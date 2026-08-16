@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\MaintainerConfiguration;
+use App\Support\Configuration\MaintainerConfiguration;
 
 if (! function_exists('maintainer_config')) {
     /**

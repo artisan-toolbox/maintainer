@@ -18,6 +18,7 @@ it('offers the available maintenance workflows', function () {
     $workflows = new ReflectionClass(MaintainerCommand::class)->getConstant('WORKFLOWS');
 
     expect($workflows)->toBe([
+        'quality' => 'Run Pint, Rector, and PHPStan',
         'release:create' => 'Create a new GitHub release',
         'init' => 'Create the Maintainer configuration file',
         'diff:html' => 'View a Git diff in the browser',

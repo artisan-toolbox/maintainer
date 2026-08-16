@@ -3,10 +3,10 @@
 namespace App\Commands;
 
 use App\Support\BrowserLauncher;
-use App\Support\GitDiffGenerator;
-use App\Support\HtmlDiffOutputFormat;
-use App\Support\HtmlDiffRenderer;
-use App\Support\MaintainerConfiguration;
+use App\Support\Configuration\MaintainerConfiguration;
+use App\Support\Diff\GitDiffGenerator;
+use App\Support\Diff\HtmlDiffOutputFormat;
+use App\Support\Diff\HtmlDiffRenderer;
 use App\Support\ProjectPath;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;

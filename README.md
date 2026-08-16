@@ -98,7 +98,7 @@ if (maintainer_config_missing()) {
 For dependency-injected code, use `MaintainerConfiguration` directly:
 
 ```php
-use App\Support\MaintainerConfiguration;
+use App\Support\Configuration\MaintainerConfiguration;
 
 final readonly class QualityWorkflow
 {
@@ -132,7 +132,7 @@ final class ApplicationVersion implements Versionable
 }
 ```
 
-The version class must live directly in one of the production PSR-4 namespaces declared under `autoload.psr-4` in the project's `composer.json` and declare a public, string-typed `VERSION` constant. Classes in nested namespaces and development-only PSR-4 mappings are not considered.
+The version class must live directly in one of the production PSR-4 namespaces declared under `autoload.psr-4` in the project's `composer.json`. Declaring `public const string VERSION` is optional: Maintainer creates it when absent and updates it when present. Existing constants must be public, string-typed, and use `MAJOR.MINOR.PATCH`, optionally followed by `-alpha`, `-alpha.N`, `-beta`, or `-beta.N`. Other formats, including `v` prefixes, release candidates, build metadata, missing components, and leading zeros, are rejected. Classes in nested namespaces and development-only PSR-4 mappings are not considered.
 
 Contract implementations are designed to run within the consuming project and communicate structured data to the isolated Maintainer process. Objects and framework services will not cross the process boundary.
 
@@ -150,7 +150,27 @@ The menu lists the available maintenance workflows. It can create the Maintainer
 
 The interactive menu displays a Maintainer ASCII art banner before presenting the available workflows.
 
-The menu requires interactive input. In non-interactive environments, run `release:create` directly to create a GitHub release or `init` to create the configuration file.
+The menu requires interactive input. Run `release:create` directly to create a GitHub release or `init` to create the configuration file. Version selection in `release:create` is also interactive.
+
+### Code quality
+
+Run Pint, Rector, and PHPStan in sequence:
+
+```bash
+vendor/bin/maintainer quality
+```
+
+Maintainer always runs the binaries installed by the consuming project and explicitly passes that project's configuration file to each tool. It recognizes `pint.json`, `rector.php`, and the standard `phpstan.neon`, `phpstan.neon.dist`, or `phpstan.dist.neon` filenames. The isolated dependencies bundled in the Maintainer PHAR are never used to analyze or modify the consuming project.
+
+Install the tools in the project before running the workflow. The exact constraints should follow the PHP and Laravel versions supported by that project:
+
+```bash
+composer require --dev laravel/pint rector/rector driftingly/rector-laravel larastan/larastan
+```
+
+When a configuration is missing, an interactive run offers to create a recommended template. Pint uses a shared Laravel preset. Rector and PHPStan ask whether the project is a Laravel application or Laravel package because their analyzed paths differ. Maintainer suggests the project type inferred from `composer.json`, but the selection remains explicit. Existing files are never overwritten.
+
+In non-interactive and continuous integration environments, missing configuration stops the workflow and explains which file must be added. This keeps CI deterministic and prevents Maintainer from silently introducing configuration. The workflow also stops at the first tool that fails and returns that tool's exit code.
 
 ### HTML Git diffs
 
@@ -193,9 +213,23 @@ Create a new GitHub release for the project:
 vendor/bin/maintainer release:create
 ```
 
-The command requires a completely clean Git working tree and a class directly in a production PSR-4 namespace that implements `ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable` and declares `public const string VERSION` before starting a GitHub release. Commit or discard every staged, unstaged, and untracked change before running it. The remaining GitHub release workflow will be introduced incrementally; the command does not change the project version, repository, or GitHub releases yet.
+The command requires a completely clean Git working tree and a class directly in a production PSR-4 namespace that implements `ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable` before starting a GitHub release. Its version constant is created when absent; an existing constant must be public, string-typed, and contain a supported semantic version. Commit or discard every staged, unstaged, and untracked change before running it.
+
+Releases must run from a major branch named `1.x`, `2.x`, and so on. The branch determines the release major; other branch names and detached HEAD states abort the workflow. Maintainer retrieves every published GitHub release through the authenticated GitHub CLI, ignores drafts and unsupported tags, then selects the highest valid version for the branch major. If that major has no valid GitHub release, its initial choices are `MAJOR.0.0`, `MAJOR.0.0-alpha.1`, and `MAJOR.0.0-beta.1`.
+
+The interactive version menu follows these transitions:
+
+- A stable release may advance to the next patch, the next stable minor, the next minor alpha, or the next minor beta.
+- An alpha release may advance to the next alpha, the first beta, or the stable version with the same major, minor, and patch.
+- A beta release may advance to the next beta or the stable version with the same major, minor, and patch.
+- Alpha and beta flows cannot create another patch or minor until their current version becomes stable.
+- Major increments are never offered. Start the new major from its matching `MAJOR.x` branch.
+
+Version selection requires an interactive terminal. After selection, Maintainer writes the selected version to the implementation's `VERSION` constant, creating the declaration when necessary. The command does not create commits, tags, or GitHub releases yet; those operations will be introduced incrementally.
 
 ## Development
+
+Internal support services are grouped by responsibility under `app/Support`: configuration loading, diff generation, Git inspection, and GitHub release/version workflows live in the `Configuration`, `Diff`, `Git`, and `Release` namespaces respectively. Standalone utilities remain at the support root until they have related services.
 
 Clone the repository and install its dependencies:
 

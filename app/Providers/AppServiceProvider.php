@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Support\Release\GitHubCliReleaseSource;
+use App\Support\Release\GitHubReleaseSource;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +21,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(GitHubReleaseSource::class, GitHubCliReleaseSource::class);
     }
 }

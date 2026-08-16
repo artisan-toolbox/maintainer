@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\MaintainerConfiguration;
+use App\Support\Configuration\MaintainerConfiguration;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;

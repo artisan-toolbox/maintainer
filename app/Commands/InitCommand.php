@@ -2,7 +2,7 @@
 
 namespace App\Commands;
 
-use App\Support\DefaultMaintainerConfiguration;
+use App\Support\Configuration\DefaultMaintainerConfiguration;
 use App\Support\ProjectPath;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;

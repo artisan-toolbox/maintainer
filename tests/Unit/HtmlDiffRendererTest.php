@@ -1,7 +1,7 @@
 <?php
 
-use App\Support\HtmlDiffOutputFormat;
-use App\Support\HtmlDiffRenderer;
+use App\Support\Diff\HtmlDiffOutputFormat;
+use App\Support\Diff\HtmlDiffRenderer;
 
 it('renders a Git diff with pinned diff2html assets', function () {
     $diff = <<<'DIFF'
