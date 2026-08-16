@@ -20,9 +20,9 @@ final class ReleaseBranch
 
         $branch = trim($process->getOutput());
 
-        throw_if(preg_match('/^(?<major>[1-9]\d*)\.x$/', $branch, $matches) !== 1, RuntimeException::class, $branch === ''
-            ? 'A release cannot be created from a detached HEAD. Check out a branch such as 1.x or 2.x.'
-            : "The branch {$branch} is not a release branch. Use a branch such as 1.x or 2.x.");
+        throw_if(preg_match('/^(?<major>0|[1-9]\d*)\.x$/', $branch, $matches) !== 1, RuntimeException::class, $branch === ''
+            ? 'A release cannot be created from a detached HEAD. Check out a branch such as 0.x, 1.x, or 2.x.'
+            : "The branch {$branch} is not a release branch. Use a branch such as 0.x, 1.x, or 2.x.");
 
         return (int) $matches['major'];
     }

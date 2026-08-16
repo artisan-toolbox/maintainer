@@ -7,6 +7,7 @@ use App\Support\BrowserLauncher;
 use App\Support\Release\GitCliReleaseRepository;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
+use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
@@ -15,6 +16,7 @@ use Symfony\Component\Process\Process;
 use Tests\Fakes\FakeBrowserLauncher;
 use Tests\Fakes\FakeGitHubReleasePublisher;
 use Tests\Fakes\FakeGitHubReleaseSource;
+use Tests\Fakes\FakeReleaseDiffReviewer;
 use Tests\Fakes\FakeReleaseGitRepository;
 
 /**
@@ -90,6 +92,9 @@ JSON
     app()->instance(FakeReleaseGitRepository::class, $git);
     app()->instance(GitHubReleasePublisher::class, $publisher);
     app()->instance(FakeGitHubReleasePublisher::class, $publisher);
+    $diffReviewer = new FakeReleaseDiffReviewer;
+    app()->instance(ReleaseDiffReviewer::class, $diffReviewer);
+    app()->instance(FakeReleaseDiffReviewer::class, $diffReviewer);
     $browser = new FakeBrowserLauncher;
     app()->instance(BrowserLauncher::class, $browser);
     app()->instance(FakeBrowserLauncher::class, $browser);
@@ -159,6 +164,20 @@ it('continues when the Git working tree is clean', function () {
     });
 });
 
+it('opens the proposed diff and waits for the user when review is requested', function () {
+    withinTemporaryReleaseProject(function (): void {
+        $reviewer = resolve(FakeReleaseDiffReviewer::class);
+        $reviewer->review = true;
+
+        $this->artisan('release:create')->assertSuccessful();
+
+        expect(resolve(FakeBrowserLauncher::class)->opened)
+            ->not->toBeNull()
+            ->toEndWith('.html')
+            ->and($reviewer->waited)->toBeTrue();
+    });
+});
+
 it('uses the structured AI recommendation as the default for a stable release', function () {
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
         $files->put($directory.'/maintainer_secrets.json', <<<'JSON'
@@ -175,7 +194,6 @@ JSON
             'release_increment' => 'minor',
             'justification' => 'The diff adds a backward-compatible public command option.',
         ]]);
-
         $this->artisan('release:create')
             ->expectsOutputToContain('AI recommendation')
             ->expectsOutputToContain('1.1.0')
@@ -192,7 +210,6 @@ it('does not ask AI for a release recommendation during a prerelease flow', func
         resolve(FakeGitHubReleaseSource::class)->releases = ['1.1.0-beta.1'];
         new Process(['git', 'tag', '1.1.0-beta.1'], getcwd())->mustRun();
         ReleaseVersionAgent::fake()->preventStrayPrompts();
-
         $this->artisan('release:create')
             ->assertSuccessful();
 
@@ -235,7 +252,6 @@ PHP
         );
         new Process(['git', 'add', '--all'], $directory)->mustRun();
         new Process(['git', 'commit', '-m', 'Add versioning lifecycle'], $directory)->mustRun();
-
         $this->artisan('release:create')
             ->expectsOutputToContain('Before versioning')
             ->expectsOutputToContain('After versioning')
@@ -399,7 +415,6 @@ PHP
         );
         new Process(['git', 'add', '--all'], $directory)->mustRun();
         new Process(['git', 'commit', '-m', 'Remove version constant'], $directory)->mustRun();
-
         $this->artisan('release:create')
             ->expectsOutputToContain('Current version')
             ->expectsOutputToContain('Version file')
@@ -427,7 +442,6 @@ PHP
         );
         new Process(['git', 'add', '--all'], $directory)->mustRun();
         new Process(['git', 'commit', '-m', 'Add incomplete version class'], $directory)->mustRun();
-
         $this->artisan('release:create')
             ->assertSuccessful();
     });
@@ -467,6 +481,25 @@ it('rejects a branch outside the major release pattern', function () {
     });
 });
 
+it('supports the SemVer initial-development lifecycle on a zero-major branch', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        new Process(['git', 'branch', '-m', '0.x'], $directory)->mustRun();
+        resolve(FakeGitHubReleaseSource::class)->releases = [];
+        $this->artisan('release:create')
+            ->expectsOutputToContain('Release branch')
+            ->expectsOutputToContain('Selected version')
+            ->assertSuccessful();
+
+        expect($files->get($directory.'/src/ProjectVersion.php'))
+            ->toContain("public const string VERSION = '0.0.0';")
+            ->and(resolve(FakeGitHubReleasePublisher::class)->published)->toMatchArray([
+                'version' => '0.0.0',
+                'target' => '0.x',
+                'prerelease' => false,
+            ]);
+    });
+});
+
 it('starts a major at zero when GitHub has no valid release for the branch', function () {
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
         resolve(FakeGitHubReleaseSource::class)->releases = [];
@@ -476,7 +509,6 @@ it('starts a major at zero when GitHub has no valid release for the branch', fun
         );
         new Process(['git', 'add', '--all'], $directory)->mustRun();
         new Process(['git', 'commit', '-m', 'Remove initial version'], $directory)->mustRun();
-
         $this->artisan('release:create')
             ->expectsOutputToContain('No valid release found')
             ->assertSuccessful();

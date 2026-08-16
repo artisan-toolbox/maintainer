@@ -57,13 +57,13 @@ final readonly class ChangelogWriter
         $body = str_starts_with($existing, $heading)
             ? ltrim(substr($existing, strlen($heading)))
             : $existing;
-        $contents = $heading.PHP_EOL.PHP_EOL.implode(PHP_EOL, $section);
+        $contents = $heading."\n\n".implode("\n", $section);
 
         if ($body !== '') {
-            $contents .= PHP_EOL.PHP_EOL.$body;
+            $contents .= "\n\n".$body;
         }
 
-        $this->files->put($path, $contents.PHP_EOL);
+        $this->files->put($path, $contents."\n");
 
         return $path;
     }

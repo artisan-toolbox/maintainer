@@ -14,6 +14,7 @@ use App\Support\Release\ChangelogWriter;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\LatestGitHubRelease;
 use App\Support\Release\ReadmeVersionBadge;
+use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
 use App\Support\Release\ReleaseVersionOptions;
 use App\Support\Release\SemanticVersion;
@@ -28,8 +29,6 @@ use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 use Throwable;
 
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\pause;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
 
@@ -58,6 +57,7 @@ final class CreateReleaseCommand extends Command
         ReleaseChangelogGenerator $changelogGenerator,
         ChangelogWriter $changelogWriter,
         GitHubReleasePublisher $publisher,
+        ReleaseDiffReviewer $diffReviewer,
     ): int {
         $projectRoot = $projectPath->root();
 
@@ -163,13 +163,10 @@ final class CreateReleaseCommand extends Command
 
             $git->stageAll($projectRoot);
 
-            if ($latestVersion !== null && confirm(
-                'Would you like to review the proposed release diff in your browser before continuing?',
-                true,
-            )) {
+            if ($latestVersion !== null && $diffReviewer->shouldReview()) {
                 throw_if($this->call('diff:html', ['base' => $latestVersion->value()]) !== self::SUCCESS, RuntimeException::class, 'The proposed release diff could not be opened.');
 
-                pause('Return to this terminal and press enter to continue the release...');
+                $diffReviewer->waitForReturn();
             }
 
             $commit = spin(

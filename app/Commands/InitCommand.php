@@ -79,10 +79,12 @@ final class InitCommand extends Command
             return true;
         }
 
+        $lineEnding = str_contains($contents, "\r\n") ? "\r\n" : "\n";
+
         if ($contents !== '' && ! str_ends_with($contents, "\n") && ! str_ends_with($contents, "\r")) {
-            $contents .= PHP_EOL;
+            $contents .= $lineEnding;
         }
 
-        return $files->put($path, $contents.'maintainer_secrets.json'.PHP_EOL) !== false;
+        return $files->put($path, $contents.'maintainer_secrets.json'.$lineEnding) !== false;
     }
 }

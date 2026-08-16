@@ -13,19 +13,19 @@ it('creates a configuration file in the current project', function () {
 
         expect(json_decode($configuration, true))
             ->toBe(defaultMaintainerConfigurationFixture())
-            ->and($configuration)->toContain(implode(PHP_EOL, [
+            ->and($configuration)->toContain(implode("\n", [
                 '{',
                 '    "ai": {',
                 '        "providers": {',
             ]))
             ->and($directory.'/maintainer_secrets.json')->toBeFile()
-            ->and($secrets)->toContain(implode(PHP_EOL, [
+            ->and($secrets)->toContain(implode("\n", [
                 '{',
                 '    "ai_providers": {',
                 '        "anthropic": {',
             ]))
             ->and(file_get_contents($directory.'/.gitignore'))
-            ->toBe('maintainer_secrets.json'.PHP_EOL);
+            ->toBe("maintainer_secrets.json\n");
     });
 });
 
@@ -96,7 +96,7 @@ it('adds the secrets file to an existing gitignore only once', function () {
         $this->artisan('init')->assertSuccessful();
         $this->artisan('init', ['--force' => true])->assertSuccessful();
 
-        expect($files->get($directory.'/.gitignore'))->toBe(implode(PHP_EOL, [
+        expect($files->get($directory.'/.gitignore'))->toBe(implode("\n", [
             '/vendor',
             'maintainer_secrets.json',
             '',

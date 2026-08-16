@@ -5,8 +5,12 @@ use Illuminate\Filesystem\Filesystem;
 function installFakeQualityBinaries(string $directory, Filesystem $files): void
 {
     foreach (['pint', 'rector', 'phpstan', 'pest'] as $binary) {
-        $path = $directory.'/vendor/bin/'.$binary;
-        $files->put($path, "#!/bin/sh\nprintf '%s %s\\n' '".$binary."' \"\$*\" >> '".$directory."/quality.log'\n");
+        $windows = PHP_OS_FAMILY === 'Windows';
+        $path = $directory.'/vendor/bin/'.$binary.($windows ? '.bat' : '');
+        $script = $windows
+            ? "@echo off\r\necho {$binary} %*>>\"{$directory}/quality.log\"\r\n"
+            : "#!/bin/sh\nprintf '%s %s\\n' '".$binary."' \"\$*\" >> '".$directory."/quality.log'\n";
+        $files->put($path, $script);
         chmod($path, 0755);
     }
 }

@@ -25,7 +25,7 @@ final class JsonTemplateFormatter
             return json_encode(
                 $decoded,
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
-            ).PHP_EOL;
+            )."\n";
         } catch (JsonException $exception) {
             throw new RuntimeException(
                 "The default {$name} could not be formatted: {$exception->getMessage()}",

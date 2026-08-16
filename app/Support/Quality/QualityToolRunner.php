@@ -26,6 +26,10 @@ final readonly class QualityToolRunner
             .DIRECTORY_SEPARATOR.'bin'
             .DIRECTORY_SEPARATOR.$tool->binaryFilename();
 
+        if (PHP_OS_FAMILY === 'Windows' && is_file($binary.'.bat')) {
+            $binary .= '.bat';
+        }
+
         throw_unless(
             is_file($binary),
             RuntimeException::class,

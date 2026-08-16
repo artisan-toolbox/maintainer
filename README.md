@@ -277,7 +277,7 @@ vendor/bin/maintainer release:create
 
 The command requires a completely clean Git working tree and a class directly in a production PSR-4 namespace that implements `ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable` before starting a GitHub release. Its version constant is created when absent; an existing constant must be public, string-typed, and contain a supported semantic version. Commit or discard every staged, unstaged, and untracked change before running it.
 
-Releases must run from a major branch named `1.x`, `2.x`, and so on. The branch determines the release major; other branch names and detached HEAD states abort the workflow. Maintainer retrieves every published GitHub release through the authenticated GitHub CLI, ignores drafts and unsupported tags, then selects the highest valid version for the branch major. If that major has no valid GitHub release, its initial choices are `MAJOR.0.0`, `MAJOR.0.0-alpha.1`, and `MAJOR.0.0-beta.1`.
+Releases must run from a major branch named `0.x`, `1.x`, `2.x`, and so on. The branch determines the release major; `0.x` is supported for SemVer's initial-development lifecycle. Other branch names and detached HEAD states abort the workflow. Maintainer retrieves every published GitHub release through the authenticated GitHub CLI, ignores drafts and unsupported tags, then selects the highest valid version for the branch major. If that major has no valid GitHub release, its initial choices are `MAJOR.0.0`, `MAJOR.0.0-alpha.1`, and `MAJOR.0.0-beta.1`.
 
 The interactive version menu follows these transitions:
 
