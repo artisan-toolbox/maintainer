@@ -1,4 +1,11 @@
 {
+    "ai": {
+        "providers": {
+            "commit_message": "openai",
+            "release_notes": "openai",
+            "release_changelog_update": "openai"
+        }
+    },
     "git": {
         "diff": {
             "output_format": "line_by_line"

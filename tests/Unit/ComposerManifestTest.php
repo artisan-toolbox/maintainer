@@ -14,6 +14,7 @@ it('exports only the public Maintainer namespace to consumers', function () {
         ])
         ->and($manifest['autoload-dev']['psr-4'])
         ->toHaveKeys([
+            'App\\Ai\\',
             'App\\Commands\\',
             'App\\Foundation\\',
             'App\\Providers\\',
@@ -33,5 +34,6 @@ it('packages the default Maintainer configuration in the PHAR', function () {
     );
 
     expect($boxManifest['directories'])->toContain('resources')
-        ->and(dirname(__DIR__, 2).'/resources/maintainer.json')->toBeFile();
+        ->and(dirname(__DIR__, 2).'/resources/maintainer.json')->toBeFile()
+        ->and(dirname(__DIR__, 2).'/resources/maintainer_secrets.json')->toBeFile();
 });

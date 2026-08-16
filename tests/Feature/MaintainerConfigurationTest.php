@@ -72,13 +72,7 @@ it('uses attributes to enforce its lifecycle and getter usage', function () {
 it('uses the default configuration when the project file is missing', function () {
     withinTemporaryConfigurationProject(function () {
         $configuration = resolve(MaintainerConfiguration::class);
-        $defaults = [
-            'git' => [
-                'diff' => [
-                    'output_format' => 'line_by_line',
-                ],
-            ],
-        ];
+        $defaults = defaultMaintainerConfigurationFixture();
 
         expect($configuration->configMissing())->toBeTrue()
             ->and($configuration->all())->toBe($defaults)
@@ -117,6 +111,13 @@ it('caches values until the configuration is refreshed', function () {
 
         expect($configuration->get('version'))->toBe(1)
             ->and($configuration->refresh())->toBe([
+                'ai' => [
+                    'providers' => [
+                        'commit_message' => 'openai',
+                        'release_notes' => 'openai',
+                        'release_changelog_update' => 'openai',
+                    ],
+                ],
                 'git' => [
                     'diff' => [
                         'output_format' => 'line_by_line',

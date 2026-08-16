@@ -5,16 +5,14 @@ use Illuminate\Filesystem\Filesystem;
 it('creates a configuration file in the current project', function () {
     withinTemporaryProject(function (string $directory) {
         $this->artisan('init')
-            ->expectsOutputToContain('Created maintainer.json.')
+            ->expectsOutputToContain('Created Maintainer configuration and protected its secrets file.')
             ->assertSuccessful();
 
-        expect(json_decode(file_get_contents($directory.'/maintainer.json'), true))->toBe([
-            'git' => [
-                'diff' => [
-                    'output_format' => 'line_by_line',
-                ],
-            ],
-        ]);
+        expect(json_decode(file_get_contents($directory.'/maintainer.json'), true))
+            ->toBe(defaultMaintainerConfigurationFixture())
+            ->and($directory.'/maintainer_secrets.json')->toBeFile()
+            ->and(file_get_contents($directory.'/.gitignore'))
+            ->toBe('maintainer_secrets.json'.PHP_EOL);
     });
 });
 
@@ -66,16 +64,56 @@ it('overwrites an existing configuration file when forced', function () {
         $path = $directory.'/maintainer.json';
         $files->put($path, "{\n    \"existing\": true\n}\n");
 
+        $secretsPath = $directory.'/maintainer_secrets.json';
+        $files->put($secretsPath, "{\"ai_providers\": {\"openai\": {\"key\": \"keep-me\"}}}\n");
+
         $this->artisan('init', ['--force' => true])
-            ->expectsOutputToContain('Created maintainer.json.')
+            ->expectsOutputToContain('maintainer_secrets.json already exists and was not overwritten.')
             ->assertSuccessful();
 
-        expect(json_decode($files->get($path), true))->toBe([
-            'git' => [
-                'diff' => [
-                    'output_format' => 'line_by_line',
-                ],
-            ],
+        expect(json_decode($files->get($path), true))->toBe(defaultMaintainerConfigurationFixture())
+            ->and($files->get($secretsPath))->toContain('keep-me');
+    });
+});
+
+it('adds the secrets file to an existing gitignore only once', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        $files->put($directory.'/.gitignore', "/vendor\n");
+
+        $this->artisan('init')->assertSuccessful();
+        $this->artisan('init', ['--force' => true])->assertSuccessful();
+
+        expect($files->get($directory.'/.gitignore'))->toBe(implode(PHP_EOL, [
+            '/vendor',
+            'maintainer_secrets.json',
+            '',
+        ]));
+    });
+});
+
+it('publishes every Laravel AI provider in the secrets template', function () {
+    withinTemporaryProject(function (string $directory) {
+        $this->artisan('init')->assertSuccessful();
+
+        $secrets = json_decode(file_get_contents($directory.'/maintainer_secrets.json'), true);
+
+        expect(array_keys($secrets['ai_providers']))->toBe([
+            'anthropic',
+            'azure',
+            'bedrock',
+            'cohere',
+            'deepseek',
+            'eleven',
+            'gemini',
+            'groq',
+            'jina',
+            'mistral',
+            'ollama',
+            'openai',
+            'openai-compatible',
+            'openrouter',
+            'voyageai',
+            'xai',
         ]);
     });
 });

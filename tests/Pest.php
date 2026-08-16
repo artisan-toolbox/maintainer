@@ -48,6 +48,27 @@ function something(): void
     // ..
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function defaultMaintainerConfigurationFixture(): array
+{
+    return [
+        'ai' => [
+            'providers' => [
+                'commit_message' => 'openai',
+                'release_notes' => 'openai',
+                'release_changelog_update' => 'openai',
+            ],
+        ],
+        'git' => [
+            'diff' => [
+                'output_format' => 'line_by_line',
+            ],
+        ],
+    ];
+}
+
 function withinTemporaryProject(
     Closure $callback,
     string $workingDirectory = '.',
