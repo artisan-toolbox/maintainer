@@ -27,7 +27,7 @@ PHP
     );
 
     try {
-        (new VersionableVersionWriter($files))->write(
+        new VersionableVersionWriter($files)->write(
             new VersionableClass('Fixture\ProjectVersion', $path, false, null),
             '2.0.0-alpha.1',
         );
@@ -59,7 +59,7 @@ PHP
     );
 
     try {
-        (new VersionableVersionWriter($files))->write(
+        new VersionableVersionWriter($files)->write(
             new VersionableClass('Fixture\ProjectVersion', $path, true, '1.0.0'),
             '1.1.0',
         );

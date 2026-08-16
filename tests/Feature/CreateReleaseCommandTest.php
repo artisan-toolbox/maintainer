@@ -251,8 +251,8 @@ final class ProjectVersion implements Versionable
 }
 PHP
         );
-        (new Process(['git', 'add', '--all'], $directory))->mustRun();
-        (new Process(['git', 'commit', '-m', 'Use unsupported prerelease'], $directory))->mustRun();
+        new Process(['git', 'add', '--all'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Use unsupported prerelease'], $directory)->mustRun();
 
         $this->artisan('release:create')
             ->expectsOutputToContain('VERSION must use MAJOR.MINOR.PATCH with an optional alpha or beta prerelease.')
@@ -272,7 +272,7 @@ it('rejects a branch outside the major release pattern', function () {
 
 it('starts a major at zero when GitHub has no valid release for the branch', function () {
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
-        app(FakeGitHubReleaseSource::class)->releases = [];
+        resolve(FakeGitHubReleaseSource::class)->releases = [];
         $files->put(
             $directory.'/src/ProjectVersion.php',
             str_replace("    public const string VERSION = '1.0.0';\n", '', $files->get($directory.'/src/ProjectVersion.php')),

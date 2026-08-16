@@ -14,8 +14,7 @@ final readonly class DefaultMaintainerConfiguration
     public function __construct(
         private Filesystem $files,
         private JsonTemplateFormatter $formatter,
-    ) {
-    }
+    ) {}
 
     /**
      * Return the default configuration as distributed with Maintainer.

@@ -34,7 +34,7 @@ PHP
     );
 
     try {
-        $versionable = (new VersionableImplementation($files))->find($directory);
+        $versionable = new VersionableImplementation($files)->find($directory);
 
         expect($versionable)
             ->not->toBeNull()

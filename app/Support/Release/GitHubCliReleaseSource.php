@@ -7,12 +7,12 @@ use JsonException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
-final class GitHubCliReleaseSource implements GitHubReleaseSource
+final readonly class GitHubCliReleaseSource implements GitHubReleaseSource
 {
     /**
      * @param  (Closure(list<string>, string): Process)|null  $processFactory
      */
-    public function __construct(private readonly ?Closure $processFactory = null) {}
+    public function __construct(private ?Closure $processFactory = null) {}
 
     /**
      * @return list<string>
@@ -44,9 +44,7 @@ final class GitHubCliReleaseSource implements GitHubReleaseSource
             throw new RuntimeException('GitHub CLI returned invalid release data.', previous: $exception);
         }
 
-        if (! is_array($pages)) {
-            throw new RuntimeException('GitHub CLI returned an unexpected release response.');
-        }
+        throw_unless(is_array($pages), RuntimeException::class, 'GitHub CLI returned an unexpected release response.');
 
         $versions = [];
 
