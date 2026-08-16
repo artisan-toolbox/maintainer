@@ -28,13 +28,20 @@ it('runs project binaries with each existing project configuration', function ()
             ->assertSuccessful();
 
         $resolvedDirectory = realpath($directory);
+        assert(is_string($resolvedDirectory));
+        $normalizedDirectory = str_replace('\\', '/', $resolvedDirectory);
+        $qualityLog = str_replace(
+            ["\r\n", '\\', '"'],
+            ["\n", '/', ''],
+            $files->get($directory.'/quality.log'),
+        );
 
         expect($resolvedDirectory)->not->toBeFalse()
-            ->and($files->get($directory.'/quality.log'))->toBe(implode("\n", [
-                "pint --config {$resolvedDirectory}/pint.json",
-                "rector process --config {$resolvedDirectory}/rector.php",
-                "phpstan analyse --configuration {$resolvedDirectory}/phpstan.neon.dist --memory-limit=2G",
-                "pest --configuration {$resolvedDirectory}/phpunit.xml.dist",
+            ->and($qualityLog)->toBe(implode("\n", [
+                "pint --config {$normalizedDirectory}/pint.json",
+                "rector process --config {$normalizedDirectory}/rector.php",
+                "phpstan analyse --configuration {$normalizedDirectory}/phpstan.neon.dist --memory-limit=2G",
+                "pest --configuration {$normalizedDirectory}/phpunit.xml.dist",
                 '',
             ]));
     });
@@ -101,10 +108,17 @@ it('passes a project-specific memory limit to PHPStan', function () {
         $this->artisan('quality', ['--no-interaction' => true])->assertSuccessful();
 
         $resolvedDirectory = realpath($directory);
+        assert(is_string($resolvedDirectory));
+        $normalizedDirectory = str_replace('\\', '/', $resolvedDirectory);
+        $qualityLog = str_replace(
+            ['\\', '"'],
+            ['/', ''],
+            $files->get($directory.'/quality.log'),
+        );
 
         expect($resolvedDirectory)->not->toBeFalse();
-        expect($files->get($directory.'/quality.log'))
-            ->toContain('phpstan analyse --configuration '.$resolvedDirectory.'/phpstan.neon --memory-limit=4G');
+        expect($qualityLog)
+            ->toContain('phpstan analyse --configuration '.$normalizedDirectory.'/phpstan.neon --memory-limit=4G');
     });
 });
 
