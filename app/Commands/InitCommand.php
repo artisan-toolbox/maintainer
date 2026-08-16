@@ -24,7 +24,7 @@ final class InitCommand extends Command
         $projectRoot = $projectPath->root();
 
         if ($projectRoot === null) {
-            $this->error('Unable to locate the project root. Run Maintainer inside a Composer project.');
+            $this->components->error('Unable to locate the project root. Run Maintainer inside a Composer project.');
 
             return self::FAILURE;
         }
@@ -32,18 +32,18 @@ final class InitCommand extends Command
         $path = $projectRoot.DIRECTORY_SEPARATOR.'maintainer.json';
 
         if ($files->exists($path) && ! $this->option('force')) {
-            $this->error('maintainer.json already exists. Use --force to overwrite it.');
+            $this->components->error('maintainer.json already exists. Use --force to overwrite it.');
 
             return self::FAILURE;
         }
 
         if ($files->put($path, $defaults->contents()) === false) {
-            $this->error('Unable to write maintainer.json.');
+            $this->components->error('Unable to write maintainer.json.');
 
             return self::FAILURE;
         }
 
-        $this->info('Created maintainer.json.');
+        $this->components->success('Created maintainer.json.');
 
         return self::SUCCESS;
     }

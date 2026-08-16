@@ -122,17 +122,19 @@ Maintainer exports lightweight PHP contracts through the consuming project's Com
 ```php
 <?php
 
-namespace App\Maintainer;
+namespace App;
 
 use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
 
 final class ApplicationVersion implements Versionable
 {
-    // Project-specific behavior will be defined by the contract.
+    public const string VERSION = '1.0.0';
 }
 ```
 
-Contract implementations are designed to run within the consuming project and communicate structured data to the isolated Maintainer process. Objects and framework services will not cross the process boundary. The bridge transport that discovers and invokes implementations will be introduced with the first project operation.
+The version class must live directly in one of the production PSR-4 namespaces declared under `autoload.psr-4` in the project's `composer.json` and declare a public, string-typed `VERSION` constant. Classes in nested namespaces and development-only PSR-4 mappings are not considered.
+
+Contract implementations are designed to run within the consuming project and communicate structured data to the isolated Maintainer process. Objects and framework services will not cross the process boundary.
 
 Because Maintainer is normally installed as a development dependency, project integrations should also be development-only. If production code implements a Maintainer contract, install the package as a regular dependency so the interface remains available after `composer install --no-dev`.
 
@@ -191,7 +193,7 @@ Create a new GitHub release for the project:
 vendor/bin/maintainer release:create
 ```
 
-The GitHub release workflow will be introduced incrementally. The command currently provides the entry point without changing the project version, repository, or GitHub releases.
+The command requires a completely clean Git working tree and a class directly in a production PSR-4 namespace that implements `ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable` and declares `public const string VERSION` before starting a GitHub release. Commit or discard every staged, unstaged, and untracked change before running it. The remaining GitHub release workflow will be introduced incrementally; the command does not change the project version, repository, or GitHub releases yet.
 
 ## Development
 

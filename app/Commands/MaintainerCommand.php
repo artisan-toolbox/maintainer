@@ -8,6 +8,7 @@ use Illuminate\Console\Attributes\Signature;
 use LaravelZero\Framework\Commands\Command;
 use LogicException;
 
+use function Laravel\Prompts\info;
 use function Laravel\Prompts\select;
 
 #[Signature('maintainer')]
@@ -29,14 +30,12 @@ final class MaintainerCommand extends Command
     public function handle(MaintainerBanner $banner): int
     {
         if (! $this->input->isInteractive()) {
-            $this->error('The maintainer command requires interactive input. Run release:create for a GitHub release or init to create the configuration file.');
+            $this->components->error('The maintainer command requires interactive input. Run release:create for a GitHub release or init to create the configuration file.');
 
             return self::FAILURE;
         }
 
-        $this->newLine();
-        $this->line($banner->render());
-        $this->newLine();
+        info($banner->render());
 
         $command = select(
             label: 'Which workflow would you like to run?',

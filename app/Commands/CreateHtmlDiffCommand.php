@@ -15,6 +15,8 @@ use JsonException;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 
+use function Laravel\Prompts\spin;
+
 #[Signature('diff:html {base=HEAD : Base Git commit or reference} {target? : Target Git commit or reference; omit to compare with the working tree} {--output= : Path for the generated HTML file} {--no-open : Generate the HTML file without opening the browser}')]
 #[Description('Generate an HTML Git diff and open it in the browser')]
 final class CreateHtmlDiffCommand extends Command
@@ -33,7 +35,7 @@ final class CreateHtmlDiffCommand extends Command
         $projectRoot = $projectPath->root();
 
         if ($projectRoot === null) {
-            $this->error('Unable to locate the project root. Run Maintainer inside a Composer project.');
+            $this->components->error('Unable to locate the project root. Run Maintainer inside a Composer project.');
 
             return self::FAILURE;
         }
@@ -47,11 +49,28 @@ final class CreateHtmlDiffCommand extends Command
                 ? HtmlDiffOutputFormat::tryFrom($configuredOutputFormat)
                 : null;
 
-            if ($outputFormat === null) {
-                throw new RuntimeException('git.diff.output_format must be line_by_line or side_by_side.');
+            throw_if($outputFormat === null, RuntimeException::class, 'git.diff.output_format must be line_by_line or side_by_side.');
+
+            if ($this->input->isInteractive()) {
+                $diff = spin(
+                    fn (): string => $diffGenerator->generate($projectRoot, $base, $target),
+                    'Generating the Git diff...',
+                );
+            } else {
+                $diff = null;
+
+                $this->components->task(
+                    'Generating the Git diff',
+                    function () use ($diffGenerator, $projectRoot, $base, $target, &$diff): bool {
+                        $diff = $diffGenerator->generate($projectRoot, $base, $target);
+
+                        return true;
+                    },
+                );
+
+                throw_unless(is_string($diff), RuntimeException::class, 'Git did not return a diff.');
             }
 
-            $diff = $diffGenerator->generate($projectRoot, $base, $target);
             $title = $target === null
                 ? "Git diff: {$base} to working tree"
                 : "Git diff: {$base} to {$target}";
@@ -61,19 +80,21 @@ final class CreateHtmlDiffCommand extends Command
             $files->ensureDirectoryExists(dirname($outputPath));
 
             if ($files->put($outputPath, $html) === false) {
-                $this->error("Unable to write the HTML diff to {$outputPath}.");
+                $this->components->error("Unable to write the HTML diff to {$outputPath}.");
 
                 return self::FAILURE;
             }
 
-            $this->info("Generated HTML diff: {$outputPath}");
+            $this->components->twoColumnDetail('HTML diff', $outputPath);
 
             if (! $this->option('no-open')) {
                 $browser->open($outputPath);
-                $this->info('Opened the HTML diff in the default browser.');
+                $this->components->success('Generated and opened the HTML diff in the default browser.');
+            } else {
+                $this->components->success('Generated the HTML diff.');
             }
         } catch (JsonException|RuntimeException $exception) {
-            $this->error("Unable to generate the HTML diff: {$exception->getMessage()}");
+            $this->components->error("Unable to generate the HTML diff: {$exception->getMessage()}");
 
             return self::FAILURE;
         }

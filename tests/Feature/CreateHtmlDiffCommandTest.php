@@ -28,7 +28,7 @@ function withinTemporaryGitDiffProject(Closure $callback): void
         ['add', 'example.txt'],
         ['commit', '-m', 'Create fixture'],
     ] as $arguments) {
-        (new Process(['git', ...$arguments], $temporaryDirectory))->mustRun();
+        new Process(['git', ...$arguments], $temporaryDirectory)->mustRun();
     }
 
     $GLOBALS['_composer_autoload_path'] = $temporaryDirectory.'/vendor/autoload.php';
@@ -56,8 +56,9 @@ it('generates an HTML diff for working tree changes', function () {
         $this->artisan('diff:html', [
             '--output' => 'reports/working-tree-diff',
             '--no-open' => true,
+            '--no-interaction' => true,
         ])
-            ->expectsOutputToContain('Generated HTML diff:')
+            ->expectsOutputToContain('Generated the HTML diff.')
             ->assertSuccessful();
 
         $outputPath = $directory.'/reports/working-tree-diff.html';
@@ -86,6 +87,7 @@ it('uses the configured side-by-side output format', function () {
         $this->artisan('diff:html', [
             '--output' => 'reports/side-by-side.html',
             '--no-open' => true,
+            '--no-interaction' => true,
         ])->assertSuccessful();
 
         expect($files->get($directory.'/reports/side-by-side.html'))
@@ -101,7 +103,7 @@ it('generates an HTML diff between two Git references', function () {
             ['add', 'example.txt'],
             ['commit', '-m', 'Update fixture'],
         ] as $arguments) {
-            (new Process(['git', ...$arguments], $directory))->mustRun();
+            new Process(['git', ...$arguments], $directory)->mustRun();
         }
 
         $this->artisan('diff:html', [
@@ -109,6 +111,7 @@ it('generates an HTML diff between two Git references', function () {
             'target' => 'HEAD',
             '--output' => 'reports/commit-diff.html',
             '--no-open' => true,
+            '--no-interaction' => true,
         ])->assertSuccessful();
 
         expect($files->get($directory.'/reports/commit-diff.html'))
@@ -122,6 +125,7 @@ it('fails when a Git reference is invalid', function () {
             'base' => 'missing-reference',
             '--output' => 'reports/invalid.html',
             '--no-open' => true,
+            '--no-interaction' => true,
         ])
             ->expectsOutputToContain('Unable to generate the HTML diff:')
             ->assertFailed();
@@ -145,6 +149,7 @@ it('rejects an unsupported configured output format', function () {
         $this->artisan('diff:html', [
             '--output' => 'reports/unsupported.html',
             '--no-open' => true,
+            '--no-interaction' => true,
         ])
             ->expectsOutputToContain('git.diff.output_format must be line_by_line or side_by_side.')
             ->assertFailed();

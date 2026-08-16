@@ -20,9 +20,7 @@ final readonly class DefaultMaintainerConfiguration
     {
         $path = resource_path('maintainer.json');
 
-        if (! $this->files->isFile($path)) {
-            throw new RuntimeException('The default Maintainer configuration file could not be found.');
-        }
+        throw_unless($this->files->isFile($path), RuntimeException::class, 'The default Maintainer configuration file could not be found.');
 
         return $this->files->get($path);
     }
@@ -45,9 +43,7 @@ final readonly class DefaultMaintainerConfiguration
             );
         }
 
-        if (! $decoded instanceof stdClass) {
-            throw new RuntimeException('The default Maintainer configuration must contain a JSON object.');
-        }
+        throw_unless($decoded instanceof stdClass, RuntimeException::class, 'The default Maintainer configuration must contain a JSON object.');
 
         /** @var array<string, mixed> $configuration */
         $configuration = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);

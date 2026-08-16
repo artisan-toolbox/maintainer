@@ -48,8 +48,6 @@ final class GitDiffGenerator
 
     private function ensureValidReference(string $reference): void
     {
-        if ($reference === '' || str_starts_with($reference, '-')) {
-            throw new RuntimeException("Invalid Git reference: {$reference}");
-        }
+        throw_if($reference === '' || str_starts_with($reference, '-'), RuntimeException::class, "Invalid Git reference: {$reference}");
     }
 }

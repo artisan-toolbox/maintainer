@@ -39,14 +39,15 @@
         "laravel/pint": "^1.30.4",
         "laravel/prompts": "^0.3.22",
         "mockery/mockery": "^1.6.12",
+        "nikic/php-parser": "^5.8",
         "pestphp/pest": "^5.0.3",
         "rector/rector": "^2.6.2",
         "symfony/process": "^8.1"
     },
     "autoload": {
         "psr-4": {
-            "ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\": "app/Versionable/Contracts/",
-            "ArtisanToolbox\\Maintainer\\Versionable\\Attributes\\": "app/Versionable/Attributes/"
+            "ArtisanToolbox\\Maintainer\\Contracts\\Versionable\\": "app/Versionable/Contracts/",
+            "ArtisanToolbox\\Maintainer\\Attributes\\Versionable\\": "app/Versionable/Attributes/"
         }
     },
     "autoload-dev": {
