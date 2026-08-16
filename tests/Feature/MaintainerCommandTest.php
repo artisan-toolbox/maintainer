@@ -14,12 +14,13 @@ it('registers the Maintainer workflow menu as the default command', function () 
         ->toBe(MaintainerCommand::class);
 });
 
-it('offers configuration initialization and GitHub release workflows', function () {
+it('offers the available maintenance workflows', function () {
     $workflows = new ReflectionClass(MaintainerCommand::class)->getConstant('WORKFLOWS');
 
     expect($workflows)->toBe([
         'release:create' => 'Create a new GitHub release',
         'init' => 'Create the Maintainer configuration file',
+        'diff:html' => 'View a Git diff in the browser',
     ]);
 });
 

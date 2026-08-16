@@ -51,7 +51,13 @@ it('creates a configuration file in the current project', function () {
             ->expectsOutputToContain('Created maintainer.json.')
             ->assertSuccessful();
 
-        expect(file_get_contents($directory.'/maintainer.json'))->toBe("{}\n");
+        expect(json_decode(file_get_contents($directory.'/maintainer.json'), true))->toBe([
+            'git' => [
+                'diff' => [
+                    'output_format' => 'line_by_line',
+                ],
+            ],
+        ]);
     });
 });
 
@@ -107,6 +113,12 @@ it('overwrites an existing configuration file when forced', function () {
             ->expectsOutputToContain('Created maintainer.json.')
             ->assertSuccessful();
 
-        expect($files->get($path))->toBe("{}\n");
+        expect(json_decode($files->get($path), true))->toBe([
+            'git' => [
+                'diff' => [
+                    'output_format' => 'line_by_line',
+                ],
+            ],
+        ]);
     });
 });

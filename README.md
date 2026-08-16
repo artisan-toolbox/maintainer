@@ -70,11 +70,19 @@ Maintainer does not overwrite an existing configuration file. To intentionally r
 vendor/bin/maintainer init --force
 ```
 
-The initial configuration is an empty JSON object. Configuration options will be added as their corresponding workflows are introduced:
+The published file starts with Maintainer's current defaults:
 
 ```json
-{}
+{
+    "git": {
+        "diff": {
+            "output_format": "line_by_line"
+        }
+    }
+}
 ```
+
+Maintainer merges this distributed default configuration with the project's `maintainer.json` at runtime. Project values take precedence, while options introduced by newer Maintainer versions remain available to projects created with older configuration files. Projects without a `maintainer.json` also use all defaults without creating a file automatically.
 
 Maintainer commands and services can read configuration values with dot notation and optional defaults:
 
@@ -105,7 +113,7 @@ final readonly class QualityWorkflow
 }
 ```
 
-Configuration values are cached for the lifetime of the process. Call `refresh()` when a workflow changes `maintainer.json` and needs to read the updated values immediately. Missing files are treated as an empty configuration, while invalid JSON raises an exception with an actionable message.
+Configuration values are cached for the lifetime of the process. Call `refresh()` when a workflow changes `maintainer.json` and needs to read the updated values immediately. `maintainer_config_missing()` still reports whether the project file exists even though defaults remain available. Invalid JSON raises an exception with an actionable message.
 
 ## Project Integration
 
@@ -136,11 +144,46 @@ Open the interactive menu:
 vendor/bin/maintainer
 ```
 
-The menu lists the available maintenance workflows. It can create the Maintainer configuration file by running `init` or create a new GitHub release by running `release:create`.
+The menu lists the available maintenance workflows. It can create the Maintainer configuration file, create a new GitHub release, or open an HTML Git diff in the browser.
 
 The interactive menu displays a Maintainer ASCII art banner before presenting the available workflows.
 
 The menu requires interactive input. In non-interactive environments, run `release:create` directly to create a GitHub release or `init` to create the configuration file.
+
+### HTML Git diffs
+
+Generate an HTML comparison between `HEAD` and the current working tree, then open it in the default browser:
+
+```bash
+vendor/bin/maintainer diff:html
+```
+
+Pass one Git commit or reference to use it as the base for the working tree comparison, or pass two references to compare them directly:
+
+```bash
+vendor/bin/maintainer diff:html main
+vendor/bin/maintainer diff:html v1.0.0 v1.1.0
+```
+
+By default, reports are written to the operating system's temporary directory. Use `--output` to select a path or `--no-open` to generate a report without opening the browser:
+
+```bash
+vendor/bin/maintainer diff:html main --output=artifacts/main-diff.html --no-open
+```
+
+Working tree comparisons include staged and unstaged changes to tracked files. Add new files to Git before generating the report if they should be included. Generated reports load the pinned `diff2html` 3.4.56 assets from jsDelivr when opened.
+
+Set `git.diff.output_format` to `line_by_line` (the default) or `side_by_side` in `maintainer.json` to control the report layout:
+
+```json
+{
+    "git": {
+        "diff": {
+            "output_format": "side_by_side"
+        }
+    }
+}
+```
 
 Create a new GitHub release for the project:
 

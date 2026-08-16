@@ -40,7 +40,8 @@
         "laravel/prompts": "^0.3.22",
         "mockery/mockery": "^1.6.12",
         "pestphp/pest": "^5.0.3",
-        "rector/rector": "^2.6.2"
+        "rector/rector": "^2.6.2",
+        "symfony/process": "^8.1"
     },
     "autoload": {
         "psr-4": {

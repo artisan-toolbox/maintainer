@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Support\DefaultMaintainerConfiguration;
 use App\Support\ProjectPath;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -15,8 +16,11 @@ final class InitCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(Filesystem $files, ProjectPath $projectPath): int
-    {
+    public function handle(
+        Filesystem $files,
+        ProjectPath $projectPath,
+        DefaultMaintainerConfiguration $defaults,
+    ): int {
         $projectRoot = $projectPath->root();
 
         if ($projectRoot === null) {
@@ -33,7 +37,7 @@ final class InitCommand extends Command
             return self::FAILURE;
         }
 
-        if ($files->put($path, "{}\n") === false) {
+        if ($files->put($path, $defaults->contents()) === false) {
             $this->error('Unable to write maintainer.json.');
 
             return self::FAILURE;

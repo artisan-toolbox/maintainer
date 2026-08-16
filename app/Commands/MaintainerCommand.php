@@ -20,6 +20,7 @@ final class MaintainerCommand extends Command
     private const array WORKFLOWS = [
         'release:create' => 'Create a new GitHub release',
         'init' => 'Create the Maintainer configuration file',
+        'diff:html' => 'View a Git diff in the browser',
     ];
 
     /**
@@ -46,6 +47,7 @@ final class MaintainerCommand extends Command
         return match ($command) {
             'release:create' => $this->call('release:create'),
             'init' => $this->call('init'),
+            'diff:html' => $this->call('diff:html'),
             default => throw new LogicException('The selected Maintainer workflow is not supported.'),
         };
     }

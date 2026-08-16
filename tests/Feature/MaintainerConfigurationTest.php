@@ -51,6 +51,7 @@ it('reads configuration values using dot notation and defaults', function () {
 
         expect($configuration->configMissing())->toBeFalse()
             ->and($configuration->get('quality.phpstan.level'))->toBe(8)
+            ->and($configuration->get('git.diff.output_format'))->toBe('line_by_line')
             ->and($configuration->get('quality.pint.preset', 'laravel'))->toBe('laravel')
             ->and($configuration->has('quality.phpstan.level'))->toBeTrue()
             ->and(maintainer_config('quality.phpstan.level'))->toBe(8)
@@ -68,14 +69,37 @@ it('uses attributes to enforce its lifecycle and getter usage', function () {
         ->and($reflection->getMethod('get')->getAttributes(NoDiscard::class))->toHaveCount(1);
 });
 
-it('treats a missing configuration file as empty', function () {
+it('uses the default configuration when the project file is missing', function () {
     withinTemporaryConfigurationProject(function () {
         $configuration = resolve(MaintainerConfiguration::class);
+        $defaults = [
+            'git' => [
+                'diff' => [
+                    'output_format' => 'line_by_line',
+                ],
+            ],
+        ];
 
         expect($configuration->configMissing())->toBeTrue()
-            ->and($configuration->all())->toBe([])
-            ->and(maintainer_config())->toBe([])
+            ->and($configuration->all())->toBe($defaults)
+            ->and(maintainer_config())->toBe($defaults)
             ->and(maintainer_config_missing())->toBeTrue();
+    });
+});
+
+it('allows project configuration to override defaults', function () {
+    withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+        $files->put($directory.'/maintainer.json', <<<'JSON'
+            {
+                "git": {
+                    "diff": {
+                        "output_format": "side_by_side"
+                    }
+                }
+            }
+            JSON.PHP_EOL);
+
+        expect(maintainer_config('git.diff.output_format'))->toBe('side_by_side');
     });
 });
 
@@ -86,12 +110,20 @@ it('caches values until the configuration is refreshed', function () {
 
         $configuration = resolve(MaintainerConfiguration::class);
 
-        expect($configuration->get('version'))->toBe(1);
+        expect($configuration->get('version'))->toBe(1)
+            ->and($configuration->get('git.diff.output_format'))->toBe('line_by_line');
 
         $files->put($path, "{\"version\": 2}\n");
 
         expect($configuration->get('version'))->toBe(1)
-            ->and($configuration->refresh())->toBe(['version' => 2])
+            ->and($configuration->refresh())->toBe([
+                'git' => [
+                    'diff' => [
+                        'output_format' => 'line_by_line',
+                    ],
+                ],
+                'version' => 2,
+            ])
             ->and($configuration->get('version'))->toBe(2);
     });
 });

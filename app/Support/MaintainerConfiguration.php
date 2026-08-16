@@ -18,6 +18,7 @@ final class MaintainerConfiguration
     public function __construct(
         private readonly Filesystem $files,
         private readonly ProjectPath $projectPath,
+        private readonly DefaultMaintainerConfiguration $defaults,
     ) {}
 
     /**
@@ -78,9 +79,10 @@ final class MaintainerConfiguration
     private function load(): array
     {
         $path = $this->path();
+        $defaults = $this->defaults->all();
 
         if (! $this->files->isFile($path)) {
-            return [];
+            return $defaults;
         }
 
         $contents = $this->files->get($path);
@@ -99,6 +101,6 @@ final class MaintainerConfiguration
         /** @var array<string, mixed> $configuration */
         $configuration = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
 
-        return $configuration;
+        return array_replace_recursive($defaults, $configuration);
     }
 }
