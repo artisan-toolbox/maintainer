@@ -204,7 +204,7 @@ composer install
 List the available commands:
 
 ```bash
-php application list
+php maintainer list
 ```
 
 Run the automated tests:
@@ -230,7 +230,7 @@ vendor/bin/pint
 Maintainer can be compiled as a standalone PHAR with Laravel Zero:
 
 ```bash
-php application app:build maintainer
+php maintainer app:build
 ```
 
 The compiled application is written to `builds/maintainer`. This PHAR archive is the executable distributed through Composer as `vendor/bin/maintainer`.

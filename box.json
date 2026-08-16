@@ -1,5 +1,7 @@
 {
     "chmod": "0755",
+    "main": "maintainer",
+    "output": "maintainer.phar",
     "directories": [
         "app",
         "bootstrap",

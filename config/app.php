@@ -1,6 +1,7 @@
 <?php
 
 use App\Providers\AppServiceProvider;
+use Laravel\Ai\AiServiceProvider;
 
 return [
 
@@ -57,6 +58,7 @@ return [
 
     'providers' => [
         AppServiceProvider::class,
+        AiServiceProvider::class,
     ],
 
 ];
