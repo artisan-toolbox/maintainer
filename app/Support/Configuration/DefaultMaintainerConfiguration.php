@@ -11,7 +11,11 @@ use stdClass;
 #[Singleton]
 final readonly class DefaultMaintainerConfiguration
 {
-    public function __construct(private Filesystem $files) {}
+    public function __construct(
+        private Filesystem $files,
+        private JsonTemplateFormatter $formatter,
+    ) {
+    }
 
     /**
      * Return the default configuration as distributed with Maintainer.
@@ -20,9 +24,13 @@ final readonly class DefaultMaintainerConfiguration
     {
         $path = resource_path('maintainer.json');
 
-        throw_unless($this->files->isFile($path), RuntimeException::class, 'The default Maintainer configuration file could not be found.');
+        throw_unless($this->files->isFile($path), RuntimeException::class,
+            'The default Maintainer configuration file could not be found.');
 
-        return $this->files->get($path);
+        return $this->formatter->format(
+            $this->files->get($path),
+            'Maintainer configuration',
+        );
     }
 
     /**
@@ -43,7 +51,8 @@ final readonly class DefaultMaintainerConfiguration
             );
         }
 
-        throw_unless($decoded instanceof stdClass, RuntimeException::class, 'The default Maintainer configuration must contain a JSON object.');
+        throw_unless($decoded instanceof stdClass, RuntimeException::class,
+            'The default Maintainer configuration must contain a JSON object.');
 
         /** @var array<string, mixed> $configuration */
         $configuration = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);

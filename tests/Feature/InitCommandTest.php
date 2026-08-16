@@ -8,9 +8,22 @@ it('creates a configuration file in the current project', function () {
             ->expectsOutputToContain('Created Maintainer configuration and protected its secrets file.')
             ->assertSuccessful();
 
-        expect(json_decode(file_get_contents($directory.'/maintainer.json'), true))
+        $configuration = file_get_contents($directory.'/maintainer.json');
+        $secrets = file_get_contents($directory.'/maintainer_secrets.json');
+
+        expect(json_decode($configuration, true))
             ->toBe(defaultMaintainerConfigurationFixture())
+            ->and($configuration)->toContain(implode(PHP_EOL, [
+                '{',
+                '    "ai": {',
+                '        "providers": {',
+            ]))
             ->and($directory.'/maintainer_secrets.json')->toBeFile()
+            ->and($secrets)->toContain(implode(PHP_EOL, [
+                '{',
+                '    "ai_providers": {',
+                '        "anthropic": {',
+            ]))
             ->and(file_get_contents($directory.'/.gitignore'))
             ->toBe('maintainer_secrets.json'.PHP_EOL);
     });
