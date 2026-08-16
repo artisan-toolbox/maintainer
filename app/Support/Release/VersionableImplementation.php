@@ -2,7 +2,7 @@
 
 namespace App\Support\Release;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 use Illuminate\Filesystem\Filesystem;
 use JsonException;
 use PhpParser\ConstExprEvaluationException;
@@ -159,6 +159,10 @@ final readonly class VersionableImplementation
                         $file->getPathname(),
                         $hasVersionConstant,
                         $version,
+                        array_values(array_map(
+                            static fn ($implemented): string => $implemented->toString(),
+                            $class->implements,
+                        )),
                     );
                 }
             }

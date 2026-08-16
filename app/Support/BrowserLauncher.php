@@ -5,7 +5,7 @@ namespace App\Support;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
-final class BrowserLauncher
+class BrowserLauncher
 {
     /**
      * Open a local file in the operating system's default browser.

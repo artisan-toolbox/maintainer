@@ -57,6 +57,7 @@ function defaultMaintainerConfigurationFixture(): array
         'ai' => [
             'providers' => [
                 'commit_message' => 'openai',
+                'release_type_suggestion' => 'openai',
                 'release_notes' => 'openai',
                 'release_changelog_update' => 'openai',
             ],

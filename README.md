@@ -77,6 +77,7 @@ The published file starts with Maintainer's current defaults:
     "ai": {
         "providers": {
             "commit_message": "openai",
+            "release_type_suggestion": "openai",
             "release_notes": "openai",
             "release_changelog_update": "openai"
         }
@@ -94,11 +95,11 @@ The published file starts with Maintainer's current defaults:
 }
 ```
 
-The three `ai.providers` values select the Laravel AI provider used for commit messages, release notes, and release changelog updates. Commit messages currently use this configuration; the release values establish the provider choices for their respective workflows as those workflows are introduced.
+The four `ai.providers` values select the Laravel AI provider used for commit messages, release type suggestions, release notes, and release changelog updates. Stable release suggestions and commit messages currently use this configuration; the remaining release values establish the provider choices for their respective workflows as those workflows are introduced. The release type suggestion agent always uses the provider's cheapest model through Laravel AI's `UseCheapestModel` attribute.
 
 The `init` command also creates `maintainer_secrets.json` beside `maintainer.json` and adds `maintainer_secrets.json` to the project's `.gitignore`. The secrets template contains every provider supported by the installed Laravel AI SDK. Add credentials only for the providers the project uses. Provider values may include connection settings such as an endpoint in addition to the API key. The `--force` option never overwrites an existing secrets file.
 
-The content-generation workflows require a provider that supports text: `anthropic`, `azure`, `bedrock`, `deepseek`, `gemini`, `groq`, `mistral`, `ollama`, `openai`, `openai-compatible`, `openrouter`, or `xai`. Laravel AI providers intended only for audio, embeddings, or reranking remain available in the secrets template but are rejected for these three text workflows with an actionable error.
+The content-generation workflows require a provider that supports text: `anthropic`, `azure`, `bedrock`, `deepseek`, `gemini`, `groq`, `mistral`, `ollama`, `openai`, `openai-compatible`, `openrouter`, or `xai`. Laravel AI providers intended only for audio, embeddings, or reranking remain available in the secrets template but are rejected for these four text workflows with an actionable error.
 
 Maintainer merges this distributed default configuration with the project's `maintainer.json` at runtime. Project values take precedence, while options introduced by newer Maintainer versions remain available to projects created with older configuration files. Projects without a `maintainer.json` also use all defaults without creating a file automatically.
 
@@ -142,17 +143,40 @@ Maintainer exports lightweight PHP contracts through the consuming project's Com
 
 namespace App;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\AfterVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
 
-final class ApplicationVersion implements Versionable
+final class ApplicationVersion implements Versionable, BeforeVersioning, AfterVersioning, WithReadmeBadgeVersion
 {
     public const string VERSION = '1.0.0';
+
+    public static function beforeVersioning(): void
+    {
+        // Prepare project-specific release files before version selection.
+    }
+
+    public static function afterVersioning(): void
+    {
+        // Run project-specific follow-up after GitHub publishes the release.
+    }
 }
 ```
 
 The version class must live directly in one of the production PSR-4 namespaces declared under `autoload.psr-4` in the project's `composer.json`. Declaring `public const string VERSION` is optional: Maintainer creates it when absent and updates it when present. Existing constants must be public, string-typed, and use `MAJOR.MINOR.PATCH`, optionally followed by `-alpha`, `-alpha.N`, `-beta`, or `-beta.N`. Other formats, including `v` prefixes, release candidates, build metadata, missing components, and leading zeros, are rejected. Classes in nested namespaces and development-only PSR-4 mappings are not considered.
 
-Contract implementations are designed to run within the consuming project and communicate structured data to the isolated Maintainer process. Objects and framework services will not cross the process boundary.
+`BeforeVersioning::beforeVersioning()` runs immediately after Maintainer's initial project, Git, branch, and version-class validations. Any files it changes become part of the release commit. If it or a later pre-push step fails, Maintainer resets the repository to the original `HEAD` and removes untracked release files. `AfterVersioning::afterVersioning()` runs only after the release commit is pushed and the GitHub release is published; at that point remote work cannot be rolled back automatically.
+
+`WithReadmeBadgeVersion` is a marker contract. When present, Maintainer inserts or updates this protected block near the top of `README.md`:
+
+```markdown
+<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->
+[![version](https://img.shields.io/badge/version-1.0.0-blue)](VERSION)
+<!-- MAINTAINER:VERSION_BADGE:END -->
+```
+
+The markers are stable and must not be edited manually: Maintainer uses them to replace the badge safely on every release.
 
 Because Maintainer is normally installed as a development dependency, project integrations should also be development-only. If production code implements a Maintainer contract, install the package as a regular dependency so the interface remains available after `composer install --no-dev`.
 
@@ -251,7 +275,7 @@ Create a new GitHub release for the project:
 vendor/bin/maintainer release:create
 ```
 
-The command requires a completely clean Git working tree and a class directly in a production PSR-4 namespace that implements `ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable` before starting a GitHub release. Its version constant is created when absent; an existing constant must be public, string-typed, and contain a supported semantic version. Commit or discard every staged, unstaged, and untracked change before running it.
+The command requires a completely clean Git working tree and a class directly in a production PSR-4 namespace that implements `ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable` before starting a GitHub release. Its version constant is created when absent; an existing constant must be public, string-typed, and contain a supported semantic version. Commit or discard every staged, unstaged, and untracked change before running it.
 
 Releases must run from a major branch named `1.x`, `2.x`, and so on. The branch determines the release major; other branch names and detached HEAD states abort the workflow. Maintainer retrieves every published GitHub release through the authenticated GitHub CLI, ignores drafts and unsupported tags, then selects the highest valid version for the branch major. If that major has no valid GitHub release, its initial choices are `MAJOR.0.0`, `MAJOR.0.0-alpha.1`, and `MAJOR.0.0-beta.1`.
 
@@ -263,7 +287,17 @@ The interactive version menu follows these transitions:
 - Alpha and beta flows cannot create another patch or minor until their current version becomes stable.
 - Major increments are never offered. Start the new major from its matching `MAJOR.x` branch.
 
-Version selection requires an interactive terminal. After selection, Maintainer writes the selected version to the implementation's `VERSION` constant, creating the declaration when necessary. The command does not create commits, tags, or GitHub releases yet; those operations will be introduced incrementally.
+When the latest GitHub release is stable, Maintainer compares its tag with `HEAD` and asks the provider configured under `ai.providers.release_type_suggestion` to recommend either the next patch or stable minor version. The structured suggestion follows Semantic Versioning rules, includes a diff-based justification, and becomes the version menu's default. AI is not consulted when no prior release exists or while an alpha or beta release must complete its prerelease flow. If the provider or local release tag is unavailable, Maintainer reports the problem and safely keeps the next patch as the default.
+
+After version selection, Maintainer builds the release content from the commit history and Git diff since the latest release:
+
+- `ai.providers.release_notes` creates a concise structured title and detailed Markdown body for GitHub.
+- `ai.providers.release_changelog_update` creates validated changelog entries with a Conventional Commit type, source commit hash, title, and detailed functional description.
+- `CHANGELOG.md` is created when absent. New releases are prepended and grouped under Features, Fixes, Documentation, Refactoring, Performance, Tests, Build, CI, Maintenance, and other relevant categories.
+
+Maintainer then updates or creates the `VERSION` constant, updates the protected README badge when requested, and stages every generated release file. When a previous release exists, it offers to open an HTML diff from that release reference to the complete proposal; the default is yes, and the terminal waits for the maintainer to return before continuing.
+
+Finally, Maintainer creates a `chore(release): prepare VERSION` commit, pushes it to `origin`, and publishes the GitHub release through `gh release create`. Alpha and beta versions are published with GitHub's prerelease flag. The configured AI agents always use their providers' cheapest model through Laravel AI's `UseCheapestModel` attribute.
 
 ## Development
 

@@ -24,7 +24,7 @@ JSON
 
 namespace Fixture;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 final class ProjectVersion implements Versionable
 {

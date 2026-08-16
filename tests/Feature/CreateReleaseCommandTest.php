@@ -1,11 +1,21 @@
 <?php
 
+use App\Ai\Agents\ReleaseChangelogAgent;
+use App\Ai\Agents\ReleaseNotesAgent;
+use App\Ai\Agents\ReleaseVersionAgent;
+use App\Support\BrowserLauncher;
+use App\Support\Release\GitCliReleaseRepository;
+use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
+use App\Support\Release\ReleaseGitRepository;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Fakes\FakeBrowserLauncher;
+use Tests\Fakes\FakeGitHubReleasePublisher;
 use Tests\Fakes\FakeGitHubReleaseSource;
+use Tests\Fakes\FakeReleaseGitRepository;
 
 /**
  * @param  Closure(string, Filesystem): void  $callback
@@ -35,7 +45,7 @@ JSON
 
 namespace Fixture;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 final class ProjectVersion implements Versionable
 {
@@ -43,9 +53,20 @@ final class ProjectVersion implements Versionable
 }
 PHP
     );
-    $files->put($temporaryDirectory.'/.gitignore', "/vendor/\n");
+    $files->put($temporaryDirectory.'/.gitignore', "/vendor/\nmaintainer_secrets.json\n");
     $files->put($temporaryDirectory.'/example.txt', "committed\n");
+    $files->put($temporaryDirectory.'/README.md', "# Fixture\n\nFixture documentation.\n");
     $files->put($temporaryDirectory.'/vendor/autoload.php', "<?php\n");
+    $files->put($temporaryDirectory.'/maintainer_secrets.json', <<<'JSON'
+{
+    "ai_providers": {
+        "openai": {
+            "key": "test-key"
+        }
+    }
+}
+JSON
+    );
 
     foreach ([
         ['init', '--initial-branch=1.x'],
@@ -54,6 +75,7 @@ PHP
         ['config', 'core.autocrlf', 'false'],
         ['add', '.'],
         ['commit', '-m', 'Create fixture'],
+        ['tag', '1.0.0'],
     ] as $arguments) {
         new Process(['git', ...$arguments], $temporaryDirectory)->mustRun();
     }
@@ -62,6 +84,31 @@ PHP
     $releaseSource = new FakeGitHubReleaseSource;
     app()->instance(GitHubReleaseSource::class, $releaseSource);
     app()->instance(FakeGitHubReleaseSource::class, $releaseSource);
+    $git = new FakeReleaseGitRepository;
+    $publisher = new FakeGitHubReleasePublisher;
+    app()->instance(ReleaseGitRepository::class, $git);
+    app()->instance(FakeReleaseGitRepository::class, $git);
+    app()->instance(GitHubReleasePublisher::class, $publisher);
+    app()->instance(FakeGitHubReleasePublisher::class, $publisher);
+    $browser = new FakeBrowserLauncher;
+    app()->instance(BrowserLauncher::class, $browser);
+    app()->instance(FakeBrowserLauncher::class, $browser);
+    ReleaseVersionAgent::fake([[
+        'release_increment' => 'patch',
+        'justification' => 'The diff contains backwards-compatible fixes and maintenance.',
+    ]]);
+    ReleaseNotesAgent::fake([[
+        'title' => 'Improve the release workflow',
+        'body' => "## Changed\n\nImproved the release workflow.",
+    ]]);
+    ReleaseChangelogAgent::fake([[
+        'entries' => [[
+            'type' => 'feat',
+            'hash' => 'abc1234',
+            'title' => 'Improve the release workflow',
+            'description' => 'Adds a complete and documented release workflow.',
+        ]],
+    ]]);
     chdir($temporaryDirectory);
 
     try {
@@ -99,7 +146,157 @@ it('continues when the Git working tree is clean', function () {
             ->assertSuccessful();
 
         expect($files->get($directory.'/src/ProjectVersion.php'))
-            ->toContain("public const string VERSION = '1.0.1';");
+            ->toContain("public const string VERSION = '1.0.1';")
+            ->and($files->get($directory.'/CHANGELOG.md'))->toContain('## [1.0.1] - ')
+            ->and(resolve(FakeReleaseGitRepository::class)->staged)->toBeTrue()
+            ->and(resolve(FakeReleaseGitRepository::class)->committed)->toBeTrue()
+            ->and(resolve(FakeReleaseGitRepository::class)->pushed)->toBeTrue()
+            ->and(resolve(FakeGitHubReleasePublisher::class)->published)->toMatchArray([
+                'version' => '1.0.1',
+                'target' => '1.x',
+                'prerelease' => false,
+            ]);
+    });
+});
+
+it('uses the structured AI recommendation as the default for a stable release', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/maintainer_secrets.json', <<<'JSON'
+{
+    "ai_providers": {
+        "openai": {
+            "key": "test-key"
+        }
+    }
+}
+JSON
+        );
+        ReleaseVersionAgent::fake([[
+            'release_increment' => 'minor',
+            'justification' => 'The diff adds a backward-compatible public command option.',
+        ]]);
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('AI recommendation')
+            ->expectsOutputToContain('1.1.0')
+            ->expectsOutputToContain('The diff adds a backward-compatible public command option.')
+            ->assertSuccessful();
+
+        expect($files->get($directory.'/src/ProjectVersion.php'))
+            ->toContain("public const string VERSION = '1.1.0';");
+    });
+});
+
+it('does not ask AI for a release recommendation during a prerelease flow', function () {
+    withinTemporaryReleaseProject(function (): void {
+        resolve(FakeGitHubReleaseSource::class)->releases = ['1.1.0-beta.1'];
+        new Process(['git', 'tag', '1.1.0-beta.1'], getcwd())->mustRun();
+        ReleaseVersionAgent::fake()->preventStrayPrompts();
+
+        $this->artisan('release:create')
+            ->assertSuccessful();
+
+        ReleaseVersionAgent::assertNeverPrompted();
+
+        expect(resolve(FakeGitHubReleasePublisher::class)->published)->toMatchArray([
+            'version' => '1.1.0-beta.2',
+            'prerelease' => true,
+        ]);
+    });
+});
+
+it('runs lifecycle callbacks and maintains the protected README badge', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/src/ProjectVersion.php', <<<'PHP'
+<?php
+
+namespace Fixture;
+
+use ArtisanToolbox\Maintainer\Versionable\Contracts\AfterVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
+
+final class ProjectVersion implements Versionable, BeforeVersioning, AfterVersioning, WithReadmeBadgeVersion
+{
+    public const string VERSION = '1.0.0';
+
+    public static function beforeVersioning(): void
+    {
+        file_put_contents(getcwd().'/before-versioning.txt', 'completed');
+    }
+
+    public static function afterVersioning(): void
+    {
+        file_put_contents(getcwd().'/after-versioning.txt', 'completed');
+    }
+}
+PHP
+        );
+        new Process(['git', 'add', '--all'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add versioning lifecycle'], $directory)->mustRun();
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('Before versioning')
+            ->expectsOutputToContain('After versioning')
+            ->expectsOutputToContain('README badge')
+            ->assertSuccessful();
+
+        expect($directory.'/before-versioning.txt')->toBeFile()
+            ->and($directory.'/after-versioning.txt')->toBeFile()
+            ->and($files->get($directory.'/README.md'))->toContain(implode(PHP_EOL, [
+                '<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->',
+                '[![version](https://img.shields.io/badge/version-1.0.1-blue)](VERSION)',
+                '<!-- MAINTAINER:VERSION_BADGE:END -->',
+            ]));
+    });
+});
+
+it('rolls back the complete working tree when the before callback fails', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/composer.json', <<<'JSON'
+{
+    "autoload": {
+        "psr-4": {
+            "FixtureRollback\\": "src/"
+        }
+    }
+}
+JSON
+        );
+        $files->put($directory.'/src/ProjectVersion.php', <<<'PHP'
+<?php
+
+namespace FixtureRollback;
+
+use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+use RuntimeException;
+
+final class ProjectVersion implements Versionable, BeforeVersioning
+{
+    public const string VERSION = '1.0.0';
+
+    public static function beforeVersioning(): void
+    {
+        file_put_contents(getcwd().'/callback-change.txt', 'rollback me');
+
+        throw new RuntimeException('Preparation failed.');
+    }
+}
+PHP
+        );
+        new Process(['git', 'add', '--all'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add failing lifecycle'], $directory)->mustRun();
+        app()->instance(ReleaseGitRepository::class, new GitCliReleaseRepository);
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('Rolled back all release changes')
+            ->expectsOutputToContain('Preparation failed.')
+            ->assertFailed();
+
+        expect($directory.'/callback-change.txt')->not->toBeFile()
+            ->and((new Process(['git', 'status', '--porcelain'], $directory))->mustRun()->getOutput())->toBe('');
     });
 });
 
@@ -140,7 +337,7 @@ it('rejects a versionable class in a nested namespace', function () {
 
 namespace Fixture\Maintainer;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 final class ProjectVersion implements Versionable
 {
@@ -164,7 +361,7 @@ it('rejects a versionable class without a public typed version constant', functi
 
 namespace Fixture;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 final class ProjectVersion implements Versionable
 {
@@ -192,7 +389,7 @@ it('creates the version constant when the versionable class does not declare one
 
 namespace Fixture;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 final class ProjectVersion implements Versionable
 {
@@ -220,7 +417,7 @@ it('accepts a valid versionable class when another implementation is incomplete'
 
 namespace Fixture;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 final class IncompleteVersion implements Versionable
 {
@@ -243,7 +440,7 @@ it('rejects a versionable class with an unsupported semantic version', function 
 
 namespace Fixture;
 
-use ArtisanToolbox\Maintainer\Contracts\Versionable\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 final class ProjectVersion implements Versionable
 {

@@ -1,0 +1,44 @@
+<?php
+
+use App\Support\Release\ReadmeVersionBadge;
+use App\Support\Release\VersionableClass;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
+
+it('inserts and replaces a protected static README version badge', function () {
+    $files = new Filesystem;
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-badge-'.Str::uuid();
+    $files->makeDirectory($directory);
+    $files->put($directory.'/README.md', "# Example\n\nDocumentation.\n");
+    $versionable = new VersionableClass(
+        'Example\\Version',
+        $directory.'/Version.php',
+        true,
+        '1.0.0',
+        [WithReadmeBadgeVersion::class],
+    );
+    $badge = new ReadmeVersionBadge($files);
+
+    try {
+        expect($badge->update($directory, $versionable, '1.1.0'))->toBeTrue()
+            ->and($badge->update($directory, $versionable, '1.1.1'))->toBeTrue();
+
+        $contents = $files->get($directory.'/README.md');
+
+        expect($contents)
+            ->toContain('User agents must not edit this section')
+            ->toContain('[![version](https://img.shields.io/badge/version-1.1.1-blue)](VERSION)')
+            ->not->toContain('version-1.1.0-blue')
+            ->and(substr_count($contents, 'MAINTAINER:VERSION_BADGE:START'))->toBe(1);
+    } finally {
+        $files->deleteDirectory($directory);
+    }
+});
+
+it('does nothing when the versionable class does not request a README badge', function () {
+    $files = new Filesystem;
+    $versionable = new VersionableClass('Example\\Version', '/tmp/Version.php', true, '1.0.0');
+
+    expect((new ReadmeVersionBadge($files))->update('/missing', $versionable, '1.0.1'))->toBeFalse();
+});

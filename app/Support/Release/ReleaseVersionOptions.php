@@ -29,7 +29,7 @@ final class ReleaseVersionOptions
         $nextMinor = "{$major}.".($latest->minor + 1).'.0';
 
         return [
-            $nextPatch => "Bugfix — {$nextPatch}",
+            $nextPatch => "Patch — {$nextPatch}",
             $nextMinor => "Minor — {$nextMinor}",
             $nextMinor.'-alpha.1' => "Minor alpha — {$nextMinor}-alpha.1",
             $nextMinor.'-beta.1' => "Minor beta — {$nextMinor}-beta.1",
