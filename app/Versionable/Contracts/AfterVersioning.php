@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ArtisanToolbox\Maintainer\Contracts\Versionable;
+namespace ArtisanToolbox\Maintainer\Versionable\Contracts;
 
 interface AfterVersioning
 {

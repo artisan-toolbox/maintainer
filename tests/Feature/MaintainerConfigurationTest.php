@@ -123,6 +123,11 @@ it('caches values until the configuration is refreshed', function () {
                         'output_format' => 'line_by_line',
                     ],
                 ],
+                'quality' => [
+                    'phpstan' => [
+                        'memory_limit' => '2G',
+                    ],
+                ],
                 'version' => 2,
             ])
             ->and($configuration->get('version'))->toBe(2);

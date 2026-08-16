@@ -2,6 +2,8 @@
 
 namespace App\Commands;
 
+use App\Support\Configuration\MaintainerConfiguration;
+use App\Support\Git\GitWorkingTree;
 use App\Support\ProjectPath;
 use App\Support\Quality\LaravelProjectType;
 use App\Support\Quality\LaravelProjectTypeDetector;
@@ -17,7 +19,7 @@ use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 
 #[Signature('quality')]
-#[Description('Run Pint, Rector, and PHPStan with the project configuration')]
+#[Description('Run Pint, Rector, PHPStan, and Pest with the project configuration')]
 final class RunQualityCommand extends Command
 {
     /**
@@ -28,6 +30,8 @@ final class RunQualityCommand extends Command
         QualityConfigurationManager $configurations,
         LaravelProjectTypeDetector $projectTypeDetector,
         QualityToolRunner $runner,
+        GitWorkingTree $workingTree,
+        MaintainerConfiguration $maintainerConfiguration,
     ): int {
         $projectRoot = $projectPath->root();
 
@@ -58,6 +62,7 @@ final class RunQualityCommand extends Command
                     function (string $output): void {
                         $this->output->write($output);
                     },
+                    $this->additionalArguments($tool, $maintainerConfiguration),
                 );
 
                 if ($exitCode !== self::SUCCESS) {
@@ -72,7 +77,11 @@ final class RunQualityCommand extends Command
             return self::FAILURE;
         }
 
-        $this->components->success('Pint, Rector, and PHPStan completed successfully.');
+        $this->components->success('Pint, Rector, PHPStan, and Pest completed successfully.');
+
+        if ($this->input->isInteractive() && $this->shouldCreateCommit($projectRoot, $workingTree)) {
+            return $this->call('commit');
+        }
 
         return self::SUCCESS;
     }
@@ -138,5 +147,45 @@ final class RunQualityCommand extends Command
         );
 
         return LaravelProjectType::from($selected);
+    }
+
+    private function shouldCreateCommit(string $projectRoot, GitWorkingTree $workingTree): bool
+    {
+        try {
+            if ($workingTree->isClean($projectRoot)) {
+                return false;
+            }
+        } catch (RuntimeException $exception) {
+            $this->components->warn("Unable to inspect Git changes, so the commit suggestion was skipped: {$exception->getMessage()}");
+
+            return false;
+        }
+
+        return confirm(
+            label: 'The project has changes. Would you like to create a commit now?',
+            default: true,
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function additionalArguments(
+        QualityTool $tool,
+        MaintainerConfiguration $configuration,
+    ): array {
+        if ($tool !== QualityTool::PhpStan) {
+            return [];
+        }
+
+        $memoryLimit = $configuration->get('quality.phpstan.memory_limit');
+
+        throw_unless(
+            is_string($memoryLimit) && preg_match('/^(?:-1|[1-9]\d*[KMG]?)$/i', $memoryLimit) === 1,
+            RuntimeException::class,
+            'quality.phpstan.memory_limit must be -1, a byte count, or a value such as 512M or 2G.',
+        );
+
+        return ["--memory-limit={$memoryLimit}"];
     }
 }

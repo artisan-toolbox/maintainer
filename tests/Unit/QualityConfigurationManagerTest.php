@@ -32,6 +32,8 @@ it('finds every supported project configuration filename', function (
     'PHPStan' => [QualityTool::PhpStan, 'phpstan.neon'],
     'PHPStan dist suffix' => [QualityTool::PhpStan, 'phpstan.neon.dist'],
     'PHPStan alternate dist suffix' => [QualityTool::PhpStan, 'phpstan.dist.neon'],
+    'Pest' => [QualityTool::Pest, 'phpunit.xml'],
+    'Pest dist suffix' => [QualityTool::Pest, 'phpunit.xml.dist'],
 ]);
 
 it('installs application templates with application paths', function () {
@@ -40,10 +42,12 @@ it('installs application templates with application paths', function () {
     $pint = $manager->install(QualityTool::Pint, $this->directory, LaravelProjectType::Application);
     $rector = $manager->install(QualityTool::Rector, $this->directory, LaravelProjectType::Application);
     $phpstan = $manager->install(QualityTool::PhpStan, $this->directory, LaravelProjectType::Application);
+    $pest = $manager->install(QualityTool::Pest, $this->directory, LaravelProjectType::Application);
 
     expect($this->files->get($pint))->toContain('"preset": "laravel"')
         ->and($this->files->get($rector))->toContain("__DIR__.'/app'")
-        ->and($this->files->get($phpstan))->toContain('- app/');
+        ->and($this->files->get($phpstan))->toContain('- app/')
+        ->and($this->files->get($pest))->toContain('<directory suffix=".php">app</directory>');
 });
 
 it('installs package templates with package paths', function () {
@@ -51,11 +55,14 @@ it('installs package templates with package paths', function () {
 
     $rector = $manager->install(QualityTool::Rector, $this->directory, LaravelProjectType::Package);
     $phpstan = $manager->install(QualityTool::PhpStan, $this->directory, LaravelProjectType::Package);
+    $pest = $manager->install(QualityTool::Pest, $this->directory, LaravelProjectType::Package);
 
     expect($this->files->get($rector))->toContain("__DIR__.'/src'")
         ->not->toContain("__DIR__.'/app'")
         ->and($this->files->get($phpstan))->toContain('- src/')
-        ->not->toContain('- app/');
+        ->not->toContain('- app/')
+        ->and($this->files->get($pest))->toContain('<directory suffix=".php">src</directory>')
+        ->not->toContain('<directory suffix=".php">app</directory>');
 });
 
 it('never overwrites an existing project configuration', function () {

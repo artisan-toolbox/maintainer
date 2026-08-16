@@ -20,7 +20,7 @@ final class MaintainerCommand extends Command
      */
     private const array WORKFLOWS = [
         'commit' => 'Create a Git commit',
-        'quality' => 'Run Pint, Rector, and PHPStan',
+        'quality' => 'Run Pint, Rector, PHPStan, and Pest',
         'release:create' => 'Create a new GitHub release',
         'init' => 'Create the Maintainer configuration and secrets files',
         'diff:html' => 'View a Git diff in the browser',

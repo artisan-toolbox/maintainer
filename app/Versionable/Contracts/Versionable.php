@@ -1,6 +1,6 @@
 <?php
 
-namespace ArtisanToolbox\Maintainer\Contracts\Versionable;
+namespace ArtisanToolbox\Maintainer\Versionable\Contracts;
 
 /**
  * Marks a consuming project component as providing version behavior to Maintainer.

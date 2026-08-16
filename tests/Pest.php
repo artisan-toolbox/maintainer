@@ -66,6 +66,11 @@ function defaultMaintainerConfigurationFixture(): array
                 'output_format' => 'line_by_line',
             ],
         ],
+        'quality' => [
+            'phpstan' => [
+                'memory_limit' => '2G',
+            ],
+        ],
     ];
 }
 

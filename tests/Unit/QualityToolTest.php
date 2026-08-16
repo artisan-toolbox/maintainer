@@ -20,6 +20,10 @@ it('builds commands that explicitly select the project configuration', function 
         QualityTool::PhpStan,
         ['/project/vendor/bin/phpstan', 'analyse', '--configuration', '/project/config-file'],
     ],
+    'Pest' => [
+        QualityTool::Pest,
+        ['/project/vendor/bin/pest', '--configuration', '/project/config-file'],
+    ],
 ]);
 
 it('recognizes supported PHPStan configuration filenames', function () {
@@ -27,5 +31,26 @@ it('recognizes supported PHPStan configuration filenames', function () {
         'phpstan.neon',
         'phpstan.neon.dist',
         'phpstan.dist.neon',
+    ]);
+});
+
+it('recognizes supported PHPUnit configuration filenames for Pest', function () {
+    expect(QualityTool::Pest->configurationFilenames())->toBe([
+        'phpunit.xml',
+        'phpunit.xml.dist',
+    ]);
+});
+
+it('appends project-specific arguments to the tool command', function () {
+    expect(QualityTool::PhpStan->command(
+        '/project/vendor/bin/phpstan',
+        '/project/phpstan.neon',
+        ['--memory-limit=2G'],
+    ))->toBe([
+        '/project/vendor/bin/phpstan',
+        'analyse',
+        '--configuration',
+        '/project/phpstan.neon',
+        '--memory-limit=2G',
     ]);
 });

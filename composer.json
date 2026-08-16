@@ -47,8 +47,7 @@
     },
     "autoload": {
         "psr-4": {
-            "ArtisanToolbox\\Maintainer\\Contracts\\Versionable\\": "app/Versionable/Contracts/",
-            "ArtisanToolbox\\Maintainer\\Attributes\\Versionable\\": "app/Versionable/Attributes/"
+            "ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\": "app/Versionable/Contracts/"
         }
     },
     "autoload-dev": {

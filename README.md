@@ -85,6 +85,11 @@ The published file starts with Maintainer's current defaults:
         "diff": {
             "output_format": "line_by_line"
         }
+    },
+    "quality": {
+        "phpstan": {
+            "memory_limit": "2G"
+        }
     }
 }
 ```
@@ -100,7 +105,7 @@ Maintainer merges this distributed default configuration with the project's `mai
 Maintainer commands and services can read configuration values with dot notation and optional defaults:
 
 ```php
-$level = maintainer_config('quality.phpstan.level', 8);
+$memoryLimit = maintainer_config('quality.phpstan.memory_limit', '2G');
 $configuration = maintainer_config();
 
 if (maintainer_config_missing()) {
@@ -121,7 +126,7 @@ final readonly class QualityWorkflow
 
     public function run(): void
     {
-        $level = $this->configuration->get('quality.phpstan.level', 8);
+        $memoryLimit = $this->configuration->get('quality.phpstan.memory_limit', '2G');
     }
 }
 ```
@@ -183,23 +188,27 @@ The commit workflow requires an interactive terminal. If AI is selected, configu
 
 ### Code quality
 
-Run Pint, Rector, and PHPStan in sequence:
+Run Pint, Rector, PHPStan, and Pest in sequence:
 
 ```bash
 vendor/bin/maintainer quality
 ```
 
-Maintainer always runs the binaries installed by the consuming project and explicitly passes that project's configuration file to each tool. It recognizes `pint.json`, `rector.php`, and the standard `phpstan.neon`, `phpstan.neon.dist`, or `phpstan.dist.neon` filenames. The isolated dependencies bundled in the Maintainer PHAR are never used to analyze or modify the consuming project.
+Maintainer always runs the binaries installed by the consuming project and explicitly passes that project's configuration file to each tool. It recognizes `pint.json`, `rector.php`, the standard `phpstan.neon`, `phpstan.neon.dist`, or `phpstan.dist.neon` filenames, and either `phpunit.xml` or `phpunit.xml.dist` for Pest. The isolated dependencies bundled in the Maintainer PHAR are never used to analyze, modify, or test the consuming project.
+
+PHPStan receives the memory limit configured in `quality.phpstan.memory_limit` as an explicit `--memory-limit` argument. The default is `2G`; projects may use another PHP memory value such as `512M`, `4G`, a byte count, or `-1` for unlimited memory when that trade-off is intentional.
 
 Install the tools in the project before running the workflow. The exact constraints should follow the PHP and Laravel versions supported by that project:
 
 ```bash
-composer require --dev laravel/pint rector/rector driftingly/rector-laravel larastan/larastan
+composer require --dev laravel/pint rector/rector driftingly/rector-laravel larastan/larastan pestphp/pest
 ```
 
-When a configuration is missing, an interactive run offers to create a recommended template. Pint uses a shared Laravel preset. Rector and PHPStan ask whether the project is a Laravel application or Laravel package because their analyzed paths differ. Maintainer suggests the project type inferred from `composer.json`, but the selection remains explicit. Existing files are never overwritten.
+When a configuration is missing, an interactive run offers to create a recommended template. Pint uses a shared Laravel preset. Rector, PHPStan, and Pest ask whether the project is a Laravel application or Laravel package because their source and test paths differ. Maintainer suggests the project type inferred from `composer.json`, but the selection remains explicit. Existing files are never overwritten.
 
 In non-interactive and continuous integration environments, missing configuration stops the workflow and explains which file must be added. This keeps CI deterministic and prevents Maintainer from silently introducing configuration. The workflow also stops at the first tool that fails and returns that tool's exit code.
+
+After every tool succeeds, an interactive run inspects the Git working tree. When changes are present, Maintainer offers to continue directly into the commit workflow. Continuous integration never receives this prompt and never creates a commit.
 
 ### HTML Git diffs
 

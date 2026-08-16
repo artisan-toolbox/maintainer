@@ -12,12 +12,14 @@ final readonly class QualityToolRunner
      * Run a quality tool installed by the consuming project.
      *
      * @param  Closure(string): void  $output
+     * @param  list<string>  $additionalArguments
      */
     public function run(
         QualityTool $tool,
         string $projectRoot,
         string $configurationPath,
         Closure $output,
+        array $additionalArguments = [],
     ): int {
         $binary = $projectRoot
             .DIRECTORY_SEPARATOR.'vendor'
@@ -30,7 +32,10 @@ final readonly class QualityToolRunner
             "{$tool->label()} is not installed in the project. Install its Composer development dependency first.",
         );
 
-        $process = new Process($tool->command($binary, $configurationPath), $projectRoot);
+        $process = new Process(
+            $tool->command($binary, $configurationPath, $additionalArguments),
+            $projectRoot,
+        );
         $process->setTimeout(null);
 
         return $process->run(static function (string $type, string $buffer) use ($output): void {
