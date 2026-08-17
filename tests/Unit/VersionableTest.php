@@ -14,9 +14,9 @@ it('exports the versionable contract to consuming projects', function () {
 it('exports the lifecycle and README badge contracts to consuming projects', function () {
     $versionable = new class implements AfterVersioning, BeforeVersioning, Versionable, WithReadmeBadgeVersion
     {
-        public static function beforeVersioning(): void {}
+        public static function beforeVersioning(string $current, string $next): void {}
 
-        public static function afterVersioning(): void {}
+        public static function afterVersioning(string $current, string $next): void {}
     };
 
     expect($versionable)

@@ -1,8 +1,21 @@
 <?php
 
 use App\Support\Release\VersionableImplementation;
+use ArtisanToolbox\Maintainer\Maintainer;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+
+it('discovers Maintainer as its own versionable class', function () {
+    $versionable = new VersionableImplementation(new Filesystem)->find(dirname(__DIR__, 2));
+
+    expect($versionable)
+        ->not->toBeNull()
+        ->name->toBe(Maintainer::class)
+        ->and($versionable->implements(BeforeVersioning::class))->toBeTrue()
+        ->and($versionable->implements(WithReadmeBadgeVersion::class))->toBeTrue();
+});
 
 it('returns the versionable class and its current version', function () {
     $files = new Filesystem;

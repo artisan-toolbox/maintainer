@@ -23,6 +23,8 @@ use App\Support\Release\VersionableClass;
 use App\Support\Release\VersionableImplementation;
 use App\Support\Release\VersionableVersionWriter;
 use App\Support\Release\VersioningLifecycle;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\AfterVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -100,10 +102,6 @@ final class CreateReleaseCommand extends Command
         $pushed = false;
 
         try {
-            if ($lifecycle->before($versionableClass)) {
-                $this->components->twoColumnDetail('Before versioning', 'Completed');
-            }
-
             $latestVersion = spin(
                 fn () => $latestGitHubRelease->forMajor($projectRoot, $major),
                 'Fetching GitHub releases...',
@@ -135,6 +133,19 @@ final class CreateReleaseCommand extends Command
 
             $selectedVersion = $versionSelector->select($options, $defaultVersion);
             $this->components->twoColumnDetail('Selected version', $selectedVersion);
+            $currentVersion = $versionableClass->version
+                ?? $latestVersion?->value()
+                ?? "{$major}.0.0";
+            $versionWriter->write($versionableClass, $selectedVersion);
+            $this->components->twoColumnDetail('Version file', $versionableClass->file);
+
+            if ($versionableClass->implements(BeforeVersioning::class)) {
+                spin(
+                    fn (): bool => $lifecycle->before($versionableClass, $currentVersion, $selectedVersion),
+                    "Running the before-versioning callback for {$selectedVersion}...",
+                );
+                $this->components->twoColumnDetail('Before versioning', "{$currentVersion} → {$selectedVersion}");
+            }
 
             $changes = $git->changesSince($projectRoot, $latestVersion?->value());
             $notesProvider = $configuredAiProvider->for('release_notes');
@@ -147,9 +158,6 @@ final class CreateReleaseCommand extends Command
                 fn () => $changelogGenerator->generate($changelogProvider, $selectedVersion, $changes),
                 "Building the changelog with {$changelogProvider}...",
             );
-
-            $versionWriter->write($versionableClass, $selectedVersion);
-            $this->components->twoColumnDetail('Version file', $versionableClass->file);
 
             if ($readmeBadge->update($projectRoot, $versionableClass, $selectedVersion)) {
                 $this->components->twoColumnDetail('README badge', $selectedVersion);
@@ -193,8 +201,12 @@ final class CreateReleaseCommand extends Command
             );
             $this->components->twoColumnDetail('GitHub release', $releaseUrl);
 
-            if ($lifecycle->after($versionableClass)) {
-                $this->components->twoColumnDetail('After versioning', 'Completed');
+            if ($versionableClass->implements(AfterVersioning::class)) {
+                spin(
+                    fn (): bool => $lifecycle->after($versionableClass, $currentVersion, $selectedVersion),
+                    "Running the after-versioning callback for {$selectedVersion}...",
+                );
+                $this->components->twoColumnDetail('After versioning', "{$currentVersion} → {$selectedVersion}");
             }
 
             $this->components->success("Published GitHub release {$selectedVersion}.");

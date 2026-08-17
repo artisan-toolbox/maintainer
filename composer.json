@@ -47,7 +47,7 @@
     },
     "autoload": {
         "psr-4": {
-            "ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\": "app/Versionable/Contracts/"
+            "ArtisanToolbox\\Maintainer\\": "app/"
         }
     },
     "autoload-dev": {

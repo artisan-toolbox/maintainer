@@ -9,5 +9,5 @@ namespace ArtisanToolbox\Maintainer\Versionable\Contracts;
  */
 interface AfterVersioning
 {
-    public static function afterVersioning(): void;
+    public static function afterVersioning(string $current, string $next): void;
 }

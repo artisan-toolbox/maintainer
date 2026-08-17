@@ -152,12 +152,12 @@ final class ApplicationVersion implements Versionable, BeforeVersioning, AfterVe
 {
     public const string VERSION = '1.0.0';
 
-    public static function beforeVersioning(): void
+    public static function beforeVersioning(string $current, string $next): void
     {
-        // Prepare project-specific release files before version selection.
+        // Prepare project-specific files for the selected version transition.
     }
 
-    public static function afterVersioning(): void
+    public static function afterVersioning(string $current, string $next): void
     {
         // Run project-specific follow-up after GitHub publishes the release.
     }
@@ -166,7 +166,7 @@ final class ApplicationVersion implements Versionable, BeforeVersioning, AfterVe
 
 The version class must live directly in one of the production PSR-4 namespaces declared under `autoload.psr-4` in the project's `composer.json`. Declaring `public const string VERSION` is optional: Maintainer creates it when absent and updates it when present. Existing constants must be public, string-typed, and use `MAJOR.MINOR.PATCH`, optionally followed by `-alpha`, `-alpha.N`, `-beta`, or `-beta.N`. Other formats, including `v` prefixes, release candidates, build metadata, missing components, and leading zeros, are rejected. Classes in nested namespaces and development-only PSR-4 mappings are not considered.
 
-`BeforeVersioning::beforeVersioning()` runs immediately after Maintainer's initial project, Git, branch, and version-class validations. Any files it changes become part of the release commit. If it or a later pre-push step fails, Maintainer resets the repository to the original `HEAD` and removes untracked release files. `AfterVersioning::afterVersioning()` runs only after the release commit is pushed and the GitHub release is published; at that point remote work cannot be rolled back automatically.
+`BeforeVersioning::beforeVersioning($current, $next)` runs immediately after Maintainer writes the selected version to the version class and before it generates the remaining release files. This lets the callback build artifacts that already contain the next version. `AfterVersioning::afterVersioning($current, $next)` runs only after the release commit is pushed and the GitHub release is published. Both callbacks run inside a visible terminal spinner and receive the same transition: the class's previous `VERSION` and the selected version. When the class has no version constant, the current version falls back to the latest valid GitHub release, then to `MAJOR.0.0`. Files changed by the before callback become part of the release commit. If it or a later pre-push step fails, Maintainer resets the repository to the original `HEAD` and removes untracked release files. Once the after callback runs, remote work cannot be rolled back automatically.
 
 `WithReadmeBadgeVersion` is a marker contract. When present, Maintainer inserts or updates this protected block near the top of `README.md`:
 
@@ -289,7 +289,7 @@ The interactive version menu follows these transitions:
 
 When the latest GitHub release is stable, Maintainer compares its tag with `HEAD` and asks the provider configured under `ai.providers.release_type_suggestion` to recommend either the next patch or stable minor version. The structured suggestion follows Semantic Versioning rules, includes a diff-based justification, and becomes the version menu's default. AI is not consulted when no prior release exists or while an alpha or beta release must complete its prerelease flow. If the provider or local release tag is unavailable, Maintainer reports the problem and safely keeps the next patch as the default.
 
-After version selection, Maintainer builds the release content from the commit history and Git diff since the latest release:
+After version selection, Maintainer writes the selected version, runs the optional before-versioning callback with the current and selected versions, then builds the release content from the commit history and Git diff since the latest release:
 
 - `ai.providers.release_notes` creates a concise structured title and detailed Markdown body for GitHub.
 - `ai.providers.release_changelog_update` creates validated changelog entries with a Conventional Commit type, source commit hash, title, and detailed functional description.

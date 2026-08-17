@@ -8,7 +8,7 @@ use RuntimeException;
 
 final class VersioningLifecycle
 {
-    public function before(VersionableClass $versionable): bool
+    public function before(VersionableClass $versionable, string $current, string $next): bool
     {
         if (! $versionable->implements(BeforeVersioning::class)) {
             return false;
@@ -16,12 +16,12 @@ final class VersioningLifecycle
 
         $this->load($versionable);
         $class = $versionable->name;
-        $class::beforeVersioning();
+        $class::beforeVersioning($current, $next);
 
         return true;
     }
 
-    public function after(VersionableClass $versionable): bool
+    public function after(VersionableClass $versionable, string $current, string $next): bool
     {
         if (! $versionable->implements(AfterVersioning::class)) {
             return false;
@@ -29,7 +29,7 @@ final class VersioningLifecycle
 
         $this->load($versionable);
         $class = $versionable->name;
-        $class::afterVersioning();
+        $class::afterVersioning($current, $next);
 
         return true;
     }

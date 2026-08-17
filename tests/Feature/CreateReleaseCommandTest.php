@@ -254,14 +254,14 @@ final class ProjectVersion implements Versionable, BeforeVersioning, AfterVersio
 {
     public const string VERSION = '1.0.0';
 
-    public static function beforeVersioning(): void
+    public static function beforeVersioning(string $current, string $next): void
     {
-        file_put_contents(getcwd().'/before-versioning.txt', 'completed');
+        file_put_contents(getcwd().'/before-versioning.txt', "{$current}->{$next}:".self::VERSION);
     }
 
-    public static function afterVersioning(): void
+    public static function afterVersioning(string $current, string $next): void
     {
-        file_put_contents(getcwd().'/after-versioning.txt', 'completed');
+        file_put_contents(getcwd().'/after-versioning.txt', "{$current}->{$next}");
     }
 }
 PHP
@@ -274,8 +274,8 @@ PHP
             ->expectsOutputToContain('README badge')
             ->assertSuccessful();
 
-        expect($directory.'/before-versioning.txt')->toBeFile()
-            ->and($directory.'/after-versioning.txt')->toBeFile()
+        expect($files->get($directory.'/before-versioning.txt'))->toBe('1.0.0->1.0.1:1.0.1')
+            ->and($files->get($directory.'/after-versioning.txt'))->toBe('1.0.0->1.0.1')
             ->and($files->get($directory.'/README.md'))->toContain(implode("\n", [
                 '<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->',
                 '[![version](https://img.shields.io/badge/version-1.0.1-blue)](VERSION)',
@@ -309,7 +309,7 @@ final class ProjectVersion implements Versionable, BeforeVersioning
 {
     public const string VERSION = '1.0.0';
 
-    public static function beforeVersioning(): void
+    public static function beforeVersioning(string $current, string $next): void
     {
         file_put_contents(getcwd().'/callback-change.txt', 'rollback me');
 
