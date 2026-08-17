@@ -2,10 +2,13 @@
     <h1>Maintainer</h1>
 </div>
 
-<p align="center">
-    <a href="https://packagist.org/packages/artisan-toolbox/maintainer"><img src="https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square" alt="Packagist"></a>
-    <a href="https://github.com/artisan-toolbox/maintainer/actions"><img alt="GitHub Workflow Status (1.x)" src="https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&label=Tests&style=flat-square"></a>
-</p>
+<div align="center">
+
+<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->
+[![version](https://img.shields.io/badge/version-1.0.0--beta.1-blue?style=flat-square)](VERSION)
+<!-- MAINTAINER:VERSION_BADGE:END --> [![Packagist](https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square)](https://packagist.org/packages/artisan-toolbox/maintainer) [![Tests](https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&label=Tests&style=flat-square)](https://github.com/artisan-toolbox/maintainer/actions)
+
+</div>
 
 <p align="center">
     Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.
@@ -172,7 +175,7 @@ The version class must live directly in one of the production PSR-4 namespaces d
 
 ```markdown
 <!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->
-[![version](https://img.shields.io/badge/version-1.0.0-beta.1-blue)](VERSION)
+[![version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](VERSION)
 <!-- MAINTAINER:VERSION_BADGE:END -->
 ```
 

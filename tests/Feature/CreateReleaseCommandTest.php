@@ -278,7 +278,7 @@ PHP
             ->and($files->get($directory.'/after-versioning.txt'))->toBe('1.0.0->1.0.1')
             ->and($files->get($directory.'/README.md'))->toContain(implode("\n", [
                 '<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->',
-                '[![version](https://img.shields.io/badge/version-1.0.1-blue)](VERSION)',
+                '[![version](https://img.shields.io/badge/version-1.0.1-blue?style=flat-square)](VERSION)',
                 '<!-- MAINTAINER:VERSION_BADGE:END -->',
             ]));
     });
