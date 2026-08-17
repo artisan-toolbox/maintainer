@@ -2,6 +2,7 @@
 
 use App\Ai\Agents\ReleaseVersionAgent;
 use App\Support\Ai\LaravelAiReleaseVersionRecommender;
+use App\Support\Ai\ReleaseDiffChunker;
 use App\Support\Ai\ReleaseIncrement;
 use App\Support\Diff\GitDiffGenerator;
 use App\Support\Release\SemanticVersionNumber;
@@ -41,7 +42,7 @@ it('returns a typed structured recommendation based on the release diff', functi
             'justification' => 'The diff introduces backward-compatible functionality.',
         ]]);
 
-        $recommendation = new LaravelAiReleaseVersionRecommender(new GitDiffGenerator)->recommend(
+        $recommendation = new LaravelAiReleaseVersionRecommender(new GitDiffGenerator, new ReleaseDiffChunker)->recommend(
             'openai',
             $directory,
             new SemanticVersionNumber(1, 0, 0),
@@ -74,10 +75,49 @@ it('rejects a structured recommendation outside the supported release increments
             'justification' => 'An unsupported recommendation.',
         ]]);
 
-        expect(fn () => new LaravelAiReleaseVersionRecommender(new GitDiffGenerator)->recommend(
+        expect(fn () => new LaravelAiReleaseVersionRecommender(new GitDiffGenerator, new ReleaseDiffChunker)->recommend(
             'openai',
             $directory,
             new SemanticVersionNumber(1, 0, 0),
         ))->toThrow(RuntimeException::class, 'must recommend either patch or minor');
+    });
+});
+
+it('selects minor when any bounded diff fragment adds public functionality', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files): void {
+        foreach ([
+            ['init', '--initial-branch=1.x'],
+            ['config', 'user.name', 'Maintainer Tests'],
+            ['config', 'user.email', 'maintainer@example.com'],
+            ['add', '.'],
+            ['commit', '-m', 'Initial release'],
+            ['tag', '1.0.0'],
+        ] as $arguments) {
+            new Process(['git', ...$arguments], $directory)->mustRun();
+        }
+
+        $files->put($directory.'/fix.txt', "A backward-compatible fix.\n");
+        $files->put($directory.'/feature.txt', "A backward-compatible feature.\n");
+        new Process(['git', 'add', '.'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Fix and extend behavior'], $directory)->mustRun();
+
+        ReleaseVersionAgent::fake([
+            [
+                'release_increment' => 'minor',
+                'justification' => 'This fragment adds public functionality.',
+            ],
+            [
+                'release_increment' => 'patch',
+                'justification' => 'This fragment only fixes existing behavior.',
+            ],
+        ]);
+
+        $recommendation = new LaravelAiReleaseVersionRecommender(
+            new GitDiffGenerator,
+            new ReleaseDiffChunker,
+        )->recommend('openai', $directory, new SemanticVersionNumber(1, 0, 0));
+
+        expect($recommendation->increment)->toBe(ReleaseIncrement::Minor)
+            ->and($recommendation->justification)->toBe('This fragment adds public functionality.');
     });
 });

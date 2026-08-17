@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+
+- **Bound AI release analysis to prevent model context-window failures**
+  Replaces repeated full-diff prompts with a bounded map-and-consolidate workflow. Maintainer now splits release diffs into source-oriented fragments of no more than 24,000 characters, processes no more than 16 fragments, omits generated artifacts and dependency-heavy files from prompt bodies, and limits fragment summaries and commit context before downstream generation. Release type recommendations are consolidated across fragments, with any backwards-compatible public feature promoting the suggested increment to minor. Changelog generation consumes the consolidated summaries, while GitHub release notes are generated from the validated changelog entries rather than receiving the complete diff again. Stage-specific failures now identify whether analysis, changelog generation, release-note generation, Git operations, or GitHub publication failed, while preserving the existing pre-push rollback behavior.
+
+### Tests
+
+- **Cover bounded fragmentation, omitted artifacts, consolidated SemVer recommendations, and analysis failures**
+  Adds regression coverage for maximum fragment sizes and counts, generated and lockfile omission, structured summary reuse, minor selection across mixed patch/minor fragments, release-note generation from changelog context, actionable stage-specific errors, and worktree rollback after analysis failure.
+
 ## [1.0.0-beta.1] - 2026-08-17
 
 ### Features

@@ -19,7 +19,7 @@ final class ReleaseChangelogAgent implements Agent, HasStructuredOutput
     public function instructions(): string
     {
         return <<<'INSTRUCTIONS'
-            Build a detailed changelog entry list from the supplied commit summary and Git diff.
+            Build a detailed changelog entry list from the supplied commit summary and consolidated diff summaries.
             Use Conventional Commit types: feat, fix, docs, style, refactor, perf, test, build, ci,
             chore, or revert. Preserve each real abbreviated commit hash exactly when a change maps
             to a commit. Write concise titles and thorough functional descriptions that explain what

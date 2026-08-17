@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use App\Support\Ai\CommitMessageGenerator;
 use App\Support\Ai\LaravelAiCommitMessageGenerator;
+use App\Support\Ai\LaravelAiReleaseChangeAnalyzer;
 use App\Support\Ai\LaravelAiReleaseChangelogGenerator;
 use App\Support\Ai\LaravelAiReleaseNotesGenerator;
 use App\Support\Ai\LaravelAiReleaseVersionRecommender;
+use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\Ai\ReleaseChangelogGenerator;
 use App\Support\Ai\ReleaseNotesGenerator;
 use App\Support\Ai\ReleaseVersionRecommender;
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(CommitMessageGenerator::class, LaravelAiCommitMessageGenerator::class);
+        $this->app->bind(ReleaseChangeAnalyzer::class, LaravelAiReleaseChangeAnalyzer::class);
         $this->app->bind(ReleaseChangelogGenerator::class, LaravelAiReleaseChangelogGenerator::class);
         $this->app->bind(ReleaseNotesGenerator::class, LaravelAiReleaseNotesGenerator::class);
         $this->app->bind(ReleaseVersionRecommender::class, LaravelAiReleaseVersionRecommender::class);

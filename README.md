@@ -98,7 +98,7 @@ The published file starts with Maintainer's current defaults:
 }
 ```
 
-The four `ai.providers` values select the Laravel AI provider used for commit messages, release type suggestions, release notes, and release changelog updates. Stable release suggestions and commit messages currently use this configuration; the remaining release values establish the provider choices for their respective workflows as those workflows are introduced. The release type suggestion agent always uses the provider's cheapest model through Laravel AI's `UseCheapestModel` attribute.
+The four `ai.providers` values select the Laravel AI provider used for commit messages, release type suggestions, release notes, and release changelog updates. Every configured release agent delegates model selection to the provider's cheapest compatible model through Laravel AI's `UseCheapestModel` attribute.
 
 The `init` command also creates `maintainer_secrets.json` beside `maintainer.json` and adds `maintainer_secrets.json` to the project's `.gitignore`. The secrets template contains every provider supported by the installed Laravel AI SDK. Add credentials only for the providers the project uses. Provider values may include connection settings such as an endpoint in addition to the API key. The `--force` option never overwrites an existing secrets file.
 
@@ -290,13 +290,17 @@ The interactive version menu follows these transitions:
 - Alpha and beta flows cannot create another patch or minor until their current version becomes stable.
 - Major increments are never offered. Start the new major from its matching `MAJOR.x` branch.
 
-When the latest GitHub release is stable, Maintainer compares its tag with `HEAD` and asks the provider configured under `ai.providers.release_type_suggestion` to recommend either the next patch or stable minor version. The structured suggestion follows Semantic Versioning rules, includes a diff-based justification, and becomes the version menu's default. AI is not consulted when no prior release exists or while an alpha or beta release must complete its prerelease flow. If the provider or local release tag is unavailable, Maintainer reports the problem and safely keeps the next patch as the default.
+When the latest GitHub release is stable, Maintainer compares its tag with `HEAD` and asks the provider configured under `ai.providers.release_type_suggestion` to recommend either the next patch or stable minor version. The diff is divided into bounded fragments and each fragment receives a structured recommendation. A minor recommendation from any fragment makes minor the consolidated default; otherwise patch remains the default. The result includes a diff-based justification. AI is not consulted when no prior release exists or while an alpha or beta release must complete its prerelease flow. If the provider or local release tag is unavailable, Maintainer reports the problem and safely keeps the next patch as the default.
 
 After version selection, Maintainer writes the selected version, runs the optional before-versioning callback with the current and selected versions, then builds the release content from the commit history and Git diff since the latest release:
 
 - `ai.providers.release_notes` creates a concise structured title and detailed Markdown body for GitHub.
 - `ai.providers.release_changelog_update` creates validated changelog entries with a Conventional Commit type, source commit hash, title, and detailed functional description.
 - `CHANGELOG.md` is created when absent. New releases are prepended and grouped under Features, Fixes, Documentation, Refactoring, Performance, Tests, Build, CI, Maintenance, and other relevant categories.
+
+Maintainer never sends an unbounded release diff to an AI provider. It splits source changes into fragments of at most 24,000 characters and analyzes at most 16 fragments. Generated output and dependency-heavy paths such as `builds/`, `dist/`, `vendor/`, `node_modules/`, coverage output, lockfiles, and minified CSS or JavaScript are recorded as omitted instead of being copied into prompts. Each structured fragment summary is limited before the summaries and bounded commit history are consolidated. The changelog agent consumes that consolidated context, and the release-notes agent consumes the validated changelog entries instead of receiving the raw diff again. The browser review still shows the complete Git diff.
+
+These bounds prevent provider context-window failures and runaway request costs. When a diff exceeds the maximum fragment count, Maintainer records that the analysis was truncated and the version recommendation tells the user to review the remaining changes before accepting it.
 
 Maintainer then updates or creates the `VERSION` constant, updates the protected README badge when requested, and stages every generated release file. When a previous release exists, it offers to open an HTML diff from that release reference to the complete proposal; the default is yes, and the terminal waits for the maintainer to return before continuing.
 

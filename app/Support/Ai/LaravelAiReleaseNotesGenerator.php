@@ -18,7 +18,7 @@ final class LaravelAiReleaseNotesGenerator implements ReleaseNotesGenerator
             COMMITS
             {$changes->commits}
 
-            GIT DIFF
+            RELEASE CHANGE SUMMARY
             {$changes->diff}
             PROMPT,
             provider: $provider,

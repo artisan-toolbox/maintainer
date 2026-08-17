@@ -1,18 +1,22 @@
 <?php
 
 use App\Ai\Agents\ReleaseChangelogAgent;
+use App\Ai\Agents\ReleaseDiffSummaryAgent;
 use App\Ai\Agents\ReleaseNotesAgent;
 use App\Ai\Agents\ReleaseVersionAgent;
+use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\BrowserLauncher;
 use App\Support\Release\GitCliReleaseRepository;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
+use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
 use App\Support\Release\ReleaseVersionSelector;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use Laravel\Ai\Prompts\AgentPrompt;
 use Symfony\Component\Process\Process;
 use Tests\Fakes\FakeBrowserLauncher;
 use Tests\Fakes\FakeGitHubReleasePublisher;
@@ -107,6 +111,9 @@ JSON
         'release_increment' => 'patch',
         'justification' => 'The diff contains backwards-compatible fixes and maintenance.',
     ]]);
+    ReleaseDiffSummaryAgent::fake([[
+        'summary' => 'The release workflow changes project versioning behavior.',
+    ]]);
     ReleaseNotesAgent::fake([[
         'title' => 'Improve the release workflow',
         'body' => "## Changed\n\nImproved the release workflow.",
@@ -166,6 +173,27 @@ it('continues when the Git working tree is clean', function () {
                 'target' => '1.x',
                 'prerelease' => false,
             ]);
+
+        ReleaseChangelogAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'Fragment 1: The release workflow changes project versioning behavior.'));
+        ReleaseNotesAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '[feat] abc1234 Improve the release workflow'));
+    });
+});
+
+it('identifies release change analysis failures and rolls back the worktree', function () {
+    withinTemporaryReleaseProject(function (): void {
+        app()->instance(ReleaseChangeAnalyzer::class, new class implements ReleaseChangeAnalyzer
+        {
+            public function analyze(string $provider, ReleaseChangeSet $changes): ReleaseChangeSet
+            {
+                throw new RuntimeException('The provider context window was exceeded.');
+            }
+        });
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('Unable to analyze release changes with AI: The provider context window was exceeded.')
+            ->assertFailed();
+
+        expect(resolve(FakeReleaseGitRepository::class)->rolledBack)->toBeTrue();
     });
 });
 

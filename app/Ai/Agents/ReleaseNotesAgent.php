@@ -19,7 +19,7 @@ final class ReleaseNotesAgent implements Agent, HasStructuredOutput
     public function instructions(): string
     {
         return <<<'INSTRUCTIONS'
-            Write GitHub release notes from the supplied version, commit summary, and Git diff.
+            Write GitHub release notes from the supplied version, commit summary, and validated changelog context.
             The title must be concise but specific enough to identify the release's main outcome.
             The body must be clear, detailed Markdown organized by relevant sections such as Added,
             Changed, Fixed, Removed, Performance, Documentation, Testing, or Internal Maintenance.

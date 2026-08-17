@@ -2,7 +2,9 @@
 
 namespace App\Commands;
 
+use App\Support\Ai\ChangelogEntry;
 use App\Support\Ai\ConfiguredAiProvider;
+use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\Ai\ReleaseChangelogGenerator;
 use App\Support\Ai\ReleaseIncrement;
 use App\Support\Ai\ReleaseNotesGenerator;
@@ -14,6 +16,7 @@ use App\Support\Release\ChangelogWriter;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\LatestGitHubRelease;
 use App\Support\Release\ReadmeVersionBadge;
+use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
 use App\Support\Release\ReleaseVersionOptions;
@@ -28,6 +31,7 @@ use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
+use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 use Throwable;
@@ -55,6 +59,7 @@ final class CreateReleaseCommand extends Command
         VersioningLifecycle $lifecycle,
         ReadmeVersionBadge $readmeBadge,
         ReleaseGitRepository $git,
+        ReleaseChangeAnalyzer $releaseChangeAnalyzer,
         ReleaseNotesGenerator $releaseNotesGenerator,
         ReleaseChangelogGenerator $changelogGenerator,
         ChangelogWriter $changelogWriter,
@@ -100,8 +105,10 @@ final class CreateReleaseCommand extends Command
         }
 
         $pushed = false;
+        $operation = 'complete the release workflow';
 
         try {
+            $operation = 'fetch GitHub releases';
             $latestVersion = spin(
                 fn () => $latestGitHubRelease->forMajor($projectRoot, $major),
                 'Fetching GitHub releases...',
@@ -131,15 +138,18 @@ final class CreateReleaseCommand extends Command
                 }
             }
 
+            $operation = 'select the next release version';
             $selectedVersion = $versionSelector->select($options, $defaultVersion);
             $this->components->twoColumnDetail('Selected version', $selectedVersion);
             $currentVersion = $versionableClass->version
                 ?? $latestVersion?->value()
                 ?? "{$major}.0.0";
+            $operation = 'write the selected project version';
             $versionWriter->write($versionableClass, $selectedVersion);
             $this->components->twoColumnDetail('Version file', $versionableClass->file);
 
             if ($versionableClass->implements(BeforeVersioning::class)) {
+                $operation = 'run the before-versioning callback';
                 spin(
                     fn (): bool => $lifecycle->before($versionableClass, $currentVersion, $selectedVersion),
                     "Running the before-versioning callback for {$selectedVersion}...",
@@ -147,39 +157,57 @@ final class CreateReleaseCommand extends Command
                 $this->components->twoColumnDetail('Before versioning', "{$currentVersion} → {$selectedVersion}");
             }
 
+            $operation = 'collect release changes';
             $changes = $git->changesSince($projectRoot, $latestVersion?->value());
-            $notesProvider = $configuredAiProvider->for('release_notes');
-            $releaseNotes = spin(
-                fn () => $releaseNotesGenerator->generate($notesProvider, $selectedVersion, $changes),
-                "Writing GitHub release notes with {$notesProvider}...",
-            );
             $changelogProvider = $configuredAiProvider->for('release_changelog_update');
+            $operation = 'analyze release changes with AI';
+            $analyzedChanges = spin(
+                fn () => $releaseChangeAnalyzer->analyze($changelogProvider, $changes),
+                "Summarizing bounded release diff fragments with {$changelogProvider}...",
+            );
+            $operation = 'generate the release changelog';
             $changelogEntries = spin(
-                fn () => $changelogGenerator->generate($changelogProvider, $selectedVersion, $changes),
+                fn () => $changelogGenerator->generate($changelogProvider, $selectedVersion, $analyzedChanges),
                 "Building the changelog with {$changelogProvider}...",
             );
+            $notesProvider = $configuredAiProvider->for('release_notes');
+            $operation = 'generate GitHub release notes';
+            $releaseNotes = spin(
+                fn () => $releaseNotesGenerator->generate(
+                    $notesProvider,
+                    $selectedVersion,
+                    $this->releaseNotesContext($analyzedChanges, $changelogEntries),
+                ),
+                "Writing GitHub release notes with {$notesProvider}...",
+            );
 
+            $operation = 'update the README version badge';
             if ($readmeBadge->update($projectRoot, $versionableClass, $selectedVersion)) {
                 $this->components->twoColumnDetail('README badge', $selectedVersion);
             }
 
+            $operation = 'write CHANGELOG.md';
             $changelogPath = $changelogWriter->write($projectRoot, $selectedVersion, $changelogEntries);
             $this->components->twoColumnDetail('Changelog', $changelogPath);
 
+            $operation = 'stage the release files';
             $git->stageAll($projectRoot);
 
             if ($latestVersion !== null && $diffReviewer->shouldReview()) {
+                $operation = 'open the proposed release diff';
                 throw_if($this->call('diff:html', ['base' => $latestVersion->value()]) !== self::SUCCESS, RuntimeException::class, 'The proposed release diff could not be opened.');
 
                 $diffReviewer->waitForReturn();
             }
 
+            $operation = 'create the release commit';
             $commit = spin(
                 fn (): string => $git->commit($projectRoot, $selectedVersion),
                 'Committing the release files...',
             );
             $this->components->twoColumnDetail('Commit', $commit);
 
+            $operation = 'push the release commit';
             spin(
                 fn () => $git->push($projectRoot),
                 'Pushing the release commit to origin...',
@@ -188,6 +216,7 @@ final class CreateReleaseCommand extends Command
             $this->components->success('Pushed the release commit to origin.');
 
             $selected = $semanticVersion->parse($selectedVersion);
+            $operation = 'publish the GitHub release';
             $releaseUrl = spin(
                 fn (): string => $publisher->publish(
                     $projectRoot,
@@ -202,6 +231,7 @@ final class CreateReleaseCommand extends Command
             $this->components->twoColumnDetail('GitHub release', $releaseUrl);
 
             if ($versionableClass->implements(AfterVersioning::class)) {
+                $operation = 'run the after-versioning callback';
                 spin(
                     fn (): bool => $lifecycle->after($versionableClass, $currentVersion, $selectedVersion),
                     "Running the after-versioning callback for {$selectedVersion}...",
@@ -222,10 +252,32 @@ final class CreateReleaseCommand extends Command
                 }
             }
 
-            $this->components->error('Unable to create the GitHub release: '.$exception->getMessage());
+            $this->components->error("Unable to {$operation}: ".$exception->getMessage());
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * @param  list<ChangelogEntry>  $entries
+     */
+    private function releaseNotesContext(ReleaseChangeSet $changes, array $entries): ReleaseChangeSet
+    {
+        $summary = collect($entries)
+            ->map(fn (ChangelogEntry $entry): string => sprintf(
+                '[%s] %s %s%s%s',
+                $entry->type,
+                $entry->hash,
+                $entry->title,
+                PHP_EOL,
+                $entry->description,
+            ))
+            ->implode(PHP_EOL.PHP_EOL);
+
+        return new ReleaseChangeSet(
+            Str::limit($summary, 40_000, PHP_EOL.'… additional changelog entries omitted'),
+            $changes->commits,
+        );
     }
 
     private function validatedVersionable(

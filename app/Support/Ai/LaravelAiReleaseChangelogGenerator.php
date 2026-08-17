@@ -20,7 +20,7 @@ final class LaravelAiReleaseChangelogGenerator implements ReleaseChangelogGenera
             COMMITS
             {$changes->commits}
 
-            GIT DIFF
+            RELEASE CHANGE SUMMARY
             {$changes->diff}
             PROMPT,
             provider: $provider,
