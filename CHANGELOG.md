@@ -9,6 +9,9 @@
 
 ### Fixes
 
+- **Fetch GitHub release tags that are absent from the local clone**
+  Resolves the latest online release tag locally before version recommendation, lifecycle callbacks, release-content generation, or HTML diff review. When the tag is missing, Maintainer fetches that exact tag from `origin` and verifies that it resolves to a commit. This prevents `fatal: bad revision` failures in shallow or `--no-tags` clones while avoiding unnecessary network access when the release tag already exists locally.
+
 - **Roll back interrupted releases when SIGTERM is received**
   Registers `release:create` as a Symfony signal-aware command on platforms with `pcntl`, arms the existing worktree rollback after the starting `HEAD` is captured, and restores prepared release changes before exiting with status 143. The shared rollback state prevents duplicate restoration when signal handling intersects the normal exception path. Interruptions after a successful push report that automatic rollback was skipped because local restoration cannot safely reverse remote state. Platforms without signal support, including Windows configurations without `pcntl`, continue without registering unsupported handlers.
 

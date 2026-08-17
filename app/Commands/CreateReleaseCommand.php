@@ -121,6 +121,16 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
                 fn () => $latestGitHubRelease->forMajor($projectRoot, $major),
                 'Fetching GitHub releases...',
             );
+
+            if ($latestVersion !== null) {
+                $operation = 'fetch the latest GitHub release tag';
+                spin(
+                    fn () => $git->ensureLocalReference($projectRoot, $latestVersion->value()),
+                    "Fetching Git tag {$latestVersion->value()} from origin...",
+                );
+                $this->components->twoColumnDetail('Local release tag', $latestVersion->value());
+            }
+
             $options = $releaseVersionOptions->forMajor($major, $latestVersion);
 
             $this->components->twoColumnDetail('Release branch', "{$major}.x");

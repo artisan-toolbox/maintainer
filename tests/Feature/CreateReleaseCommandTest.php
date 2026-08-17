@@ -173,6 +173,7 @@ it('continues when the Git working tree is clean', function () {
             ->toContain("public const string VERSION = '1.0.1';")
             ->and($files->get($directory.'/CHANGELOG.md'))->toContain('## [1.0.1] - ')
             ->and(resolve(FakeReleaseGitRepository::class)->staged)->toBeTrue()
+            ->and(resolve(FakeReleaseGitRepository::class)->ensuredReferences)->toBe(['1.0.0'])
             ->and(resolve(FakeReleaseGitRepository::class)->committed)->toBeTrue()
             ->and(resolve(FakeReleaseGitRepository::class)->pushed)->toBeTrue()
             ->and(resolve(FakeGitHubReleasePublisher::class)->published)->toMatchArray([

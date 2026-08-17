@@ -6,6 +6,8 @@ interface ReleaseGitRepository
 {
     public function head(string $projectRoot): string;
 
+    public function ensureLocalReference(string $projectRoot, string $reference): void;
+
     public function changesSince(string $projectRoot, ?string $base): ReleaseChangeSet;
 
     public function stageAll(string $projectRoot): void;

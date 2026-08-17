@@ -15,9 +15,17 @@ final class FakeReleaseGitRepository implements ReleaseGitRepository
 
     public bool $rolledBack = false;
 
+    /** @var list<string> */
+    public array $ensuredReferences = [];
+
     public function head(string $projectRoot): string
     {
         return 'baseline-head';
+    }
+
+    public function ensureLocalReference(string $projectRoot, string $reference): void
+    {
+        $this->ensuredReferences[] = $reference;
     }
 
     public function changesSince(string $projectRoot, ?string $base): ReleaseChangeSet

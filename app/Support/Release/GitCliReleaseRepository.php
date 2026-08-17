@@ -12,6 +12,28 @@ final class GitCliReleaseRepository implements ReleaseGitRepository
         return trim($this->run(['git', 'rev-parse', 'HEAD'], $projectRoot));
     }
 
+    public function ensureLocalReference(string $projectRoot, string $reference): void
+    {
+        if ($this->hasCommit($projectRoot, $reference)) {
+            return;
+        }
+
+        try {
+            $this->run(['git', 'fetch', '--no-tags', 'origin', 'tag', $reference], $projectRoot);
+        } catch (RuntimeException $exception) {
+            throw new RuntimeException(
+                "GitHub release tag {$reference} is not available locally and could not be fetched from origin: {$exception->getMessage()}",
+                previous: $exception,
+            );
+        }
+
+        throw_unless(
+            $this->hasCommit($projectRoot, $reference),
+            RuntimeException::class,
+            "GitHub release tag {$reference} was fetched but does not resolve to a Git commit.",
+        );
+    }
+
     public function changesSince(string $projectRoot, ?string $base): ReleaseChangeSet
     {
         $base ??= $this->emptyTree($projectRoot);
@@ -53,6 +75,14 @@ final class GitCliReleaseRepository implements ReleaseGitRepository
         }
 
         return trim($process->getOutput());
+    }
+
+    private function hasCommit(string $projectRoot, string $reference): bool
+    {
+        $process = new Process(['git', 'rev-parse', '--verify', '--quiet', "{$reference}^{commit}"], $projectRoot);
+        $process->run();
+
+        return $process->isSuccessful();
     }
 
     /**
