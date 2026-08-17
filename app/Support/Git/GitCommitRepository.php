@@ -62,7 +62,24 @@ final class GitCommitRepository
             $files,
         ))));
 
-        $this->run(['git', 'add', '--all', '--', ...$paths], $projectRoot);
+        $tracked = array_flip(array_filter(explode("\0", $this->run([
+            'git',
+            'ls-files',
+            '--cached',
+            '-z',
+            '--',
+            ...$paths,
+        ], $projectRoot))));
+        $stageablePaths = array_values(array_filter(
+            $paths,
+            static fn (string $path): bool => isset($tracked[$path])
+                || file_exists($projectRoot.DIRECTORY_SEPARATOR.$path)
+                || is_link($projectRoot.DIRECTORY_SEPARATOR.$path),
+        ));
+
+        if ($stageablePaths !== []) {
+            $this->run(['git', 'add', '--all', '--', ...$stageablePaths], $projectRoot);
+        }
     }
 
     public function stagedStatus(string $projectRoot): string

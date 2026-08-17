@@ -10,10 +10,13 @@ final class ReleaseVersionOptions
     public function forMajor(int $major, ?SemanticVersionNumber $latest): array
     {
         if ($latest === null) {
+            $initialMinor = $major === 0 ? 1 : 0;
+            $initialVersion = "{$major}.{$initialMinor}.0";
+
             return [
-                "{$major}.0.0" => "Stable — {$major}.0.0",
-                "{$major}.0.0-alpha.1" => "Alpha — {$major}.0.0-alpha.1",
-                "{$major}.0.0-beta.1" => "Beta — {$major}.0.0-beta.1",
+                $initialVersion => "Stable — {$initialVersion}",
+                $initialVersion.'-alpha.1' => "Alpha — {$initialVersion}-alpha.1",
+                $initialVersion.'-beta.1' => "Beta — {$initialVersion}-beta.1",
             ];
         }
 

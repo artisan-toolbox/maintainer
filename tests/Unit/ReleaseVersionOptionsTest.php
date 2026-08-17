@@ -11,6 +11,14 @@ it('offers the initial versions when the major has no GitHub release', function 
     ]);
 });
 
+it('starts initial development at the SemVer-recommended zero-major version', function () {
+    expect((new ReleaseVersionOptions)->forMajor(0, null))->toBe([
+        '0.1.0' => 'Stable — 0.1.0',
+        '0.1.0-alpha.1' => 'Alpha — 0.1.0-alpha.1',
+        '0.1.0-beta.1' => 'Beta — 0.1.0-beta.1',
+    ]);
+});
+
 it('offers patch and minor transitions after a stable release', function () {
     $latest = (new SemanticVersion)->parse('1.2.3');
 

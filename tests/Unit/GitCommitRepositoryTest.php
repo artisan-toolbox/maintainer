@@ -83,6 +83,25 @@ it('stages both sides of a selected rename', function () {
         ->toContain('rename to renamed.txt');
 });
 
+it('ignores an index-only path removed before the selected files are staged', function () {
+    $this->files->put($this->directory.'/temporary-name.txt', "new file\n");
+    new Process(['git', 'add', 'temporary-name.txt'], $this->directory)->mustRun();
+    $this->files->move(
+        $this->directory.'/temporary-name.txt',
+        $this->directory.'/permanent-name.txt',
+    );
+    $repository = new GitCommitRepository;
+
+    $changes = $repository->changes($this->directory);
+    $repository->stageOnly($this->directory, $changes);
+
+    expect($repository->stagedStatus($this->directory))
+        ->toBe("A\tpermanent-name.txt")
+        ->and($repository->stagedDiff($this->directory))
+        ->toContain('permanent-name.txt')
+        ->not->toContain('temporary-name.txt');
+});
+
 it('never stages every file when the selection is empty', function () {
     $this->files->put($this->directory.'/keep.txt', "changed\n");
     $repository = new GitCommitRepository;

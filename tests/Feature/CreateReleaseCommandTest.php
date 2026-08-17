@@ -9,6 +9,7 @@ use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
+use App\Support\Release\ReleaseVersionSelector;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
@@ -18,6 +19,7 @@ use Tests\Fakes\FakeGitHubReleasePublisher;
 use Tests\Fakes\FakeGitHubReleaseSource;
 use Tests\Fakes\FakeReleaseDiffReviewer;
 use Tests\Fakes\FakeReleaseGitRepository;
+use Tests\Fakes\FakeReleaseVersionSelector;
 
 /**
  * @param  Closure(string, Filesystem): void  $callback
@@ -95,6 +97,9 @@ JSON
     $diffReviewer = new FakeReleaseDiffReviewer;
     app()->instance(ReleaseDiffReviewer::class, $diffReviewer);
     app()->instance(FakeReleaseDiffReviewer::class, $diffReviewer);
+    $versionSelector = new FakeReleaseVersionSelector;
+    app()->instance(ReleaseVersionSelector::class, $versionSelector);
+    app()->instance(FakeReleaseVersionSelector::class, $versionSelector);
     $browser = new FakeBrowserLauncher;
     app()->instance(BrowserLauncher::class, $browser);
     app()->instance(FakeBrowserLauncher::class, $browser);
@@ -199,6 +204,17 @@ JSON
             ->expectsOutputToContain('1.1.0')
             ->expectsOutputToContain('The diff adds a backward-compatible public command option.')
             ->assertSuccessful();
+
+        expect($files->get($directory.'/src/ProjectVersion.php'))
+            ->toContain("public const string VERSION = '1.1.0';");
+    });
+});
+
+it('uses the version selected by the user instead of the suggested default', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        resolve(FakeReleaseVersionSelector::class)->selected = '1.1.0';
+
+        $this->artisan('release:create')->assertSuccessful();
 
         expect($files->get($directory.'/src/ProjectVersion.php'))
             ->toContain("public const string VERSION = '1.1.0';");
@@ -491,9 +507,9 @@ it('supports the SemVer initial-development lifecycle on a zero-major branch', f
             ->assertSuccessful();
 
         expect($files->get($directory.'/src/ProjectVersion.php'))
-            ->toContain("public const string VERSION = '0.0.0';")
+            ->toContain("public const string VERSION = '0.1.0';")
             ->and(resolve(FakeGitHubReleasePublisher::class)->published)->toMatchArray([
-                'version' => '0.0.0',
+                'version' => '0.1.0',
                 'target' => '0.x',
                 'prerelease' => false,
             ]);

@@ -17,6 +17,7 @@ use App\Support\Release\ReadmeVersionBadge;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
 use App\Support\Release\ReleaseVersionOptions;
+use App\Support\Release\ReleaseVersionSelector;
 use App\Support\Release\SemanticVersion;
 use App\Support\Release\VersionableClass;
 use App\Support\Release\VersionableImplementation;
@@ -29,7 +30,6 @@ use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 use Throwable;
 
-use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
 
 #[Signature('release:create')]
@@ -58,6 +58,7 @@ final class CreateReleaseCommand extends Command
         ChangelogWriter $changelogWriter,
         GitHubReleasePublisher $publisher,
         ReleaseDiffReviewer $diffReviewer,
+        ReleaseVersionSelector $versionSelector,
     ): int {
         $projectRoot = $projectPath->root();
 
@@ -132,11 +133,7 @@ final class CreateReleaseCommand extends Command
                 }
             }
 
-            $selectedVersion = (string) select(
-                label: 'Which version should be released?',
-                options: $options,
-                default: $defaultVersion,
-            );
+            $selectedVersion = $versionSelector->select($options, $defaultVersion);
             $this->components->twoColumnDetail('Selected version', $selectedVersion);
 
             $changes = $git->changesSince($projectRoot, $latestVersion?->value());
