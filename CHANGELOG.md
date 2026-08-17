@@ -1,5 +1,140 @@
 # Changelog
 
+## [1.0.0] - 2026-08-17
+
+### Features
+
+- **Display version in maintainer banner** (`ad29f27`)
+  Enhances the maintainer CLI banner to append `Maintainer::VERSION`, making it easier for users to verify which installed version they are running. This is user-facing but non-breaking: it changes only display output. Compatibility: no API changes. Migration: none.
+
+- **Bound AI release diff analysis with chunking and summaries** (`f751e3a`)
+  Limits AI analysis of release diffs by chunking the diff and producing per-fragment summaries, reducing the chance of context-window failures and improving robustness for larger diffs. Why it matters: AI-based release tooling must scale to real-world repository diffs. User impact: more consistent generation of changelog/release artifacts for large change sets; output quality should improve due to guided summarization. Compatibility/migration: no manual migration, but the structure/content of AI-generated summaries may differ from prior behavior.
+
+- **Pass current and next versions to versioning callbacks** (`6e83eb7`)
+  Updates the versioning lifecycle so that callbacks receive both the current version and the next target version. This matters because callbacks often need to compute behavior based on an explicit version transition (e.g., updating files, validating constraints, or customizing changelog sections). User impact: improved callback capability/expressiveness. Compatibility: existing callback signatures may need adjustment depending on how the callback interface is defined in the codebase. Migration: update any custom `BeforeVersioning`/`AfterVersioning` implementations to accept/use the new parameters as applicable.
+
+- **Normalize directory paths and log content handling in RunQualityCommandTest** (`cb57143`)
+  Improves test robustness by normalizing directory paths and log content handling in `RunQualityCommandTest`. This helps avoid platform-specific failures and makes assertions less brittle. User impact: none directly (test-only). Compatibility/migration: none.
+
+- **Add ReleaseDiffReviewer with browser review and terminal pause support** (`fea4324`)
+  Introduces `ReleaseDiffReviewer`, adding a review step that can render diffs for browser inspection and optionally pause in the terminal for user confirmation. Why it matters: release workflows benefit from an explicit human review loop, especially when AI-generated changelog/release notes are involved. User impact: more controlled release creation workflow with improved review ergonomics. Compatibility: no API breaking changes implied, but release flow UI/interaction changes (an additional review step/pause) may affect automation scripts if they rely on fully non-interactive execution.
+
+- **Support zero-major SemVer branches and improve platform compatibility** (`8e8c090`)
+  Enhances SemVer handling for zero-major branches and improves platform compatibility, along with refinements to content handling. This matters for repositories whose branching/version scheme starts with `0.x` and for ensuring consistent behavior across environments/OSes. User impact: more reliable release/version behavior in early-stage versioning and fewer cross-platform issues. Compatibility/migration: behavior changes in version inference/content handling; migration typically not required but automation expectations may need validation.
+
+- **Introduce AI-powered release versioning and changelog generation** (`a65f1d1`)
+  Adds AI-powered tooling to recommend release version increments and generate changelog entries as part of the release workflow. Why it matters: reduces manual effort and improves speed/consistency in release notes. User impact: `release:create` can now use AI to draft changelog and version increment recommendations. Compatibility: introduces new behavior and potential new dependencies/configuration for AI operations. Migration: ensure AI configuration/environment is set up if you enable AI features; otherwise the non-AI path should remain functional depending on existing defaults.
+
+- **Add Git commit workflow with AI-generated message support** (`feb74be`)
+  Adds a Git commit workflow that supports AI-generated commit messages. Why it matters: streamlines developer commit creation and enforces Conventional Commit structure. User impact: new interactive/assisted commit flow, potentially changing developer experience. Compatibility: introduces new CLI command/workflow; no breaking changes expected for existing git usage. Migration: none unless you want to adopt the new commit command.
+
+- **Add HTML Git diff generation and browser viewing workflow** (`6712dda`)
+  Adds functionality/workflow to generate HTML Git diffs and view them in a browser. This supports review of changes, particularly useful for AI-assisted release workflows. User impact: new option to visually inspect diffs. Compatibility: adds a command/path; no breaking changes expected. Migration: none.
+
+- **Add release:create and maintainer commands; replace InspireCommand** (`9d8f6a9`)
+  Implements `release:create` and `maintainer` commands, replaces `InspireCommand`, and updates documentation/tests accordingly. Why it matters: establishes the core CLI entry points for release and interactive maintenance tasks. User impact: command set changes; users should use the new commands. Compatibility: if you used the old `InspireCommand`/CLI entry points, they may no longer exist. Migration: update your command usage to `maintainer` and `release:create`.
+
+- **Generate HTML or Markdown version badges in README** (`4f6de16`)
+  Includes the changes introduced by commit 4f6de16: feat: generate HTML or Markdown version badges in README.
+
+### Fixes
+
+- **Reconcile AI release changelog hashes with git commits** (`4498dcc`)
+  Fixes AI-generated release changelog entries so that they reconcile against actual git commits. This matters because deterministic traceability is critical for changelogs: entries must map to real commit hashes. User impact is improved reliability/accuracy of generated changelog output. Compatibility and migration: no breaking compatibility changes, but generated changelog history for the affected release can differ from previously generated outputs.
+
+- **Fetch missing GitHub release tags from origin** (`9d5675a`)
+  Improves the release flow by fetching missing GitHub release tags from `origin` when they are not present locally. This prevents the release process from missing context about the latest release state, which can otherwise lead to incorrect version selection and changelog/release note generation. User impact: more reliable `release:create` behavior when local tag state is incomplete. Migration: none required.
+
+- **Reject non-interactive execution for maintainer command** (`fe78a0c`)
+  Ensures the `maintainer` command is rejected when run in non-interactive mode, and updates error messaging, tests, and documentation with workflow instructions. Why it matters: interactive CLI commands can behave incorrectly or hang in CI/non-interactive environments. User impact: clearer failure behavior when automation tries to run interactive commands. Compatibility: scripts that previously invoked `maintainer` non-interactively may now fail. Migration: run `maintainer` in interactive contexts, or adjust scripts to use non-interactive-friendly alternatives if provided.
+
+- **Prevent README badge updates inside code fences** (`9a53012`)
+  Includes the changes introduced by commit 9a53012: fix: prevent README badge updates inside code fences.
+
+### Documentation
+
+- **Clarify README and documentation links** (`d5e9844`)
+  Updates README and other documentation links for improved clarity and easier navigation. This affects where users click to learn about usage and configuration, but it does not change runtime behavior or APIs. Compatibility impact is limited to documentation consumers; no migration is required.
+
+- **Update README badges to reference 1.x branch workflows** (`0e99316`)
+  Updates README badges so they point to 1.x branch workflow references. This helps users find the correct CI status indicators. User impact: documentation-only; no behavior changes. Migration: none.
+
+### Code Style
+
+- **Update branding and requirements** (`17167cf`)
+  Updates branding and requirements. This likely affects visible naming/branding text and documented constraints. User impact: documentation/branding changes. Compatibility: if requirements change (e.g., PHP/library minimums), this affects installation. Migration: ensure your environment meets the updated requirements in docs.
+
+### Refactoring
+
+- **Add version selector and refine initial zero-major handling** (`611b56f`)
+  Refactors release/version selection logic by adding a version selector and updating handling for the initial “zero major” state in SemVer-like workflows. This matters for projects starting at `0.x.y` where the rules for next versions can be unintuitive. User impact: more correct and predictable version selection in the release tooling. Compatibility: behavior change in version calculation; migration may not be required, but users relying on previous selection semantics should be aware that outputs can shift for early-stage versioning.
+
+- **Refine test and class method chaining and exception handling** (`1d1dce8`)
+  Refactors for more concise method chaining and updates exception handling patterns across tests and classes. Goal: reduce verbosity while improving clarity and consistent error behavior. User impact should be limited to more predictable failure modes and cleaner internal code; no API changes intended. Compatibility: if exception types/messages surface, tests or integrations might need updates. Migration: none expected for typical usage.
+
+- **Refactor tests and classes for concise object instantiation** (`ff0124a`)
+  Refactors code to simplify object instantiation patterns in tests and classes, improving readability while keeping behavior intended to remain the same. User impact: none directly. Compatibility/migration: none expected.
+
+- **Introduce JsonTemplateFormatter for consistent JSON formatting** (`6b3ef64`)
+  Adds `JsonTemplateFormatter` to ensure consistent JSON formatting across configuration contexts. This matters because reliable JSON formatting improves diffability, test stability, and downstream parsing expectations. User impact: more consistent JSON output/formatting where templates are used. Compatibility: if consumers depended on a specific formatting style, they may see different whitespace/ordering behavior. Migration: none unless you do strict string comparisons of formatted JSON.
+
+- **Refactor MaintainerConfiguration and ComposerManifestTest; update rector/phpstan config and composer.lock** (`dc084ce`)
+  Improves robustness/simplicity in `MaintainerConfiguration` and `ComposerManifestTest`. Also removes unused paths (`public`, `resources`, `routes`) from `rector.php` and `phpstan.neon`, and updates `composer.lock` with additional dependencies to enhance functionality (including packages like `fruitcake/php-cors`, `guzzlehttp/uri-template`, `iamcal/sql-parser`, `larastan/larastan`). User impact: improved internal configuration handling and potentially better static analysis/inspection coverage. Compatibility: dependency set changes can affect tooling; runtime behavior changes are not claimed but new dependencies are introduced for package operations/testing. Migration: run `composer install` to pick up lock changes; review any local static analysis config overrides if you customize them.
+
+- **Refactor bootstrap and namespace structure** (`fdc3c32`)
+  Refactors bootstrap and namespace structure to improve project organization. Why it matters: cleaner initialization and namespacing reduces complexity and can prevent autoloading issues. User impact: minimal if autoloading works correctly. Compatibility: if external references to old namespaces/classes exist, they may break. Migration: update any custom integrations that rely on previous namespace structure.
+
+### Tests
+
+- **Centralize temporary directory deletion helper** (`071c465`)
+  Refactors tests by centralizing a helper that deletes temporary directories. This improves test maintainability and reduces duplication, without intended functional changes to production code. User impact: none. Compatibility/migration: none.
+
+- **Enable fileinfo extension in tests workflow for PHP 8.5** (`1df3f47`)
+  Updates the GitHub Actions test workflow to enable the `fileinfo` PHP extension for PHP 8.5. Why it matters: some code paths or dependencies require `fileinfo`, and CI must mirror requirements. User impact: more reliable CI/test execution on PHP 8.5. Compatibility/migration: none beyond CI environment.
+
+### Build
+
+- **Add default PHPUnit configuration for Laravel package projects** (`4c4c7d7`)
+  Adds a default `phpunit.xml` configuration suited for Laravel package projects. This improves out-of-the-box test configuration consistency for new/standard environments. User impact: easier contributor setup and more consistent test execution. Compatibility: may change test defaults (e.g., bootstrap/files). Migration: if you have custom PHPUnit config, reconcile it with the new defaults as needed.
+
+- **Add Pest support and configure PHPStan memory limit** (`d5af994`)
+  Adds Pest testing support and introduces PHPStan memory limit configuration. Why it matters: supports projects that prefer Pest while ensuring PHPStan has enough memory for analysis. User impact: improved test tooling flexibility and more stable static analysis runs in constrained CI environments. Compatibility/migration: if you rely on PHPUnit-only workflows, you may need to update CI scripts to use Pest (or keep PHPUnit as applicable).
+
+- **Add release:create workflow with versionable class inspection** (`62d6f9a`)
+  Adds a `release:create` workflow that includes versionable class inspection. This matters for ensuring the release tooling understands what can be versioned and updated. User impact: improved automation coverage for release creation. Compatibility: workflow addition only. Migration: none for runtime, but CI/release automation might now perform additional inspection steps.
+
+- **Add tests.yml GitHub Actions workflow for cross-platform automation** (`bb87379`)
+  Introduces a GitHub Actions workflow `tests.yml` to run the test suite across `ubuntu-latest` and `windows-latest`, installing PHP 8.5 (with `fileinfo`), dependencies via Composer, and executing tests via `composer exec pest`. User impact: improved cross-platform validation; PRs can now fail due to platform differences that previously went unnoticed. Compatibility: primarily CI behavior. Migration: ensure tests pass on both Ubuntu and Windows.
+
+- **Add maintainer ASCII banner, init workflow, and tests; update docs/menu** (`0f3f3d8`)
+  Adds the maintainer ASCII banner, an `init` workflow, and supporting tests, plus updates to documentation and workflow/menu items. Why it matters: improves onboarding (init command/workflow) and clarifies available tooling. User impact: new initialization and improved UX visuals; docs and workflow navigation changes. Compatibility: new CLI capabilities; no breaking runtime changes implied. Migration: none.
+
+- **Add Rector, Pint, PHPStan, and testing dependencies** (`84c9f80`)
+  Adds dependencies for code formatting and quality tooling: Rector, Pint, PHPStan, and related testing components. Why it matters: ensures consistent enforcement of standards and more reliable static analysis. User impact: contributors/CI may now enforce additional checks. Compatibility: tooling dependencies only. Migration: run `composer install`; ensure your development environment supports the new tooling.
+
+### Maintenance
+
+- **Prepare 1.0.0-beta.2 release** (`b54f95b`)
+  Runs release preparation work for the 1.0.0-beta.2 development cycle. This is internal workflow/release bookkeeping and is not intended to change user-facing functionality. User impact is indirect (enables the release artifacts to be produced). No migration is expected.
+
+- **Prepare 1.0.0-beta.1 release** (`865040c`)
+  Performs internal release preparation for the 1.0.0-beta.1 cycle. This typically involves release workflow state and artifact readiness rather than code behavior changes. User impact is indirect (enables the beta release). No migration is expected.
+
+- **Rename application executable to maintainer and update config/tests/docs** (`08be173`)
+  Renames the application executable to `maintainer`, updates `box.json` configuration, and adjusts related tests and documentation. Why it matters: correct binary naming ensures the documented command works and reduces confusion for users. User impact: command name changes. Compatibility: existing instructions using the previous executable name may break. Migration: update your usage from the old executable to `maintainer` (and any automation scripts referencing the old name).
+
+- **Update README badges for consistency and clarity** (`206e8ae`)
+  Adjusts README badges to be more consistent and clearer. This is documentation-only work that improves presentation. User impact: none for runtime. Migration: none.
+
+- **Add AI tools and configuration support** (`abd0956`)
+  Adds AI-related tools and configuration support needed by the AI-assisted release/versioning features. Why it matters: without configuration support, AI features cannot be enabled reliably. User impact: enables AI functionality in workflows that depend on it. Compatibility: may require environment variables/credentials for AI providers if you use AI modes. Migration: configure AI provider settings as required by the new AI tooling.
+
+- **Initial commit for Artisan Toolbox Maintainer application** (`72735e4`)
+  Introduces the initial version of the Artisan Toolbox Maintainer application. This is the foundational baseline for subsequent features. User impact: provides the starting CLI/tooling skeleton. Compatibility: sets the initial structure. Migration: none.
+
+- **Add `quality` workflow to run Pint, Rector, and PHPStan with project-specific configurations:** (`1203720`)
+  Includes the changes introduced by commit 1203720: Add `quality` workflow to run Pint, Rector, and PHPStan with project-specific configurations:.
+
 ## [1.0.0-beta.2] - 2026-08-17
 
 ### Features
