@@ -132,7 +132,7 @@ JSON
             unset($GLOBALS['_composer_autoload_path']);
         }
 
-        $files->deleteDirectory($temporaryDirectory);
+        deleteTemporaryDirectory($temporaryDirectory);
     }
 }
 
@@ -276,7 +276,7 @@ PHP
 
         expect($directory.'/before-versioning.txt')->toBeFile()
             ->and($directory.'/after-versioning.txt')->toBeFile()
-            ->and($files->get($directory.'/README.md'))->toContain(implode(PHP_EOL, [
+            ->and($files->get($directory.'/README.md'))->toContain(implode("\n", [
                 '<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->',
                 '[![version](https://img.shields.io/badge/version-1.0.1-blue)](VERSION)',
                 '<!-- MAINTAINER:VERSION_BADGE:END -->',

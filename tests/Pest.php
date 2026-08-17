@@ -75,6 +75,24 @@ function defaultMaintainerConfigurationFixture(): array
     ];
 }
 
+function deleteTemporaryDirectory(string $directory): void
+{
+    if (DIRECTORY_SEPARATOR === '\\' && is_dir($directory)) {
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($items as $item) {
+            chmod($item->getPathname(), 0777);
+        }
+
+        chmod($directory, 0777);
+    }
+
+    (new Filesystem)->deleteDirectory($directory);
+}
+
 function withinTemporaryProject(
     Closure $callback,
     string $workingDirectory = '.',
@@ -115,6 +133,6 @@ function withinTemporaryProject(
             unset($GLOBALS['_composer_autoload_path']);
         }
 
-        $files->deleteDirectory($temporaryDirectory);
+        deleteTemporaryDirectory($temporaryDirectory);
     }
 }

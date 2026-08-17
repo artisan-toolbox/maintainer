@@ -24,7 +24,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    $this->files->deleteDirectory($this->directory);
+    deleteTemporaryDirectory($this->directory);
 });
 
 it('lists modified, untracked, and renamed files', function () {
