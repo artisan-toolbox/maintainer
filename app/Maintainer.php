@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Process;
 final class Maintainer implements BeforeVersioning, Versionable, WithReadmeBadgeVersion
 {
     public const string VERSION = '1.0.0-beta.1';
+
     public static function beforeVersioning(string $current, string $next): void
     {
         $projectRoot = dirname(__DIR__);

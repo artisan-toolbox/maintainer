@@ -27,13 +27,15 @@ final readonly class ReadmeVersionBadge
         $contents = $this->files->get($path);
         $lineEnding = str_contains($contents, "\r\n") ? "\r\n" : "\n";
         $badgeVersion = str_replace('-', '--', $version);
+        $managedBlock = $this->managedBlock($contents);
+        $badgeMarkup = $this->usesHtmlBadge($contents, $managedBlock)
+            ? "<a href=\"VERSION\"><img src=\"https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square\" alt=\"version\"></a>"
+            : "[![version](https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square)](VERSION)";
         $badge = implode($lineEnding, [
             self::START,
-            "[![version](https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square)](VERSION)",
+            $badgeMarkup,
             self::END,
         ]);
-
-        $managedBlock = $this->managedBlock($contents);
 
         if ($managedBlock !== null) {
             $updated = substr_replace($contents, $badge, $managedBlock['offset'], $managedBlock['length']);
@@ -63,6 +65,38 @@ final readonly class ReadmeVersionBadge
         }
 
         return null;
+    }
+
+    /**
+     * @param  array{offset: int, length: int}|null  $managedBlock
+     */
+    private function usesHtmlBadge(string $contents, ?array $managedBlock): bool
+    {
+        if ($managedBlock !== null) {
+            $block = substr($contents, $managedBlock['offset'], $managedBlock['length']);
+
+            return preg_match('/<img\b/i', $block) === 1;
+        }
+
+        $patterns = [
+            'html' => '/<img\b[^>]*\bsrc=["\'][^"\']*img\.shields\.io[^"\']*["\'][^>]*>/i',
+            'markdown' => '/!\[[^\]]*\]\(https?:\/\/img\.shields\.io\/[^)]+\)/i',
+        ];
+        $badges = [];
+
+        foreach ($patterns as $format => $pattern) {
+            preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+
+            foreach ($matches[0] as [$badge, $offset]) {
+                if (! $this->insideMarkdownFence($contents, $offset)) {
+                    $badges[] = ['format' => $format, 'offset' => $offset];
+                }
+            }
+        }
+
+        usort($badges, fn (array $left, array $right): int => $left['offset'] <=> $right['offset']);
+
+        return ($badges[0]['format'] ?? 'markdown') === 'html';
     }
 
     private function insideMarkdownFence(string $contents, int $offset): bool

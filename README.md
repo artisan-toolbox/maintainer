@@ -2,13 +2,13 @@
     <h1>Maintainer</h1>
 </div>
 
-<div align="center">
-
+<p align="center">
 <!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->
-[![version](https://img.shields.io/badge/version-1.0.0--beta.1-blue?style=flat-square)](VERSION)
-<!-- MAINTAINER:VERSION_BADGE:END --> [![Packagist](https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square)](https://packagist.org/packages/artisan-toolbox/maintainer) [![Tests](https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&label=Tests&style=flat-square)](https://github.com/artisan-toolbox/maintainer/actions)
-
-</div>
+<a href="VERSION"><img src="https://img.shields.io/badge/version-1.0.0--beta.1-blue?style=flat-square" alt="version"></a>
+<!-- MAINTAINER:VERSION_BADGE:END -->
+<a href="https://packagist.org/packages/artisan-toolbox/maintainer"><img src="https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square" alt="Packagist"></a>
+<a href="https://github.com/artisan-toolbox/maintainer/actions"><img src="https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&amp;label=Tests&amp;style=flat-square" alt="Tests"></a>
+</p>
 
 <p align="center">
     Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.
@@ -173,13 +173,13 @@ The version class must live directly in one of the production PSR-4 namespaces d
 
 `WithReadmeBadgeVersion` is a marker contract. When present, Maintainer inserts or updates this protected block near the top of `README.md`:
 
-```markdown
+```html
 <!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->
-[![version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](VERSION)
+<a href="VERSION"><img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="version"></a>
 <!-- MAINTAINER:VERSION_BADGE:END -->
 ```
 
-The markers are stable and must not be edited manually: Maintainer uses them to replace the badge safely on every release.
+The markers are stable and must not be edited manually: Maintainer uses them to replace the badge safely on every release. The generated markup follows the README's existing badge style. Maintainer preserves HTML or Markdown from an existing managed block; when inserting the block for the first time, it follows the first Shields.io badge found outside code fences. Markdown is used when the README has no existing badge style to follow.
 
 Because Maintainer is normally installed as a development dependency, project integrations should also be development-only. If production code implements a Maintainer contract, install the package as a regular dependency so the interface remains available after `composer install --no-dev`.
 
