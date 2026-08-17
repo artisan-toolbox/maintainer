@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use ArtisanToolbox\Maintainer\Maintainer;
+
 final class MaintainerBanner
 {
     /**
@@ -9,12 +11,14 @@ final class MaintainerBanner
      */
     public function render(): string
     {
-        return <<<'BANNER'
+        $art = <<<'BANNER'
  __  __       _       _        _
 |  \/  | __ _(_)_ __ | |_ __ _(_)_ __   ___ _ __
 | |\/| |/ _` | | '_ \| __/ _` | | '_ \ / _ \ '__|
 | |  | | (_| | | | | | || (_| | | | | |  __/ |
 |_|  |_|\__,_|_|_| |_|\__\__,_|_|_| |_|\___|_|
 BANNER;
+
+        return $art.' '.Maintainer::VERSION;
     }
 }

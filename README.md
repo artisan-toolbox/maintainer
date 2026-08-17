@@ -191,7 +191,7 @@ Open the interactive menu:
 vendor/bin/maintainer
 ```
 
-The menu lists the available maintenance workflows. It can create commits, run code-quality tools, create the Maintainer configuration, create a new GitHub release, or open an HTML Git diff in the browser.
+The menu displays the running Maintainer version beside its terminal banner and lists the available maintenance workflows. It can create commits, run code-quality tools, create the Maintainer configuration, create a new GitHub release, or open an HTML Git diff in the browser.
 
 The interactive menu displays a Maintainer ASCII art banner before presenting the available workflows.
 
@@ -305,6 +305,8 @@ These bounds prevent provider context-window failures and runaway request costs.
 Maintainer then updates or creates the `VERSION` constant, updates the protected README badge when requested, and stages every generated release file. When a previous release exists, it offers to open an HTML diff from that release reference to the complete proposal; the default is yes, and the terminal waits for the maintainer to return before continuing.
 
 Finally, Maintainer creates a `chore(release): prepare VERSION` commit, pushes it to `origin`, and publishes the GitHub release through `gh release create`. Alpha and beta versions are published with GitHub's prerelease flag. The configured AI agents always use their providers' cheapest model through Laravel AI's `UseCheapestModel` attribute.
+
+On platforms that expose `SIGTERM` through `pcntl`, `release:create` captures termination requests throughout the workflow. If release changes have been prepared but the release commit has not been pushed, Maintainer restores the complete worktree to the captured starting `HEAD` before exiting with the conventional `143` status. Repeated failure paths do not run rollback twice. Once the push succeeds, Maintainer deliberately skips automatic rollback because reverting the local worktree would not safely undo the remote commit or a release that may already be publishing.
 
 ## Development
 

@@ -21,6 +21,7 @@ use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
 use App\Support\Release\ReleaseVersionOptions;
 use App\Support\Release\ReleaseVersionSelector;
+use App\Support\Release\ReleaseWorktreeRollback;
 use App\Support\Release\SemanticVersion;
 use App\Support\Release\VersionableClass;
 use App\Support\Release\VersionableImplementation;
@@ -34,14 +35,19 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Throwable;
 
 use function Laravel\Prompts\spin;
 
 #[Signature('release:create')]
 #[Description('Create a new GitHub release for the project')]
-final class CreateReleaseCommand extends Command
+final class CreateReleaseCommand extends Command implements SignalableCommandInterface
 {
+    private const int SIGTERM = 15;
+
+    private ?ReleaseWorktreeRollback $releaseRollback = null;
+
     /**
      * Execute the complete GitHub release workflow.
      */
@@ -66,7 +72,9 @@ final class CreateReleaseCommand extends Command
         GitHubReleasePublisher $publisher,
         ReleaseDiffReviewer $diffReviewer,
         ReleaseVersionSelector $versionSelector,
+        ReleaseWorktreeRollback $releaseRollback,
     ): int {
+        $this->releaseRollback = $releaseRollback;
         $projectRoot = $projectPath->root();
 
         if ($projectRoot === null) {
@@ -98,13 +106,13 @@ final class CreateReleaseCommand extends Command
 
         try {
             $baseline = $git->head($projectRoot);
+            $releaseRollback->arm($git, $projectRoot, $baseline);
         } catch (RuntimeException $exception) {
             $this->components->error('Unable to capture the release rollback point: '.$exception->getMessage());
 
             return self::FAILURE;
         }
 
-        $pushed = false;
         $operation = 'complete the release workflow';
 
         try {
@@ -209,10 +217,12 @@ final class CreateReleaseCommand extends Command
 
             $operation = 'push the release commit';
             spin(
-                fn () => $git->push($projectRoot),
+                function () use ($git, $projectRoot, $releaseRollback): void {
+                    $git->push($projectRoot);
+                    $releaseRollback->markPushed();
+                },
                 'Pushing the release commit to origin...',
             );
-            $pushed = true;
             $this->components->success('Pushed the release commit to origin.');
 
             $selected = $semanticVersion->parse($selectedVersion);
@@ -239,14 +249,16 @@ final class CreateReleaseCommand extends Command
                 $this->components->twoColumnDetail('After versioning', "{$currentVersion} → {$selectedVersion}");
             }
 
+            $releaseRollback->disarm();
             $this->components->success("Published GitHub release {$selectedVersion}.");
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if (! $pushed) {
+            if (! $releaseRollback->wasPushed()) {
                 try {
-                    $git->rollback($projectRoot, $baseline);
-                    $this->components->warn('Rolled back all release changes in the Git working tree.');
+                    if ($releaseRollback->rollback()) {
+                        $this->components->warn('Rolled back all release changes in the Git working tree.');
+                    }
                 } catch (Throwable $rollbackException) {
                     $this->components->error('The release failed and the Git working tree could not be rolled back: '.$rollbackException->getMessage());
                 }
@@ -256,6 +268,45 @@ final class CreateReleaseCommand extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /** @return list<int> */
+    public function getSubscribedSignals(): array
+    {
+        if (! defined('SIGTERM') || ! function_exists('pcntl_signal')) {
+            return [];
+        }
+
+        return [self::SIGTERM];
+    }
+
+    public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
+    {
+        if ($signal !== self::SIGTERM) {
+            return false;
+        }
+
+        if ($this->releaseRollback === null || ! $this->releaseRollback->isArmed()) {
+            $this->components->warn('SIGTERM received before release changes were prepared. No rollback was required.');
+
+            return 128 + self::SIGTERM;
+        }
+
+        if ($this->releaseRollback->wasPushed()) {
+            $this->components->warn('SIGTERM received after the release commit was pushed. Automatic rollback was skipped because remote changes cannot be safely reverted.');
+
+            return 128 + self::SIGTERM;
+        }
+
+        try {
+            if ($this->releaseRollback->rollback()) {
+                $this->components->warn('SIGTERM received. Rolled back all release changes in the Git working tree.');
+            }
+        } catch (Throwable $exception) {
+            $this->components->error('SIGTERM received, but the Git working tree could not be rolled back: '.$exception->getMessage());
+        }
+
+        return 128 + self::SIGTERM;
     }
 
     /**

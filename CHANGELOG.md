@@ -2,7 +2,15 @@
 
 ## [Unreleased]
 
+### Features
+
+- **Display the running version beside the Maintainer terminal banner**
+  Appends `Maintainer::VERSION` to the final line of the interactive ASCII banner so users can immediately identify which executable version is running. Because the banner reads the version constant directly, release builds automatically display the newly selected version without requiring a second manual update.
+
 ### Fixes
+
+- **Roll back interrupted releases when SIGTERM is received**
+  Registers `release:create` as a Symfony signal-aware command on platforms with `pcntl`, arms the existing worktree rollback after the starting `HEAD` is captured, and restores prepared release changes before exiting with status 143. The shared rollback state prevents duplicate restoration when signal handling intersects the normal exception path. Interruptions after a successful push report that automatic rollback was skipped because local restoration cannot safely reverse remote state. Platforms without signal support, including Windows configurations without `pcntl`, continue without registering unsupported handlers.
 
 - **Bound AI release analysis to prevent model context-window failures**
   Replaces repeated full-diff prompts with a bounded map-and-consolidate workflow. Maintainer now splits release diffs into source-oriented fragments of no more than 24,000 characters, processes no more than 16 fragments, omits generated artifacts and dependency-heavy files from prompt bodies, and limits fragment summaries and commit context before downstream generation. Release type recommendations are consolidated across fragments, with any backwards-compatible public feature promoting the suggested increment to minor. Changelog generation consumes the consolidated summaries, while GitHub release notes are generated from the validated changelog entries rather than receiving the complete diff again. Stage-specific failures now identify whether analysis, changelog generation, release-note generation, Git operations, or GitHub publication failed, while preserving the existing pre-push rollback behavior.

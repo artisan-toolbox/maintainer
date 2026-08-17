@@ -4,6 +4,7 @@ use App\Ai\Agents\ReleaseChangelogAgent;
 use App\Ai\Agents\ReleaseDiffSummaryAgent;
 use App\Ai\Agents\ReleaseNotesAgent;
 use App\Ai\Agents\ReleaseVersionAgent;
+use App\Commands\CreateReleaseCommand;
 use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\BrowserLauncher;
 use App\Support\Release\GitCliReleaseRepository;
@@ -17,6 +18,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 use Laravel\Ai\Prompts\AgentPrompt;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Process\Process;
 use Tests\Fakes\FakeBrowserLauncher;
 use Tests\Fakes\FakeGitHubReleasePublisher;
@@ -150,6 +152,11 @@ it('registers the create release command', function () {
         ->toHaveKey('release:create')
         ->and($commands['release:create']->getDescription())
         ->toBe('Create a new GitHub release for the project');
+
+    expect($commands['release:create'])->toBeInstanceOf(SignalableCommandInterface::class)
+        ->and($commands['release:create']->getSubscribedSignals())->toBe(
+            defined('SIGTERM') && function_exists('pcntl_signal') ? [15] : [],
+        );
 });
 
 it('continues when the Git working tree is clean', function () {
@@ -194,6 +201,37 @@ it('identifies release change analysis failures and rolls back the worktree', fu
             ->assertFailed();
 
         expect(resolve(FakeReleaseGitRepository::class)->rolledBack)->toBeTrue();
+    });
+});
+
+it('rolls back prepared release changes when SIGTERM is handled', function () {
+    withinTemporaryReleaseProject(function (): void {
+        $command = resolve(Kernel::class)->all()['release:create'];
+
+        expect($command)->toBeInstanceOf(CreateReleaseCommand::class);
+
+        $interruption = new class($command) implements ReleaseChangeAnalyzer
+        {
+            public ?int $exitCode = null;
+
+            public function __construct(private readonly CreateReleaseCommand $command) {}
+
+            public function analyze(string $provider, ReleaseChangeSet $changes): ReleaseChangeSet
+            {
+                $exitCode = $this->command->handleSignal(15);
+                $this->exitCode = is_int($exitCode) ? $exitCode : null;
+
+                throw new RuntimeException('Release interrupted for the signal regression test.');
+            }
+        };
+        app()->instance(ReleaseChangeAnalyzer::class, $interruption);
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('SIGTERM received. Rolled back all release changes in the Git working tree.')
+            ->assertFailed();
+
+        expect($interruption->exitCode)->toBe(143)
+            ->and(resolve(FakeReleaseGitRepository::class)->rolledBack)->toBeTrue();
     });
 });
 
