@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.0.0-beta.2] - 2026-08-17
+
+### Features
+
+- **Display version in maintainer banner** (`ad29f27`)
+  Enhances the maintainer ASCII banner rendering to append the running executable version (`Maintainer::VERSION`) to the final banner line. Why it matters: makes it easier for operators to confirm which version of the maintainer/tooling is running directly from CLI output. User impact: banner text changes; automated checks/tests that assert exact banner output may need updates. Compatibility: output format is modified but no public API signatures changed.
+
+- **Bound AI release diff analysis with chunking and summaries** (`f751e3a`)
+  Introduces bounded AI analysis for release diffs by chunking the diff and generating per-fragment summaries via a new structured-output agent. This prevents context-window failures and enforces a controlled summarization size. User impact: release note/changelog generation becomes more stable for large diffs and avoids truncation-induced analysis errors. Compatibility: the content/wording of AI-generated summaries may change because analysis is now fragment-based and bounded. Migration: none for end users; maintainers should expect slightly different AI-generated release artifacts for large releases due to the new chunking strategy.
+
+- **Generate HTML or Markdown version badges in README** (`4f6de16`)
+  Adds functionality for generating version badges for the README, supporting both HTML and Markdown badge markup. This updates badge management so the README can reflect the current version consistently. User impact: README displays updated version badges according to the configured/managed badge format. Compatibility: badge rendering/placement may change. Migration: maintainers should ensure their badge markers/management workflow aligns with the new generated badge markup approach.
+
+### Fixes
+
+- **Reconcile AI release changelog hashes with git commits** (`4498dcc`)
+  Updates the release-changelog generation flow to ensure AI-produced changelog entries are traceable to the authoritative set of git commit hashes. The changelog generator no longer accepts invalid or invented hashes from AI output; instead it validates that each returned entry’s `hash` matches one of the exact abbreviated hashes from the supplied commit list. Any commit hash not represented by the AI output now receives an appended fallback changelog entry derived from the git commit subject, ensuring full coverage. User impact: changelogs become reliable and reproducible (no missing/incorrect entries), and every entry can be mapped back to a real commit. Compatibility: this can change the number/content of changelog entries compared to earlier behavior when AI output was less strictly validated. Migration: none required for end users; maintainers should be aware that workflow-related/generated release-prep changes without supplied commit hashes are intentionally omitted from changelog output.
+
+- **Fetch missing GitHub release tags from origin** (`9d5675a`)
+  Improves the release/create workflow robustness by fetching missing GitHub release tags from `origin` into the local clone when needed. It verifies that the selected tag resolves to a commit, preventing failures such as “bad revision” in shallow clones or clones without tags. User impact: release creation is less likely to fail due to missing tag history. Compatibility: no code API change, but it alters runtime behavior of the release command in environments where tags are not present locally. Migration: none for users; maintainers may notice releases succeed in previously failing tagless/shallow scenarios.
+
+- **Prevent README badge updates inside code fences** (`9a53012`)
+  Fixes README badge update logic to avoid modifying badge examples when they appear inside fenced code blocks. Why it matters: prevents accidental corruption of documentation/code samples and ensures only the intended managed badge regions are updated. User impact: README remains accurate and example code is preserved. Compatibility: changes only affect documentation update behavior during badge management; no runtime application behavior is altered. Migration: none.
+
 ## [Unreleased]
 
 ### Features
