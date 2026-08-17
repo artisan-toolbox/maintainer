@@ -9,6 +9,9 @@
 
 ### Fixes
 
+- **Reconcile AI changelog output against actual Git commits**
+  Treats `git log` as the authoritative changelog hash list instead of aborting when the model returns an empty or invented hash. The agent is instructed to create exactly one entry per supplied commit and ignore temporary release-preparation changes without commits. Invalid hash entries are discarded, while every real commit omitted by the model receives a deterministic entry derived from its Conventional Commit type and subject. This preserves complete, traceable changelogs and prevents a malformed structured response from rolling back an otherwise valid release.
+
 - **Fetch GitHub release tags that are absent from the local clone**
   Resolves the latest online release tag locally before version recommendation, lifecycle callbacks, release-content generation, or HTML diff review. When the tag is missing, Maintainer fetches that exact tag from `origin` and verifies that it resolves to a commit. This prevents `fatal: bad revision` failures in shallow or `--no-tags` clones while avoiding unnecessary network access when the release tag already exists locally.
 

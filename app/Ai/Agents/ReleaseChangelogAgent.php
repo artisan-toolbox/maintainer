@@ -21,11 +21,12 @@ final class ReleaseChangelogAgent implements Agent, HasStructuredOutput
         return <<<'INSTRUCTIONS'
             Build a detailed changelog entry list from the supplied commit summary and consolidated diff summaries.
             Use Conventional Commit types: feat, fix, docs, style, refactor, perf, test, build, ci,
-            chore, or revert. Preserve each real abbreviated commit hash exactly when a change maps
-            to a commit. Write concise titles and thorough functional descriptions that explain what
+            chore, or revert. Create one entry for every supplied commit and copy its abbreviated hash
+            exactly. Never create changelog entries for generated release-preparation changes that do
+            not have a supplied commit hash. Write concise titles and thorough functional descriptions that explain what
             changed, why it matters, user impact, compatibility, and migration needs when supported.
-            Consolidate duplicate changes, but do not omit meaningful implementation, removal,
-            documentation, test, build, or CI work. Never invent commits, hashes, behavior, or results.
+            Do not omit meaningful implementation, removal, documentation, test, build, or CI work.
+            Never invent commits, hashes, behavior, or results.
             INSTRUCTIONS;
     }
 
@@ -38,7 +39,7 @@ final class ReleaseChangelogAgent implements Agent, HasStructuredOutput
                     'type' => $schema->string()
                         ->enum(['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert'])
                         ->required(),
-                    'hash' => $schema->string()->description('The abbreviated source commit hash.')->required(),
+                    'hash' => $schema->string()->description('One exact abbreviated commit hash supplied in the prompt.')->required(),
                     'title' => $schema->string()->description('A concise title for the change.')->required(),
                     'description' => $schema->string()->description('A detailed functional explanation of the change.')->required(),
                 ])->withoutAdditionalProperties(),
