@@ -172,7 +172,7 @@ The version class must live directly in one of the production PSR-4 namespaces d
 
 ```markdown
 <!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->
-[![version](https://img.shields.io/badge/version-1.0.0-blue)](VERSION)
+[![version](https://img.shields.io/badge/version-1.0.0-beta.1-blue)](VERSION)
 <!-- MAINTAINER:VERSION_BADGE:END -->
 ```
 
