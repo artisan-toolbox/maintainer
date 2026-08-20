@@ -4,16 +4,13 @@ namespace App\Support\Configuration;
 
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Filesystem\Filesystem;
-use JsonException;
-use RuntimeException;
-use stdClass;
 
 #[Singleton]
 final readonly class DefaultMaintainerConfiguration
 {
     public function __construct(
         private Filesystem $files,
-        private JsonTemplateFormatter $formatter,
+        private PhpConfigurationLoader $loader,
     ) {}
 
     /**
@@ -21,15 +18,10 @@ final readonly class DefaultMaintainerConfiguration
      */
     public function contents(): string
     {
-        $path = resource_path('maintainer.json');
+        $path = $this->path();
+        $this->loader->load($path, 'The default Maintainer configuration file');
 
-        throw_unless($this->files->isFile($path), RuntimeException::class,
-            'The default Maintainer configuration file could not be found.');
-
-        return $this->formatter->format(
-            $this->files->get($path),
-            'Maintainer configuration',
-        );
+        return $this->files->get($path);
     }
 
     /**
@@ -39,23 +31,11 @@ final readonly class DefaultMaintainerConfiguration
      */
     public function all(): array
     {
-        $contents = $this->contents();
+        return $this->loader->load($this->path(), 'The default Maintainer configuration file');
+    }
 
-        try {
-            $decoded = json_decode($contents, flags: JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException(
-                'The default Maintainer configuration contains invalid JSON: '.$exception->getMessage(),
-                previous: $exception,
-            );
-        }
-
-        throw_unless($decoded instanceof stdClass, RuntimeException::class,
-            'The default Maintainer configuration must contain a JSON object.');
-
-        /** @var array<string, mixed> $configuration */
-        $configuration = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-
-        return $configuration;
+    private function path(): string
+    {
+        return config_path('maintainer.php');
     }
 }

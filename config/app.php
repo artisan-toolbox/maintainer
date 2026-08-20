@@ -47,6 +47,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Development User Configuration Prefix
+    |--------------------------------------------------------------------------
+    |
+    | Source checkouts use prefixed project configuration files so local user
+    | values do not collide with the defaults packaged by Maintainer. Builds
+    | run in production and therefore ignore this prefix.
+    |
+    */
+
+    'user_config_prefix' => 'dev_',
+
+    /*
+    |--------------------------------------------------------------------------
     | Autoloaded Service Providers
     |--------------------------------------------------------------------------
     |

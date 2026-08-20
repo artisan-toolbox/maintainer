@@ -95,15 +95,13 @@ it('passes a project-specific memory limit to PHPStan', function () {
         $files->put($directory.'/rector.php', "<?php\n");
         $files->put($directory.'/phpstan.neon', "parameters:\n");
         $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
-        $files->put($directory.'/maintainer.json', <<<'JSON'
-            {
-                "quality": {
-                    "phpstan": {
-                        "memory_limit": "4G"
-                    }
-                }
-            }
-            JSON.PHP_EOL);
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'phpstan' => [
+                    'memory_limit' => '4G',
+                ],
+            ],
+        ]);
 
         $this->artisan('quality', ['--no-interaction' => true])->assertSuccessful();
 
@@ -129,15 +127,13 @@ it('rejects an invalid PHPStan memory limit', function () {
         $files->put($directory.'/rector.php', "<?php\n");
         $files->put($directory.'/phpstan.neon', "parameters:\n");
         $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
-        $files->put($directory.'/maintainer.json', <<<'JSON'
-            {
-                "quality": {
-                    "phpstan": {
-                        "memory_limit": "all the RAM"
-                    }
-                }
-            }
-            JSON.PHP_EOL);
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'phpstan' => [
+                    'memory_limit' => 'all the RAM',
+                ],
+            ],
+        ]);
 
         $this->artisan('quality', ['--no-interaction' => true])
             ->expectsOutputToContain('quality.phpstan.memory_limit must be -1')

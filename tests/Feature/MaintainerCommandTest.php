@@ -20,6 +20,7 @@ it('offers the available maintenance workflows', function () {
     expect($workflows)->toBe([
         'commit' => 'Create a Git commit',
         'quality' => 'Run Pint, Rector, PHPStan, and Pest',
+        'config:publish' => 'Publish configuration files',
         'release:create' => 'Create a new GitHub release',
         'init' => 'Create the Maintainer configuration and secrets files',
         'diff:html' => 'View a Git diff in the browser',

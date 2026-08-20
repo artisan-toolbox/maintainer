@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- Add an interactive `config:publish` workflow with granular template selection for Maintainer settings and secrets, Pint, Rector, PHPStan, Pest/PHPUnit, and Deployer. Selected files can be added to `.gitignore` by default without duplicate entries. Every existing destination requires an explicit per-file overwrite confirmation that defaults to preserving the file.
+- Move project configuration from root-level JSON files to `config/maintainer.php` and `config/maintainer_secrets.php`. Both files return arrays, project values are recursively merged over the latest distributed PHP defaults, and `init` migrates legacy JSON files without losing values. Source development uses the configurable `dev_` prefix to keep local overrides separate from packaged defaults; Laravel Zero's production build environment disables that prefix in the PHAR. Legacy JSON remains readable during migration.
+
 ## [1.0.0] - 2026-08-17
 
 ### Features

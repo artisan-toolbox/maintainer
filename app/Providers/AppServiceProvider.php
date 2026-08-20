@@ -12,12 +12,16 @@ use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\Ai\ReleaseChangelogGenerator;
 use App\Support\Ai\ReleaseNotesGenerator;
 use App\Support\Ai\ReleaseVersionRecommender;
+use App\Support\Configuration\ConfigurationFilePublisher;
+use App\Support\Configuration\UserConfigurationPath;
 use App\Support\Release\GitCliReleaseRepository;
 use App\Support\Release\GitHubCliReleasePublisher;
 use App\Support\Release\GitHubCliReleaseSource;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
 use App\Support\Release\ReleaseGitRepository;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,6 +39,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(
+            ConfigurationFilePublisher::class,
+            fn (Application $application): ConfigurationFilePublisher => new ConfigurationFilePublisher(
+                $application->make(Filesystem::class),
+                $application->make(UserConfigurationPath::class),
+            ),
+        );
         $this->app->bind(CommitMessageGenerator::class, LaravelAiCommitMessageGenerator::class);
         $this->app->bind(ReleaseChangeAnalyzer::class, LaravelAiReleaseChangeAnalyzer::class);
         $this->app->bind(ReleaseChangelogGenerator::class, LaravelAiReleaseChangelogGenerator::class);

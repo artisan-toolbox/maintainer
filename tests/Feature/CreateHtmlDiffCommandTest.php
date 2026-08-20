@@ -73,15 +73,13 @@ it('generates an HTML diff for working tree changes', function () {
 
 it('uses the configured side-by-side output format', function () {
     withinTemporaryGitDiffProject(function (string $directory, Filesystem $files): void {
-        $files->put($directory.'/maintainer.json', <<<'JSON'
-            {
-                "git": {
-                    "diff": {
-                        "output_format": "side_by_side"
-                    }
-                }
-            }
-            JSON.PHP_EOL);
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'git' => [
+                'diff' => [
+                    'output_format' => 'side_by_side',
+                ],
+            ],
+        ]);
         $files->put($directory.'/example.txt', "after\n");
 
         $this->artisan('diff:html', [
@@ -136,15 +134,13 @@ it('fails when a Git reference is invalid', function () {
 
 it('rejects an unsupported configured output format', function () {
     withinTemporaryGitDiffProject(function (string $directory, Filesystem $files): void {
-        $files->put($directory.'/maintainer.json', <<<'JSON'
-            {
-                "git": {
-                    "diff": {
-                        "output_format": "unsupported"
-                    }
-                }
-            }
-            JSON.PHP_EOL);
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'git' => [
+                'diff' => [
+                    'output_format' => 'unsupported',
+                ],
+            ],
+        ]);
 
         $this->artisan('diff:html', [
             '--output' => 'reports/unsupported.html',

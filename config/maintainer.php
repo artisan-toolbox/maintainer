@@ -1,0 +1,22 @@
+<?php
+
+return [
+    'ai' => [
+        'providers' => [
+            'commit_message' => 'openai',
+            'release_type_suggestion' => 'openai',
+            'release_notes' => 'openai',
+            'release_changelog_update' => 'openai',
+        ],
+    ],
+    'git' => [
+        'diff' => [
+            'output_format' => 'line_by_line',
+        ],
+    ],
+    'quality' => [
+        'phpstan' => [
+            'memory_limit' => '2G',
+        ],
+    ],
+];

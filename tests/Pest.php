@@ -75,6 +75,21 @@ function defaultMaintainerConfigurationFixture(): array
     ];
 }
 
+/**
+ * @param  array<string, mixed>  $configuration
+ */
+function putPhpConfiguration(
+    Filesystem $files,
+    string $path,
+    array $configuration,
+): void {
+    $files->ensureDirectoryExists(dirname($path));
+    $files->put(
+        $path,
+        "<?php\n\nreturn ".var_export($configuration, true).";\n",
+    );
+}
+
 function deleteTemporaryDirectory(string $directory): void
 {
     if (DIRECTORY_SEPARATOR === '\\' && is_dir($directory)) {

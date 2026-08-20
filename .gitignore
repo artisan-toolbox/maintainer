@@ -5,3 +5,5 @@
 .phpunit.result.cache
 maintainer.json
 maintainer_secrets.json
+/config/dev_maintainer.php
+/config/dev_maintainer_secrets.php

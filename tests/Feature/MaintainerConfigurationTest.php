@@ -35,22 +35,22 @@ function withinTemporaryConfigurationProject(Closure $callback): void
     }
 }
 
-it('reads configuration values using dot notation and defaults', function () {
+it('reads PHP configuration values using dot notation and current defaults', function () {
     withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
-        $files->put($directory.'/maintainer.json', <<<'JSON'
-            {
-                "quality": {
-                    "phpstan": {
-                        "level": 8
-                    }
-                }
-            }
-            JSON.PHP_EOL);
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'phpstan' => [
+                    'level' => 8,
+                ],
+            ],
+        ]);
 
         $configuration = resolve(MaintainerConfiguration::class);
 
         expect($configuration->configMissing())->toBeFalse()
+            ->and($configuration->path())->toEndWith('/config/dev_maintainer.php')
             ->and($configuration->get('quality.phpstan.level'))->toBe(8)
+            ->and($configuration->get('quality.phpstan.memory_limit'))->toBe('2G')
             ->and($configuration->get('git.diff.output_format'))->toBe('line_by_line')
             ->and($configuration->get('quality.pint.preset', 'laravel'))->toBe('laravel')
             ->and($configuration->has('quality.phpstan.level'))->toBeTrue()
@@ -69,7 +69,7 @@ it('uses attributes to enforce its lifecycle and getter usage', function () {
         ->and($reflection->getMethod('get')->getAttributes(NoDiscard::class))->toHaveCount(1);
 });
 
-it('uses the default configuration when the project file is missing', function () {
+it('uses the current default configuration when the project file is missing', function () {
     withinTemporaryConfigurationProject(function () {
         $configuration = resolve(MaintainerConfiguration::class);
         $defaults = defaultMaintainerConfigurationFixture();
@@ -81,74 +81,97 @@ it('uses the default configuration when the project file is missing', function (
     });
 });
 
-it('allows project configuration to override defaults', function () {
+it('removes the development prefix in the production environment used by builds', function () {
     withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
-        $files->put($directory.'/maintainer.json', <<<'JSON'
-            {
-                "git": {
-                    "diff": {
-                        "output_format": "side_by_side"
-                    }
-                }
-            }
-            JSON.PHP_EOL);
+        $this->app['env'] = 'production';
+        putPhpConfiguration($files, $directory.'/config/maintainer.php', [
+            'version' => 'production',
+        ]);
+
+        $configuration = resolve(MaintainerConfiguration::class);
+
+        expect($configuration->path())->toEndWith('/config/maintainer.php')
+            ->and($configuration->get('version'))->toBe('production');
+    });
+});
+
+it('rejects an unsafe development configuration prefix', function () {
+    withinTemporaryConfigurationProject(function () {
+        config()->set('app.user_config_prefix', '../');
+
+        expect(fn () => resolve(MaintainerConfiguration::class)->path())
+            ->toThrow(RuntimeException::class, 'app.user_config_prefix must contain only');
+    });
+});
+
+it('allows project PHP configuration to override defaults', function () {
+    withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'git' => [
+                'diff' => [
+                    'output_format' => 'side_by_side',
+                ],
+            ],
+        ]);
 
         expect(maintainer_config('git.diff.output_format'))->toBe('side_by_side');
     });
 });
 
-it('caches values until the configuration is refreshed', function () {
+it('caches values until the PHP configuration is refreshed', function () {
     withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
-        $path = $directory.'/maintainer.json';
-        $files->put($path, "{\"version\": 1}\n");
+        $path = $directory.'/config/dev_maintainer.php';
+        putPhpConfiguration($files, $path, ['version' => 1]);
 
         $configuration = resolve(MaintainerConfiguration::class);
 
         expect($configuration->get('version'))->toBe(1)
             ->and($configuration->get('git.diff.output_format'))->toBe('line_by_line');
 
-        $files->put($path, "{\"version\": 2}\n");
+        putPhpConfiguration($files, $path, ['version' => 2]);
 
         expect($configuration->get('version'))->toBe(1)
             ->and($configuration->refresh())->toBe([
-                'ai' => [
-                    'providers' => [
-                        'commit_message' => 'openai',
-                        'release_type_suggestion' => 'openai',
-                        'release_notes' => 'openai',
-                        'release_changelog_update' => 'openai',
-                    ],
-                ],
-                'git' => [
-                    'diff' => [
-                        'output_format' => 'line_by_line',
-                    ],
-                ],
-                'quality' => [
-                    'phpstan' => [
-                        'memory_limit' => '2G',
-                    ],
-                ],
+                ...defaultMaintainerConfigurationFixture(),
                 'version' => 2,
             ])
             ->and($configuration->get('version'))->toBe(2);
     });
 });
 
-it('rejects invalid JSON', function () {
+it('rejects a PHP configuration that does not return an associative array', function () {
+    withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+        $files->ensureDirectoryExists($directory.'/config');
+        $files->put($directory.'/config/dev_maintainer.php', "<?php\n\nreturn 'invalid';\n");
+
+        expect(fn () => maintainer_config())
+            ->toThrow(RuntimeException::class, 'config/dev_maintainer.php must return an associative array.');
+    });
+});
+
+it('continues reading legacy JSON configuration during migration', function () {
+    withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+        $files->put($directory.'/maintainer.json', <<<'JSON'
+            {
+                "quality": {
+                    "phpstan": {
+                        "level": 7
+                    }
+                }
+            }
+            JSON.PHP_EOL);
+
+        expect(maintainer_config('quality.phpstan.level'))->toBe(7)
+            ->and(maintainer_config('quality.phpstan.memory_limit'))->toBe('2G')
+            ->and(maintainer_config_missing())->toBeFalse();
+    });
+});
+
+it('rejects invalid legacy JSON', function () {
     withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
         $files->put($directory.'/maintainer.json', '{invalid');
 
         expect(fn () => maintainer_config())
             ->toThrow(RuntimeException::class, 'maintainer.json contains invalid JSON');
-    });
-});
-
-it('rejects a configuration whose root is not an object', function () {
-    withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
-        $files->put($directory.'/maintainer.json', "[]\n");
-
-        expect(fn () => maintainer_config())
-            ->toThrow(RuntimeException::class, 'maintainer.json must contain a JSON object.');
     });
 });

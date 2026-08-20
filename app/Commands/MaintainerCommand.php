@@ -21,6 +21,7 @@ final class MaintainerCommand extends Command
     private const array WORKFLOWS = [
         'commit' => 'Create a Git commit',
         'quality' => 'Run Pint, Rector, PHPStan, and Pest',
+        'config:publish' => 'Publish configuration files',
         'release:create' => 'Create a new GitHub release',
         'init' => 'Create the Maintainer configuration and secrets files',
         'diff:html' => 'View a Git diff in the browser',
@@ -48,6 +49,7 @@ final class MaintainerCommand extends Command
         return match ($command) {
             'commit' => $this->call('commit'),
             'quality' => $this->call('quality'),
+            'config:publish' => $this->call('config:publish'),
             'release:create' => $this->call('release:create'),
             'init' => $this->call('init'),
             'diff:html' => $this->call('diff:html'),

@@ -25,14 +25,14 @@ it('exports only the public Maintainer namespace to consumers', function () {
         ->not->toHaveKey('App\\');
 });
 
-it('packages the default Maintainer configuration in the PHAR', function () {
+it('packages the default Maintainer PHP configuration in the PHAR', function () {
     $boxManifest = json_decode(
         file_get_contents(dirname(__DIR__, 2).'/box.json'),
         true,
         flags: JSON_THROW_ON_ERROR,
     );
 
-    expect($boxManifest['directories'])->toContain('resources')
-        ->and(dirname(__DIR__, 2).'/resources/maintainer.json')->toBeFile()
-        ->and(dirname(__DIR__, 2).'/resources/maintainer_secrets.json')->toBeFile();
+    expect($boxManifest['directories'])->toContain('config')
+        ->and(dirname(__DIR__, 2).'/config/maintainer.php')->toBeFile()
+        ->and(dirname(__DIR__, 2).'/config/maintainer_secrets.php')->toBeFile();
 });

@@ -2,24 +2,24 @@
 
 namespace App\Support\Configuration;
 
-use App\Support\ProjectPath;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Filesystem\Filesystem;
-use JsonException;
 use RuntimeException;
-use stdClass;
 
 #[Singleton]
 final readonly class MaintainerSecrets
 {
     public function __construct(
         private Filesystem $files,
-        private ProjectPath $projectPath,
+        private UserConfigurationPath $userConfigurationPath,
+        private PhpConfigurationLoader $loader,
+        private LegacyJsonConfigurationLoader $legacyLoader,
     ) {}
 
     public function missing(): bool
     {
-        return ! $this->files->isFile($this->path());
+        return ! $this->files->isFile($this->path())
+            && ! $this->files->isFile($this->legacyPath());
     }
 
     /**
@@ -32,25 +32,13 @@ final readonly class MaintainerSecrets
      */
     public function aiProvider(string $provider): array
     {
-        throw_if($this->missing(), RuntimeException::class, 'maintainer_secrets.json is missing. Run maintainer init and configure the selected AI provider.');
+        throw_if($this->missing(), RuntimeException::class, $this->userConfigurationPath->relativePath('maintainer_secrets').' is missing. Run maintainer init and configure the selected AI provider.');
 
-        $contents = $this->files->get($this->path());
-
-        try {
-            $decodedObject = json_decode($contents, flags: JSON_THROW_ON_ERROR);
-            $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException(
-                'maintainer_secrets.json contains invalid JSON: '.$exception->getMessage(),
-                previous: $exception,
-            );
-        }
-
-        throw_unless($decodedObject instanceof stdClass && is_array($decoded), RuntimeException::class, 'maintainer_secrets.json must contain a JSON object.');
+        $decoded = $this->load();
 
         $providers = $decoded['ai_providers'] ?? null;
 
-        throw_unless(is_array($providers), RuntimeException::class, 'maintainer_secrets.json must contain an ai_providers object.');
+        throw_unless(is_array($providers), RuntimeException::class, 'Maintainer secrets must contain an ai_providers array.');
 
         $configuration = $providers[$provider] ?? null;
 
@@ -58,7 +46,7 @@ final readonly class MaintainerSecrets
             return ['key' => $configuration];
         }
 
-        throw_unless(is_array($configuration), RuntimeException::class, "maintainer_secrets.json does not contain credentials for the {$provider} provider.");
+        throw_unless(is_array($configuration), RuntimeException::class, "Maintainer secrets do not contain credentials for the {$provider} provider.");
 
         /** @var array<string, mixed> $configuration */
         return $configuration;
@@ -66,10 +54,23 @@ final readonly class MaintainerSecrets
 
     public function path(): string
     {
-        $projectRoot = $this->projectPath->root();
+        return $this->userConfigurationPath->path('maintainer_secrets');
+    }
 
-        throw_if($projectRoot === null, RuntimeException::class, 'Unable to locate the project root. Run Maintainer inside a Composer project.');
+    /**
+     * @return array<string, mixed>
+     */
+    private function load(): array
+    {
+        if ($this->files->isFile($this->path())) {
+            return $this->loader->load($this->path(), $this->userConfigurationPath->relativePath('maintainer_secrets'));
+        }
 
-        return $projectRoot.DIRECTORY_SEPARATOR.'maintainer_secrets.json';
+        return $this->legacyLoader->load($this->legacyPath(), 'maintainer_secrets.json');
+    }
+
+    private function legacyPath(): string
+    {
+        return $this->userConfigurationPath->legacyPath('maintainer_secrets.json');
     }
 }

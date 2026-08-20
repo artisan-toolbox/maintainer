@@ -63,20 +63,17 @@ final class ProjectVersion implements Versionable
 }
 PHP
     );
-    $files->put($temporaryDirectory.'/.gitignore', "/vendor/\nmaintainer_secrets.json\n");
+    $files->put($temporaryDirectory.'/.gitignore', "/vendor/\nconfig/dev_maintainer_secrets.php\n");
     $files->put($temporaryDirectory.'/example.txt', "committed\n");
     $files->put($temporaryDirectory.'/README.md', "# Fixture\n\nFixture documentation.\n");
     $files->put($temporaryDirectory.'/vendor/autoload.php', "<?php\n");
-    $files->put($temporaryDirectory.'/maintainer_secrets.json', <<<'JSON'
-{
-    "ai_providers": {
-        "openai": {
-            "key": "test-key"
-        }
-    }
-}
-JSON
-    );
+    putPhpConfiguration($files, $temporaryDirectory.'/config/dev_maintainer_secrets.php', [
+        'ai_providers' => [
+            'openai' => [
+                'key' => 'test-key',
+            ],
+        ],
+    ]);
 
     foreach ([
         ['init', '--initial-branch=1.x'],
@@ -252,16 +249,13 @@ it('opens the proposed diff and waits for the user when review is requested', fu
 
 it('uses the structured AI recommendation as the default for a stable release', function () {
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
-        $files->put($directory.'/maintainer_secrets.json', <<<'JSON'
-{
-    "ai_providers": {
-        "openai": {
-            "key": "test-key"
-        }
-    }
-}
-JSON
-        );
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer_secrets.php', [
+            'ai_providers' => [
+                'openai' => [
+                    'key' => 'test-key',
+                ],
+            ],
+        ]);
         ReleaseVersionAgent::fake([[
             'release_increment' => 'minor',
             'justification' => 'The diff adds a backward-compatible public command option.',

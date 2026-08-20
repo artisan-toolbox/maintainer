@@ -4,13 +4,18 @@ namespace App\Commands;
 
 use App\Support\Configuration\DefaultMaintainerConfiguration;
 use App\Support\Configuration\DefaultMaintainerSecrets;
+use App\Support\Configuration\LegacyJsonConfigurationLoader;
+use App\Support\Configuration\PhpConfigurationExporter;
+use App\Support\Configuration\UserConfigurationPath;
+use App\Support\Git\GitignoreManager;
 use App\Support\ProjectPath;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Filesystem\Filesystem;
 use LaravelZero\Framework\Commands\Command;
+use RuntimeException;
 
-#[Signature('init {--force : Overwrite an existing maintainer.json file}')]
+#[Signature('init {--force : Overwrite the existing Maintainer user configuration file}')]
 #[Description('Create the Maintainer configuration and secrets files')]
 final class InitCommand extends Command
 {
@@ -22,6 +27,10 @@ final class InitCommand extends Command
         ProjectPath $projectPath,
         DefaultMaintainerConfiguration $defaults,
         DefaultMaintainerSecrets $defaultSecrets,
+        LegacyJsonConfigurationLoader $legacyLoader,
+        PhpConfigurationExporter $exporter,
+        GitignoreManager $gitignore,
+        UserConfigurationPath $userConfigurationPath,
     ): int {
         $projectRoot = $projectPath->root();
 
@@ -31,60 +40,60 @@ final class InitCommand extends Command
             return self::FAILURE;
         }
 
-        $path = $projectRoot.DIRECTORY_SEPARATOR.'maintainer.json';
-        $secretsPath = $projectRoot.DIRECTORY_SEPARATOR.'maintainer_secrets.json';
+        $path = $userConfigurationPath->path('maintainer');
+        $secretsPath = $userConfigurationPath->path('maintainer_secrets');
+        $configurationRelativePath = $userConfigurationPath->relativePath('maintainer');
+        $secretsRelativePath = $userConfigurationPath->relativePath('maintainer_secrets');
+        $legacyPath = $userConfigurationPath->legacyPath('maintainer.json');
+        $legacySecretsPath = $userConfigurationPath->legacyPath('maintainer_secrets.json');
 
         if ($files->exists($path) && ! $this->option('force')) {
-            $this->components->error('maintainer.json already exists. Use --force to overwrite it.');
+            $this->components->error("{$configurationRelativePath} already exists. Use --force to overwrite it.");
 
             return self::FAILURE;
         }
 
-        if ($files->put($path, $defaults->contents()) === false) {
-            $this->components->error('Unable to write maintainer.json.');
+        try {
+            $files->ensureDirectoryExists(dirname($path));
+            $migratedConfiguration = ! $files->exists($path) && $files->isFile($legacyPath);
+            $configurationContents = $migratedConfiguration
+                ? $exporter->export($legacyLoader->load($legacyPath, 'maintainer.json'))
+                : $defaults->contents();
 
-            return self::FAILURE;
-        }
+            throw_if($files->put($path, $configurationContents) === false, RuntimeException::class, "Unable to write {$configurationRelativePath}.");
 
-        if (! $this->ignoreSecretsFile($files, $projectRoot)) {
-            $this->components->error('Unable to add maintainer_secrets.json to .gitignore.');
-
-            return self::FAILURE;
-        }
-
-        if (! $files->exists($secretsPath)) {
-            if ($files->put($secretsPath, $defaultSecrets->contents()) === false) {
-                $this->components->error('Unable to write maintainer_secrets.json.');
-
-                return self::FAILURE;
+            if ($migratedConfiguration) {
+                throw_unless($files->delete($legacyPath), RuntimeException::class, 'Unable to remove the migrated maintainer.json file.');
+                $this->components->twoColumnDetail('Migrated configuration', $path);
             }
 
-            $this->components->twoColumnDetail('Created secrets', $secretsPath);
-        } else {
-            $this->components->warn('maintainer_secrets.json already exists and was not overwritten.');
+            $gitignore->add($projectRoot, [$secretsRelativePath]);
+
+            if (! $files->exists($secretsPath)) {
+                $migratedSecrets = $files->isFile($legacySecretsPath);
+                $secretsContents = $migratedSecrets
+                    ? $exporter->export($legacyLoader->load($legacySecretsPath, 'maintainer_secrets.json'))
+                    : $defaultSecrets->contents();
+
+                throw_if($files->put($secretsPath, $secretsContents) === false, RuntimeException::class, "Unable to write {$secretsRelativePath}.");
+
+                if ($migratedSecrets) {
+                    throw_unless($files->delete($legacySecretsPath), RuntimeException::class, 'Unable to remove the migrated maintainer_secrets.json file.');
+                    $this->components->twoColumnDetail('Migrated secrets', $secretsPath);
+                } else {
+                    $this->components->twoColumnDetail('Created secrets', $secretsPath);
+                }
+            } else {
+                $this->components->warn("{$secretsRelativePath} already exists and was not overwritten.");
+            }
+        } catch (RuntimeException $exception) {
+            $this->components->error("Unable to initialize Maintainer: {$exception->getMessage()}");
+
+            return self::FAILURE;
         }
 
-        $this->components->success('Created Maintainer configuration and protected its secrets file.');
+        $this->components->success("Created Maintainer configuration at {$configurationRelativePath} and protected its secrets file.");
 
         return self::SUCCESS;
-    }
-
-    private function ignoreSecretsFile(Filesystem $files, string $projectRoot): bool
-    {
-        $path = $projectRoot.DIRECTORY_SEPARATOR.'.gitignore';
-        $contents = $files->exists($path) ? $files->get($path) : '';
-        $lines = preg_split('/\R/', $contents) ?: [];
-
-        if (in_array('maintainer_secrets.json', array_map(trim(...), $lines), true)) {
-            return true;
-        }
-
-        $lineEnding = str_contains($contents, "\r\n") ? "\r\n" : "\n";
-
-        if ($contents !== '' && ! str_ends_with($contents, "\n") && ! str_ends_with($contents, "\r")) {
-            $contents .= $lineEnding;
-        }
-
-        return $files->put($path, $contents.'maintainer_secrets.json'.$lineEnding) !== false;
     }
 }

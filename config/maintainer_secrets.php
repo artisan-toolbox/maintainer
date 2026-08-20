@@ -1,0 +1,64 @@
+<?php
+
+return [
+    'ai_providers' => [
+        'anthropic' => [
+            'key' => '',
+        ],
+        'azure' => [
+            'key' => '',
+            'url' => '',
+            'api_version' => '2025-04-01-preview',
+            'deployment' => 'gpt-4o',
+        ],
+        'bedrock' => [
+            'region' => 'us-east-1',
+            'key' => '',
+            'access_key_id' => '',
+            'secret_access_key' => '',
+            'session_token' => '',
+            'use_default_credential_provider' => true,
+        ],
+        'cohere' => [
+            'key' => '',
+        ],
+        'deepseek' => [
+            'key' => '',
+        ],
+        'eleven' => [
+            'key' => '',
+        ],
+        'gemini' => [
+            'key' => '',
+        ],
+        'groq' => [
+            'key' => '',
+        ],
+        'jina' => [
+            'key' => '',
+        ],
+        'mistral' => [
+            'key' => '',
+        ],
+        'ollama' => [
+            'key' => '',
+            'url' => 'http://localhost:11434',
+        ],
+        'openai' => [
+            'key' => '',
+        ],
+        'openai-compatible' => [
+            'key' => '',
+            'url' => '',
+        ],
+        'openrouter' => [
+            'key' => '',
+        ],
+        'voyageai' => [
+            'key' => '',
+        ],
+        'xai' => [
+            'key' => '',
+        ],
+    ],
+];

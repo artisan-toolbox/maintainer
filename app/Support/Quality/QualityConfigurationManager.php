@@ -2,8 +2,9 @@
 
 namespace App\Support\Quality;
 
+use App\Support\Configuration\ConfigurationFilePublisher;
+use App\Support\Configuration\PublishableConfiguration;
 use Illuminate\Filesystem\Filesystem;
-use RuntimeException;
 
 final readonly class QualityConfigurationManager
 {
@@ -30,43 +31,13 @@ final readonly class QualityConfigurationManager
         string $projectRoot,
         LaravelProjectType $projectType,
     ): string {
-        $destination = $projectRoot.DIRECTORY_SEPARATOR.$tool->defaultConfigurationFilename();
-
-        throw_if(
-            $this->files->exists($destination),
-            RuntimeException::class,
-            "{$tool->defaultConfigurationFilename()} already exists and will not be overwritten.",
+        return new ConfigurationFilePublisher(
+            files: $this->files,
+            templateRoot: $this->templateRoot,
+        )->publish(
+            PublishableConfiguration::from($tool->value),
+            $projectRoot,
+            $projectType,
         );
-
-        $template = $this->templatePath($tool, $projectType);
-
-        throw_unless(
-            $this->files->isFile($template),
-            RuntimeException::class,
-            "The {$tool->label()} configuration template could not be found.",
-        );
-
-        throw_unless(
-            $this->files->copy($template, $destination),
-            RuntimeException::class,
-            "Unable to create {$tool->defaultConfigurationFilename()}.",
-        );
-
-        return $destination;
-    }
-
-    private function templatePath(QualityTool $tool, LaravelProjectType $projectType): string
-    {
-        $templateRoot = $this->templateRoot ?? dirname(__DIR__, 3).DIRECTORY_SEPARATOR.'resources';
-
-        if ($tool === QualityTool::Pint) {
-            return $templateRoot.DIRECTORY_SEPARATOR.'pint.json';
-        }
-
-        $directory = $projectType === LaravelProjectType::Application
-            ? ''
-            : 'laravel-package'.DIRECTORY_SEPARATOR;
-
-        return $templateRoot.DIRECTORY_SEPARATOR.$directory.$tool->defaultConfigurationFilename();
     }
 }

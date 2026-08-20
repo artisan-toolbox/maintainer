@@ -2,13 +2,9 @@
 
 namespace App\Support\Configuration;
 
-use App\Support\ProjectPath;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Arr;
-use JsonException;
-use RuntimeException;
-use stdClass;
 
 #[Singleton]
 final class MaintainerConfiguration
@@ -18,8 +14,10 @@ final class MaintainerConfiguration
 
     public function __construct(
         private readonly Filesystem $files,
-        private readonly ProjectPath $projectPath,
+        private readonly UserConfigurationPath $userConfigurationPath,
         private readonly DefaultMaintainerConfiguration $defaults,
+        private readonly PhpConfigurationLoader $loader,
+        private readonly LegacyJsonConfigurationLoader $legacyLoader,
     ) {}
 
     /**
@@ -40,7 +38,8 @@ final class MaintainerConfiguration
 
     public function configMissing(): bool
     {
-        return ! $this->files->isFile($this->path());
+        return ! $this->files->isFile($this->path())
+            && ! $this->files->isFile($this->legacyPath());
     }
 
     /**
@@ -67,11 +66,7 @@ final class MaintainerConfiguration
 
     public function path(): string
     {
-        $projectRoot = $this->projectPath->root();
-
-        throw_if($projectRoot === null, RuntimeException::class, 'Unable to locate the project root. Run Maintainer inside a Composer project.');
-
-        return $projectRoot.DIRECTORY_SEPARATOR.'maintainer.json';
+        return $this->userConfigurationPath->path('maintainer');
     }
 
     /**
@@ -79,29 +74,27 @@ final class MaintainerConfiguration
      */
     private function load(): array
     {
-        $path = $this->path();
         $defaults = $this->defaults->all();
 
-        if (! $this->files->isFile($path)) {
-            return $defaults;
-        }
-
-        $contents = $this->files->get($path);
-
-        try {
-            $decoded = json_decode($contents, flags: JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException(
-                'maintainer.json contains invalid JSON: '.$exception->getMessage(),
-                previous: $exception,
+        if ($this->files->isFile($this->path())) {
+            return array_replace_recursive(
+                $defaults,
+                $this->loader->load($this->path(), $this->userConfigurationPath->relativePath('maintainer')),
             );
         }
 
-        throw_unless($decoded instanceof stdClass, RuntimeException::class, 'maintainer.json must contain a JSON object.');
+        if (! $this->files->isFile($this->legacyPath())) {
+            return $defaults;
+        }
 
-        /** @var array<string, mixed> $configuration */
-        $configuration = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+        return array_replace_recursive(
+            $defaults,
+            $this->legacyLoader->load($this->legacyPath(), 'maintainer.json'),
+        );
+    }
 
-        return array_replace_recursive($defaults, $configuration);
+    private function legacyPath(): string
+    {
+        return $this->userConfigurationPath->legacyPath('maintainer.json');
     }
 }
