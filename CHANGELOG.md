@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.1.0] - 2026-08-20
+
+### Features
+
+- **Add deploy:unlock command, contrib deploy recipe, and SSH key wrapper** (`f56f015`)
+  Introduces new deployment ergonomics by adding (1) a `deploy:unlock` command and (2) a Deployer contribution recipe under `app/Deployer/contrib.php` to wire maintainer SSH identity handling into Deployer. Also adds/introduces an SSH key wrapper via console tooling so keys can be decrypted/obtained as needed for deployments. Functionally, this enables unlocking failed deployments and standardizes identity usage for Deployer tasks while keeping SSH identity lifecycle explicit and controlled. Compatibility impact: adds new CLI surface area (new commands/recipes); existing workflows should continue to work.
+
+- **Add deploy workflow delegating to consuming Deployer binary** (`0d6443b`)
+  Adds a new `deploy` command/workflow that delegates execution to the consuming project’s Deployer binary. The command resolves the consuming project root via `ProjectPath`, then builds Deployer CLI arguments from provided options (e.g., file/tag/revision/branch/overrides/limits/no-hooks/plan/start-from/log/profile) and streams Deployer output to the console. It includes explicit error handling and preserves the Deployer exit code on failure, enabling predictable automation behavior. Compatibility impact: introduces a new CLI command; scripts should be updated to use `deploy` (delegation wrapper) if they previously invoked Deployer directly in a different way.
+
+- **Add env config support and encrypted secrets keys** (`4df96b9`)
+  Enhances maintainer configuration by adding support for environment-based configuration and adding encrypted secrets key handling. This matters because it allows deployments to use secrets safely (encrypted at rest) while enabling configuration to be provided via environment variables. Compatibility impact: users may need to ensure the new encrypted secrets key configuration (e.g., required environment/app key or maintainer secrets key) is set so encryption/decryption can succeed.
+
+- **Add config publish workflow and migrate Maintainer config** (`224bde0`)
+  Introduces an interactive `config:publish` workflow that lets users select which configuration templates to publish, optionally choose a project type (Application/Package) for project-specific templates, and decide whether to add published destinations to `.gitignore` (default yes). It also changes overwrite behavior to be conservative by default (preserve), requiring explicit confirmation for overwriting existing files (default no for existing destinations). For maintainer secrets, it prompts for an email and passes it through `sshKeyEmail()` (with email validation via `filter_var`). Additionally, it migrates Maintainer configuration flow to align with the new menu/commands architecture. Compatibility impact: replaces/obsoletes the old `init`-driven setup process; users should migrate to `config:publish` and follow new prompts for overwrite and `.gitignore` updates.
+
+### Fixes
+
+- **Restrict PHAR package to explicit config allowlist** (`5c7541c`)
+  Tightens PHAR packaging/repackaging rules to only include PHAR content that matches an explicit configuration allowlist. This reduces the risk of unintentionally shipping unwanted files into the PHAR distribution and improves security/supply-chain hygiene. Compatibility impact: deployments that relied on implicitly included files will need to ensure those files are present in the allowlist configuration.
+
+### Refactoring
+
+- **Centralize consuming project root paths via project_path()** (`d3e908c`)
+  Refactors code to centralize consuming project path resolution through a shared `project_path()` helper. This standardizes how paths are derived across deployment/command code paths, reducing drift and path-handling inconsistencies. User impact is primarily stability/maintenance; compatibility impact is limited unless external integrations depended on prior ad-hoc path construction quirks.
+
+- **Restructure Maintainer console menus into CI/Configuration/Deployment/Versioning** (`aadfb7f`)
+  Reworks the interactive `MaintainerCommand` UI from a single flat “which workflow” prompt into a hierarchical menu with dedicated sections (CI, Configuration, Deployment, Versioning, Exit). Adds submenu flows for configuration (`config:publish`, `ssh:key`, `ssh:public`), deployment (`deploy`, `deploy:unlock`), and CI quality tool selection. Also updates non-interactive guidance to reference `config:publish` instead of the removed `init` flow and implements submenu cancellation behavior so Ctrl+C returns to the main menu rather than terminating the entire command. Compatibility impact: users/scripts relying on older menu text or prompt order will change; integrations that expected `init` behavior must migrate.
+
+- **Remove init workflow and migrate SSH key naming** (`3eae4c7`)
+  Removes the `init` console workflow and updates related SSH key naming/usage so configuration/secrets and keys align with the new publish/unlock/ssh tooling. Compatibility impact is significant: the `init` command is no longer available, so any user flow that depended on it to generate `maintainer.json` / `maintainer_secrets.json` and update `.gitignore` must be migrated to the new `config:publish` and related commands.
+
+- **Centralize consuming project root paths via project_path()** (`d3e908c`)
+  Refactors code to centralize how the consuming project’s filesystem paths are resolved using a shared `project_path()` helper. This eliminates inconsistencies across commands (notably deployment-related ones) and ensures related operations derive roots consistently. User impact is mainly improved stability and fewer environment-specific edge cases; migration is not expected unless external code relied on non-standard path derivation.
+
+### Tests
+
+- **Normalize PHAR scanner entry paths for distributed archives** (`4b7648b`)
+  Updates the distributed PHAR scanning logic to normalize PHAR entry paths. This makes scanner behavior consistent across environments/packaging layouts where path formats can differ (e.g., differing prefixes or separators), reducing missed/incorrect matches during scanning. User impact is indirect but important for reliability of scanning in packaged/distributed artifacts; no CLI/API changes are implied.
+
 ## [Unreleased]
 
 ### Features
