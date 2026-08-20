@@ -26,7 +26,7 @@
 
 ### Tests
 
-- Keep the Maintainer test suite portable across Windows and POSIX runners. Deployer task fixtures now match Deployer's Bash execution environment, command assertions ignore Windows-only serialization quotes, and configuration path assertions use the host directory separator.
+- Keep the Maintainer test suite portable across Windows and POSIX runners. Deployer task fixtures now match Deployer's Bash execution environment, command assertions ignore Windows-only serialization quotes, path assertions use the host directory separator, and the PHAR credential scanner normalizes archive entry paths before excluding vendored dependencies.
 
 ### Refactoring
 

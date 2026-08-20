@@ -2,6 +2,20 @@
 
 use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
 
+function distributedPharInternalPath(string $pharPath, string $entryPath): string
+{
+    $prefix = 'phar://'.str_replace('\\', '/', $pharPath).'/';
+    $entryPath = str_replace('\\', '/', $entryPath);
+
+    throw_unless(
+        str_starts_with($entryPath, $prefix),
+        RuntimeException::class,
+        "Unable to resolve {$entryPath} relative to {$pharPath}.",
+    );
+
+    return substr($entryPath, strlen($prefix));
+}
+
 it('exports only the public Maintainer namespace to consumers', function () {
     $manifest = json_decode(
         file_get_contents(dirname(__DIR__, 2).'/composer.json'),
@@ -58,6 +72,23 @@ it('packages configuration and unmodified publishing templates in the PHAR', fun
         ->and(dirname(__DIR__, 2).'/config/maintainer_secrets.php')->toBeFile();
 });
 
+it('normalizes distributed PHAR entry paths across operating systems', function (
+    string $pharPath,
+    string $entryPath,
+) {
+    expect(distributedPharInternalPath($pharPath, $entryPath))
+        ->toBe('vendor/package/file.php');
+})->with([
+    'POSIX paths' => [
+        '/tmp/maintainer.phar',
+        'phar:///tmp/maintainer.phar/vendor/package/file.php',
+    ],
+    'Windows archive with normalized entry path' => [
+        'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\maintainer.phar',
+        'phar://C:/Users/runneradmin/AppData/Local/Temp/maintainer.phar/vendor/package/file.php',
+    ],
+]);
+
 it('excludes local configuration and credential signatures from the distributed PHAR', function () {
     $projectRoot = dirname(__DIR__, 2);
     $temporaryFile = tempnam(sys_get_temp_dir(), 'maintainer-phar-');
@@ -82,10 +113,9 @@ it('excludes local configuration and credential signatures from the distributed 
             'private key' => '/-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/',
         ];
         $violations = [];
-        $pharPrefix = 'phar://'.$pharPath.'/';
 
         foreach (new RecursiveIteratorIterator($phar) as $file) {
-            $internalPath = str_replace($pharPrefix, '', $file->getPathname());
+            $internalPath = distributedPharInternalPath($pharPath, $file->getPathname());
 
             if (str_starts_with($internalPath, 'vendor/')) {
                 continue;
@@ -100,7 +130,9 @@ it('excludes local configuration and credential signatures from the distributed 
             }
         }
 
-        expect($violations)->toBeEmpty();
+        expect($violations)->toBeEmpty(
+            'The distributed PHAR contains potential credentials: '.implode(', ', $violations),
+        );
     } finally {
         @unlink($pharPath);
         @unlink($temporaryFile);

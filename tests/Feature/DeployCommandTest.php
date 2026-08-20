@@ -5,6 +5,8 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Crypt;
 
+use function Illuminate\Filesystem\join_paths;
+
 function installFakeDeployerBinary(string $directory, Filesystem $files, int $exitCode = 0): void
 {
     $windows = PHP_OS_FAMILY === 'Windows';
@@ -65,6 +67,8 @@ it('runs the project Deployer binary with deployment options', function () {
             ->assertSuccessful();
 
         $deployerArguments = str_replace('"', '', trim($files->get($directory.'/deployer.log')));
+        $projectRoot = realpath($directory);
+        assert(is_string($projectRoot));
 
         expect($deployerArguments)
             ->toBe(implode(' ', [
@@ -86,7 +90,7 @@ it('runs the project Deployer binary with deployment options', function () {
                 'role=web',
             ]))
             ->and(trim($files->get($directory.'/maintainer-contrib-path.log')))
-            ->toBe(realpath($directory).'/vendor/artisan-toolbox/maintainer/app/Deployer/contrib.php')
+            ->toBe(join_paths($projectRoot, 'vendor', 'artisan-toolbox', 'maintainer', 'app', 'Deployer', 'contrib.php'))
             ->and(trim($files->get($directory.'/maintainer-ssh-identity-path.log')))
             ->toBe('')
             ->and($files->exists($directory.'/maintainer-ssh-identity-contents.log'))
