@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Commands;
+namespace App\Commands\Configuration;
 
 use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
 use Illuminate\Console\Attributes\Description;

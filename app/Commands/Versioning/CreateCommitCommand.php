@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Commands;
+namespace App\Commands\Versioning;
 
 use App\Support\Ai\CommitMessageGenerator;
 use App\Support\Ai\ConfiguredAiProvider;

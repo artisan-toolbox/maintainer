@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Commands;
+namespace App\Commands\Deployment;
 
 use App\Support\Deployer\DeployerRunner;
 use App\Support\ProjectPath;

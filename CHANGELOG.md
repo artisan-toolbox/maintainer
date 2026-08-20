@@ -4,6 +4,7 @@
 
 ### Features
 
+- Group the interactive menu into CI, Configuration, Deployment, and Versioning submenus. `Ctrl+C` returns from a submenu to the main menu, where Exit closes Maintainer. Compatible terminals are cleared on each navigation before the banner and current breadcrumb are redrawn, with a non-clearing fallback for unsupported terminals. CI uses a multi-select to run any tool combination in one workflow, backed by the repeatable `quality --tool=<tool>` option; omitting the option preserves the complete quality sequence.
 - Add an interactive `config:publish` workflow with granular template selection for Maintainer settings and secrets, Pint, Rector, PHPStan, Pest/PHPUnit, and Deployer. Selected files can be added to `.gitignore` by default without duplicate entries. Every existing destination requires an explicit per-file overwrite confirmation that defaults to preserving the file.
 - Add a package-managed Deployer task recipe. The `deploy` command passes its absolute path through `MAINTAINER_TASKS_PATH`, allowing the published `deploy.php` to import it after the Laravel and npm recipes while keeping project configuration, hosts, and hooks in the consuming project.
 - Add a `deploy` command and interactive workflow that delegate deployments to the consuming project's `vendor/bin/dep`, stream Deployer output, preserve interactive terminal access, forward supported deployment options and selectors, and return Deployer's exit code.
@@ -12,6 +13,10 @@
 - Support Laravel-style `env()` calls in Maintainer configuration files. Distributed and published templates now expose environment-backed defaults, and Maintainer loads the consuming Composer project's `.env` before evaluating its configuration while preserving operating-system environment precedence.
 - Add Laravel's authenticated encryption layer through `Crypt`, `encrypt()`, and `decrypt()`. The lazily resolved encrypter requires `maintainer_secrets.key`, whose distributed default is `env('APP_KEY')`, and throws `MissingAppKeyException` only when encryption is requested without an available key.
 - Generate an OpenSSH Ed25519 key when publishing Maintainer secrets. Only the Laravel-encrypted private key is stored under `ssh_key`; `ssh:key` decrypts it, `ssh:public` derives the public key on demand, and consumer-side `maintainer_ssh_key()` and `maintainer_ssh_public_key()` helpers call the same public key service directly without starting a subprocess. Published files receive normalized line endings, trailing whitespace, and final newlines. Key generation uses phpseclib without requiring the Sodium extension or an external `ssh-keygen` binary.
+
+### Refactoring
+
+- Organize console command classes into CI, Configuration, Deployment, and Versioning namespaces that mirror the interactive menu structure.
 
 ## [1.0.0] - 2026-08-17
 

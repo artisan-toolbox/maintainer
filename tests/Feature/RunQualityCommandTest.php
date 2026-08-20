@@ -47,6 +47,79 @@ it('runs project binaries with each existing project configuration', function ()
     });
 });
 
+it('runs only the selected quality tool', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeQualityBinaries($directory, $files);
+        $files->put($directory.'/phpstan.neon', "parameters:\n");
+
+        $this->artisan('quality', [
+            '--tool' => ['phpstan'],
+            '--no-interaction' => true,
+        ])
+            ->expectsOutputToContain('PHPStan completed successfully.')
+            ->assertSuccessful();
+
+        $resolvedDirectory = realpath($directory);
+        assert(is_string($resolvedDirectory));
+        $qualityLog = str_replace(
+            ['\\', '"'],
+            ['/', ''],
+            $files->get($directory.'/quality.log'),
+        );
+
+        expect(trim($qualityLog))->toBe(
+            'phpstan analyse --configuration '
+            .str_replace('\\', '/', $resolvedDirectory)
+            .'/phpstan.neon --memory-limit=2G',
+        );
+    });
+});
+
+it('runs multiple selected quality tools in one workflow', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeQualityBinaries($directory, $files);
+        $files->put($directory.'/pint.json', "{}\n");
+        $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
+
+        $this->artisan('quality', [
+            '--tool' => ['pint', 'pest'],
+            '--no-interaction' => true,
+        ])
+            ->expectsOutputToContain('Pint and Pest completed successfully.')
+            ->assertSuccessful();
+
+        $resolvedDirectory = realpath($directory);
+        assert(is_string($resolvedDirectory));
+        $normalizedDirectory = str_replace('\\', '/', $resolvedDirectory);
+        $qualityLog = str_replace(
+            ["\r\n", '\\', '"'],
+            ["\n", '/', ''],
+            $files->get($directory.'/quality.log'),
+        );
+
+        expect($qualityLog)->toBe(implode("\n", [
+            "pint --config {$normalizedDirectory}/pint.json",
+            "pest --configuration {$normalizedDirectory}/phpunit.xml",
+            '',
+        ]));
+    });
+});
+
+it('rejects an unsupported quality tool', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeQualityBinaries($directory, $files);
+
+        $this->artisan('quality', [
+            '--tool' => ['eslint'],
+            '--no-interaction' => true,
+        ])
+            ->expectsOutputToContain('must be pint, rector, phpstan, or pest')
+            ->assertFailed();
+
+        expect($files->exists($directory.'/quality.log'))->toBeFalse();
+    });
+});
+
 it('fails non-interactively when a project configuration is missing', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         installFakeQualityBinaries($directory, $files);

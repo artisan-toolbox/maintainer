@@ -4,7 +4,7 @@ use App\Ai\Agents\ReleaseChangelogAgent;
 use App\Ai\Agents\ReleaseDiffSummaryAgent;
 use App\Ai\Agents\ReleaseNotesAgent;
 use App\Ai\Agents\ReleaseVersionAgent;
-use App\Commands\CreateReleaseCommand;
+use App\Commands\Versioning\CreateReleaseCommand;
 use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\BrowserLauncher;
 use App\Support\Release\GitCliReleaseRepository;

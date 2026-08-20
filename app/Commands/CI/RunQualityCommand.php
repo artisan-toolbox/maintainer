@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Commands;
+namespace App\Commands\CI;
 
 use App\Support\Configuration\MaintainerConfiguration;
 use App\Support\Git\GitWorkingTree;
@@ -18,7 +18,7 @@ use RuntimeException;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 
-#[Signature('quality')]
+#[Signature('quality {--tool=* : Run only selected tools: pint, rector, phpstan, or pest}')]
 #[Description('Run Pint, Rector, PHPStan, and Pest with the project configuration')]
 final class RunQualityCommand extends Command
 {
@@ -42,17 +42,19 @@ final class RunQualityCommand extends Command
         }
 
         try {
+            $tools = $this->selectedTools();
             $configurationPaths = $this->configurationPaths(
                 $projectRoot,
                 $configurations,
                 $projectTypeDetector,
+                $tools,
             );
 
             if ($configurationPaths === null) {
                 return self::FAILURE;
             }
 
-            foreach (QualityTool::cases() as $tool) {
+            foreach ($tools as $tool) {
                 $this->components->twoColumnDetail("Running {$tool->label()}", $configurationPaths[$tool->value]);
 
                 $exitCode = $runner->run(
@@ -77,7 +79,7 @@ final class RunQualityCommand extends Command
             return self::FAILURE;
         }
 
-        $this->components->success('Pint, Rector, PHPStan, and Pest completed successfully.');
+        $this->components->success($this->successMessage($tools));
 
         if ($this->input->isInteractive() && $this->shouldCreateCommit($projectRoot, $workingTree)) {
             return $this->call('commit');
@@ -87,17 +89,69 @@ final class RunQualityCommand extends Command
     }
 
     /**
+     * @return list<QualityTool>
+     */
+    private function selectedTools(): array
+    {
+        $selected = $this->option('tool');
+
+        if ($selected === []) {
+            return QualityTool::cases();
+        }
+
+        $tools = [];
+
+        foreach ($selected as $value) {
+            $tool = is_string($value)
+                ? QualityTool::tryFrom($value)
+                : null;
+
+            throw_if($tool === null, RuntimeException::class, 'Every selected quality tool must be pint, rector, phpstan, or pest.');
+
+            $tools[$tool->value] = $tool;
+        }
+
+        return array_values($tools);
+    }
+
+    /**
+     * @param  list<QualityTool>  $tools
+     */
+    private function successMessage(array $tools): string
+    {
+        if (count($tools) === count(QualityTool::cases())) {
+            return 'Pint, Rector, PHPStan, and Pest completed successfully.';
+        }
+
+        $labels = array_map(
+            static fn (QualityTool $tool): string => $tool->label(),
+            $tools,
+        );
+
+        if (count($labels) === 1) {
+            return "{$labels[0]} completed successfully.";
+        }
+
+        $lastLabel = array_pop($labels);
+        $separator = count($labels) === 1 ? ' and ' : ', and ';
+
+        return implode(', ', $labels).$separator.$lastLabel.' completed successfully.';
+    }
+
+    /**
+     * @param  list<QualityTool>  $tools
      * @return array<string, string>|null
      */
     private function configurationPaths(
         string $projectRoot,
         QualityConfigurationManager $configurations,
         LaravelProjectTypeDetector $projectTypeDetector,
+        array $tools,
     ): ?array {
         $paths = [];
         $detectedProjectType = $projectTypeDetector->detect($projectRoot);
 
-        foreach (QualityTool::cases() as $tool) {
+        foreach ($tools as $tool) {
             $path = $configurations->find($tool, $projectRoot);
 
             if ($path !== null) {

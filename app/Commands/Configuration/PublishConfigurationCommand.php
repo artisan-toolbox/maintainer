@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Commands;
+namespace App\Commands\Configuration;
 
 use App\Support\Configuration\ConfigurationFilePublisher;
 use App\Support\Configuration\PublishableConfiguration;

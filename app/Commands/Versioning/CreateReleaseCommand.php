@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Commands;
+namespace App\Commands\Versioning;
 
 use App\Support\Ai\ChangelogEntry;
 use App\Support\Ai\ConfiguredAiProvider;
