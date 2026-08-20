@@ -59,11 +59,16 @@ final readonly class MaintainerSecrets
     {
         throw_if($this->missing(), RuntimeException::class, $this->userConfigurationPath->relativePath('maintainer_secrets').' is missing. Publish the Maintainer secrets configuration first.');
 
-        $sshKey = $this->load()['ssh_key'] ?? null;
+        $sshKey = $this->configuredSshKey();
 
-        throw_unless(is_string($sshKey) && $sshKey !== '', RuntimeException::class, 'Maintainer secrets do not contain an encrypted ssh_key. Publish the Maintainer secrets configuration to generate one.');
+        throw_unless($sshKey !== null, RuntimeException::class, 'Maintainer secrets do not contain an encrypted ssh_key. Publish the Maintainer secrets configuration to generate one.');
 
         return $sshKey;
+    }
+
+    public function hasSshKey(): bool
+    {
+        return ! $this->missing() && $this->configuredSshKey() !== null;
     }
 
     public function key(): string
@@ -104,6 +109,13 @@ final readonly class MaintainerSecrets
             $defaults,
             $this->legacyLoader->load($this->legacyPath(), 'maintainer_secrets.json'),
         );
+    }
+
+    private function configuredSshKey(): ?string
+    {
+        $sshKey = $this->load()['ssh_key'] ?? null;
+
+        return is_string($sshKey) && $sshKey !== '' ? $sshKey : null;
     }
 
     private function legacyPath(): string

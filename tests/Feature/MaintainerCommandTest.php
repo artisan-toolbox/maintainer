@@ -84,6 +84,7 @@ it('groups the available maintenance workflows into sections', function () {
         'pest',
     ])->and(array_keys(maintainerMenuOptions('DEPLOYMENT_WORKFLOWS')))->toBe([
         'deploy',
+        'deploy:unlock',
     ]);
 });
 

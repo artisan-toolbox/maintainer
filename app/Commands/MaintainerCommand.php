@@ -68,6 +68,7 @@ final class MaintainerCommand extends Command
      */
     private const array DEPLOYMENT_WORKFLOWS = [
         'deploy' => '1 - Deploy the project with Deployer',
+        'deploy:unlock' => '2 - Unlock a failed deployment',
     ];
 
     /**

@@ -50,8 +50,10 @@ it('publishes only selected configuration files and ignores them by default', fu
             ->and($files->get($directory.'/deploy.php'))->toContain(
                 "require 'recipe/laravel.php';",
                 "require 'contrib/npm.php';",
-                "import(getenv('MAINTAINER_TASKS_PATH'));",
-            )
+                "import(getenv('MAINTAINER_CONTRIB'));",
+                '| Config',
+            )->toMatch('/\/\/\s*set\(\'repository\'/')
+            ->toMatch('/\/\/\s*\'repository:tag\'/')
             ->and($files->exists($directory.'/rector.php'))->toBeFalse()
             ->and($files->get($directory.'/.gitignore'))->toBe(implode("\n", [
                 'pint.json',

@@ -6,8 +6,10 @@
         "app",
         "bootstrap",
         "config",
-        "resources",
         "vendor"
+    ],
+    "directories-bin": [
+        "resources"
     ],
     "files": [
         "composer.json"

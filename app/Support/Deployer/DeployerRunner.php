@@ -8,11 +8,17 @@ use Symfony\Component\Process\Process;
 
 final readonly class DeployerRunner
 {
+    public function __construct(
+        private TemporarySshIdentityFile $sshIdentity,
+    ) {}
+
     /**
      * Run the Deployer binary installed by the consuming project.
      *
      * @param  list<string>  $arguments
      * @param  Closure(string): void  $output
+     *
+     * @throws \Throwable
      */
     public function run(
         string $projectRoot,
@@ -35,18 +41,50 @@ final readonly class DeployerRunner
             'Deployer is not installed in the project. Install artisan-toolbox/maintainer or deployer/deployer as a Composer development dependency first.',
         );
 
-        $process = new Process(
-            [$binary, ...$arguments],
-            $projectRoot,
-            [
-                'MAINTAINER_TASKS_PATH' => $projectRoot
+        return $this->sshIdentity->using(function (?string $identityFile) use ($binary, $arguments, $projectRoot, $interactive, $output): int {
+            $environment = [
+                'MAINTAINER_CONTRIB' => $projectRoot
                     .DIRECTORY_SEPARATOR.'vendor'
                     .DIRECTORY_SEPARATOR.'artisan-toolbox'
                     .DIRECTORY_SEPARATOR.'maintainer'
                     .DIRECTORY_SEPARATOR.'app'
                     .DIRECTORY_SEPARATOR.'Deployer'
-                    .DIRECTORY_SEPARATOR.'tasks.php',
-            ],
+                    .DIRECTORY_SEPARATOR.'contrib.php',
+                'MAINTAINER_SSH_IDENTITY_FILE' => false,
+            ];
+
+            if ($identityFile !== null) {
+                $environment['MAINTAINER_SSH_IDENTITY_FILE'] = $identityFile;
+            }
+
+            return $this->runProcess(
+                $binary,
+                $arguments,
+                $projectRoot,
+                $environment,
+                $output,
+                $interactive,
+            );
+        });
+    }
+
+    /**
+     * @param  list<string>  $arguments
+     * @param  array<string, string|false>  $environment
+     * @param  Closure(string): void  $output
+     */
+    private function runProcess(
+        string $binary,
+        array $arguments,
+        string $projectRoot,
+        array $environment,
+        Closure $output,
+        bool $interactive,
+    ): int {
+        $process = new Process(
+            [$binary, ...$arguments],
+            $projectRoot,
+            $environment,
         );
         $process->setTimeout(null);
 

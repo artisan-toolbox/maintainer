@@ -123,6 +123,7 @@ final class PublishConfigurationCommand extends Command
         $selected = multiselect(
             label: 'Which configuration files would you like to publish?',
             options: $options,
+            scroll: count($options),
             required: 'Select at least one configuration file to publish.',
         );
 

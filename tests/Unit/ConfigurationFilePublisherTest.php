@@ -38,8 +38,10 @@ it('refuses to overwrite a destination unless explicitly allowed', function () {
     expect($this->files->get($path))->toContain(
         "require 'recipe/laravel.php';",
         "require 'contrib/npm.php';",
-        "import(getenv('MAINTAINER_TASKS_PATH'));",
-    );
+        "import(getenv('MAINTAINER_CONTRIB'));",
+        '| Config',
+    )->toMatch('/\/\/\s*set\(\'repository\'/')
+        ->toMatch('/\/\/\s*\'repository:tag\'/');
 });
 
 it('normalizes published configuration formatting', function () {
