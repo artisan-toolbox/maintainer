@@ -83,12 +83,13 @@ it('publishes Maintainer configuration with the development user prefix', functi
                 ->toContain("env('MAINTAINER_GIT_DIFF_OUTPUT_FORMAT', 'line_by_line')")
                 ->and($secrets)->toHaveKey('key', env('APP_KEY'))
                 ->toHaveKey('ai_providers.openai.key')
-                ->and($secrets['rsa_key'])->toBeString()
+                ->and($secrets['ssh_key'])->toBeString()
                 ->not->toContain('OPENSSH PRIVATE KEY')
                 ->and($keys->privateKey())->toStartWith('-----BEGIN OPENSSH PRIVATE KEY-----')
                 ->and($keys->publicKey())->toStartWith('ssh-ed25519 ')
                 ->toEndWith(' developer@example.com')
                 ->and($files->get($directory.'/config/dev_maintainer_secrets.php'))
+                ->toMatch("/'key' => env\\('APP_KEY'\\),\n    'ssh_key' => '[^']+',\n    'ai_providers' => \\[/")
                 ->toContain("env('OPENAI_API_KEY', '')")
                 ->and($files->get($directory.'/.gitignore'))->toBe(implode("\n", [
                     'config/dev_maintainer.php',
@@ -144,7 +145,7 @@ it('requires an encryption key before publishing Maintainer secrets', function (
 it('does not request an email or rotate a key when secrets overwrite is declined', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         putPhpConfiguration($files, $directory.'/config/dev_maintainer_secrets.php', [
-            'rsa_key' => 'keep-encrypted-key',
+            'ssh_key' => 'keep-encrypted-key',
         ]);
 
         $this->artisan('config:publish')
@@ -158,7 +159,7 @@ it('does not request an email or rotate a key when secrets overwrite is declined
             ->assertSuccessful();
 
         expect(require $directory.'/config/dev_maintainer_secrets.php')
-            ->toHaveKey('rsa_key', 'keep-encrypted-key');
+            ->toHaveKey('ssh_key', 'keep-encrypted-key');
     });
 });
 

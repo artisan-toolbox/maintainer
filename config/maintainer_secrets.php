@@ -2,9 +2,7 @@
 
 return [
     'key' => env('APP_KEY'),
-
-    'rsa_key' => null,
-
+    'ssh_key' => null,
     'ai_providers' => [
         'anthropic' => [
             'key' => env('ANTHROPIC_API_KEY', ''),

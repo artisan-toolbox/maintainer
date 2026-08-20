@@ -35,7 +35,7 @@ final readonly class MaintainerSecrets
      */
     public function aiProvider(string $provider): array
     {
-        throw_if($this->missing(), RuntimeException::class, $this->userConfigurationPath->relativePath('maintainer_secrets').' is missing. Run maintainer init and configure the selected AI provider.');
+        throw_if($this->missing(), RuntimeException::class, $this->userConfigurationPath->relativePath('maintainer_secrets').' is missing. Run maintainer config:publish and configure the selected AI provider.');
 
         $decoded = $this->load();
 
@@ -55,15 +55,15 @@ final readonly class MaintainerSecrets
         return $configuration;
     }
 
-    public function rsaKey(): string
+    public function sshKey(): string
     {
         throw_if($this->missing(), RuntimeException::class, $this->userConfigurationPath->relativePath('maintainer_secrets').' is missing. Publish the Maintainer secrets configuration first.');
 
-        $rsaKey = $this->load()['rsa_key'] ?? null;
+        $sshKey = $this->load()['ssh_key'] ?? null;
 
-        throw_unless(is_string($rsaKey) && $rsaKey !== '', RuntimeException::class, 'Maintainer secrets do not contain an encrypted rsa_key. Publish the Maintainer secrets configuration to generate one.');
+        throw_unless(is_string($sshKey) && $sshKey !== '', RuntimeException::class, 'Maintainer secrets do not contain an encrypted ssh_key. Publish the Maintainer secrets configuration to generate one.');
 
-        return $rsaKey;
+        return $sshKey;
     }
 
     public function key(): string

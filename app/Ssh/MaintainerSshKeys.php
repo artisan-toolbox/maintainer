@@ -49,7 +49,7 @@ final readonly class MaintainerSshKeys
             static fn (): StringEncrypter => MaintainerEncrypterFactory::make(
                 $configuration->get('maintainer_secrets.key', $configuration->get('app.key')),
             ),
-            static fn (): mixed => $configuration->get('maintainer_secrets.rsa_key'),
+            static fn (): mixed => $configuration->get('maintainer_secrets.ssh_key'),
         );
     }
 
@@ -57,7 +57,7 @@ final readonly class MaintainerSshKeys
     {
         $encryptedPrivateKey = ($this->encryptedPrivateKeyResolver)();
 
-        throw_unless(is_string($encryptedPrivateKey) && $encryptedPrivateKey !== '', RuntimeException::class, 'Maintainer secrets do not contain an encrypted rsa_key. Publish the Maintainer secrets configuration to generate one.');
+        throw_unless(is_string($encryptedPrivateKey) && $encryptedPrivateKey !== '', RuntimeException::class, 'Maintainer secrets do not contain an encrypted ssh_key. Publish the Maintainer secrets configuration to generate one.');
 
         return ($this->encrypterResolver)()->decryptString($encryptedPrivateKey);
     }

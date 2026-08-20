@@ -24,10 +24,10 @@ final readonly class MaintainerSecretsTemplate
         $encryptedPrivateKey = MaintainerEncrypterFactory::make($this->defaults->all()['key'] ?? null)->encryptString(
             $this->keyGenerator->generatePrivateKey($email),
         );
-        $replacement = "'rsa_key' => ".var_export($encryptedPrivateKey, true).',';
-        $contents = str_replace("'rsa_key' => null,", $replacement, $this->files->get($template), $replacements);
+        $replacement = "'ssh_key' => ".var_export($encryptedPrivateKey, true).',';
+        $contents = str_replace("'ssh_key' => null,", $replacement, $this->files->get($template), $replacements);
 
-        throw_unless($replacements === 1, RuntimeException::class, 'The Maintainer secrets template does not contain the expected rsa_key placeholder.');
+        throw_unless($replacements === 1, RuntimeException::class, 'The Maintainer secrets template does not contain the expected ssh_key placeholder.');
 
         return $contents;
     }

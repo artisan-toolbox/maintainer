@@ -14,14 +14,14 @@ it('prints the stored private key and derives its public key on demand', functio
             $privateKey = resolve(Ed25519KeyGenerator::class)->generatePrivateKey('owner@example.com');
 
             putPhpConfiguration($files, $directory.'/config/dev_maintainer_secrets.php', [
-                'rsa_key' => Crypt::encryptString($privateKey),
+                'ssh_key' => Crypt::encryptString($privateKey),
             ]);
 
-            $this->artisan('rsa:key')
+            $this->artisan('ssh:key')
                 ->expectsOutputToContain('-----BEGIN OPENSSH PRIVATE KEY-----')
                 ->assertSuccessful();
 
-            $this->artisan('rsa:public')
+            $this->artisan('ssh:public')
                 ->expectsOutputToContain('ssh-ed25519 ')
                 ->assertSuccessful();
 
@@ -40,11 +40,11 @@ it('fails when the secrets file has no generated SSH key', function () {
         withinTemporaryProject(function (string $directory, Filesystem $files) {
             $files->put($directory.'/.env', 'APP_KEY=base64:'.base64_encode(random_bytes(32))."\n");
             putPhpConfiguration($files, $directory.'/config/dev_maintainer_secrets.php', [
-                'rsa_key' => null,
+                'ssh_key' => null,
             ]);
 
-            $this->artisan('rsa:key')
-                ->expectsOutputToContain('Maintainer secrets do not contain an encrypted rsa_key')
+            $this->artisan('ssh:key')
+                ->expectsOutputToContain('Maintainer secrets do not contain an encrypted ssh_key')
                 ->assertFailed();
         });
     } finally {
@@ -62,10 +62,10 @@ it('exposes the same key service directly through the consumer helpers', functio
             $privateKey = resolve(Ed25519KeyGenerator::class)->generatePrivateKey('owner@example.com');
 
             config()->set('maintainer_secrets.key', $maintainerKey);
-            config()->set('maintainer_secrets.rsa_key', MaintainerEncrypterFactory::make($maintainerKey)->encryptString($privateKey));
+            config()->set('maintainer_secrets.ssh_key', MaintainerEncrypterFactory::make($maintainerKey)->encryptString($privateKey));
 
-            expect(maintainer_rsa_key())->toBe($privateKey)
-                ->and(maintainer_rsa_public_key())
+            expect(maintainer_ssh_key())->toBe($privateKey)
+                ->and(maintainer_ssh_public_key())
                 ->toStartWith('ssh-ed25519 ')
                 ->toEndWith(' owner@example.com');
         });

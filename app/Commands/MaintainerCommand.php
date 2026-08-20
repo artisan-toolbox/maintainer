@@ -23,7 +23,6 @@ final class MaintainerCommand extends Command
         'quality' => 'Run Pint, Rector, PHPStan, and Pest',
         'config:publish' => 'Publish configuration files',
         'release:create' => 'Create a new GitHub release',
-        'init' => 'Create the Maintainer configuration and secrets files',
         'diff:html' => 'View a Git diff in the browser',
     ];
 
@@ -33,7 +32,7 @@ final class MaintainerCommand extends Command
     public function handle(MaintainerBanner $banner): int
     {
         if (! $this->input->isInteractive()) {
-            $this->components->error('The maintainer command requires interactive input. Run release:create for a GitHub release or init to create the configuration file.');
+            $this->components->error('The maintainer command requires interactive input. Run release:create for a GitHub release or config:publish to publish configuration files.');
 
             return self::FAILURE;
         }
@@ -51,7 +50,6 @@ final class MaintainerCommand extends Command
             'quality' => $this->call('quality'),
             'config:publish' => $this->call('config:publish'),
             'release:create' => $this->call('release:create'),
-            'init' => $this->call('init'),
             'diff:html' => $this->call('diff:html'),
             default => throw new LogicException('The selected Maintainer workflow is not supported.'),
         };

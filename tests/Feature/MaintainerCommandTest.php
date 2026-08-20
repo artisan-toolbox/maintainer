@@ -8,6 +8,7 @@ it('registers the Maintainer workflow menu as the default command', function () 
 
     expect($commands)
         ->toHaveKey('maintainer')
+        ->not->toHaveKey('init')
         ->and($commands['maintainer']->getDescription())
         ->toBe('Open the Maintainer workflow menu')
         ->and(config('commands.default'))
@@ -22,7 +23,6 @@ it('offers the available maintenance workflows', function () {
         'quality' => 'Run Pint, Rector, PHPStan, and Pest',
         'config:publish' => 'Publish configuration files',
         'release:create' => 'Create a new GitHub release',
-        'init' => 'Create the Maintainer configuration and secrets files',
         'diff:html' => 'View a Git diff in the browser',
     ]);
 });
@@ -33,5 +33,4 @@ it('rejects non-interactive execution and explains how to run a workflow directl
         ->assertFailed();
 
     $this->assertCommandNotCalled('release:create');
-    $this->assertCommandNotCalled('init');
 });

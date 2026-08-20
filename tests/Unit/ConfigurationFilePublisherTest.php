@@ -37,3 +37,25 @@ it('refuses to overwrite a destination unless explicitly allowed', function () {
 
     expect($this->files->get($path))->toContain("require 'recipe/laravel.php';");
 });
+
+it('normalizes published configuration formatting', function () {
+    $templates = $this->directory.'/templates';
+    $project = $this->directory.'/project';
+    $this->files->makeDirectory($templates, recursive: true);
+    $this->files->makeDirectory($project, recursive: true);
+    $this->files->put($templates.'/pint.json', "{  \r\n    \"preset\": \"laravel\"  \r\n}\r\n\r\n");
+
+    $publisher = new ConfigurationFilePublisher(
+        $this->files,
+        templateRoot: $templates,
+    );
+
+    $publisher->publish(
+        PublishableConfiguration::Pint,
+        $project,
+        LaravelProjectType::Application,
+    );
+
+    expect($this->files->get($project.'/pint.json'))
+        ->toBe("{\n    \"preset\": \"laravel\"\n}\n");
+});

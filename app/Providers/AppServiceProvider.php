@@ -55,7 +55,7 @@ class AppServiceProvider extends ServiceProvider
             MaintainerSshKeys::class,
             fn (Application $application): MaintainerSshKeys => MaintainerSshKeys::fromResolvers(
                 fn (): StringEncrypter => $application->make(StringEncrypter::class),
-                fn (): string => $application->make(MaintainerSecrets::class)->rsaKey(),
+                fn (): string => $application->make(MaintainerSecrets::class)->sshKey(),
             ),
         );
         $this->app->bind(CommitMessageGenerator::class, LaravelAiCommitMessageGenerator::class);

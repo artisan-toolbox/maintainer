@@ -8,21 +8,21 @@ use Illuminate\Console\Attributes\Signature;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 
-#[Signature('rsa:key')]
-#[Description('Print the decrypted Maintainer SSH Ed25519 private key')]
-final class RsaPrivateKeyCommand extends Command
+#[Signature('ssh:public')]
+#[Description('Derive and print the Maintainer SSH Ed25519 public key')]
+final class SshPublicKeyCommand extends Command
 {
     public function handle(MaintainerSshKeys $keys): int
     {
         try {
-            $privateKey = $keys->privateKey();
+            $publicKey = $keys->publicKey();
         } catch (RuntimeException $exception) {
             $this->components->error($exception->getMessage());
 
             return self::FAILURE;
         }
 
-        $this->output->writeln($privateKey);
+        $this->output->writeln($publicKey);
 
         return self::SUCCESS;
     }

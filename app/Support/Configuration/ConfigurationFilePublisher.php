@@ -66,14 +66,16 @@ final readonly class ConfigurationFilePublisher
         if ($configuration === PublishableConfiguration::MaintainerSecrets) {
             throw_if($email === null || $email === '', RuntimeException::class, 'An email address is required to generate the Maintainer SSH key.');
             throw_if($this->maintainerSecretsTemplate === null, RuntimeException::class, 'The Maintainer secrets publisher is unavailable.');
-            throw_if($this->files->put($destination, $this->maintainerSecretsTemplate->contents($email)) === false, RuntimeException::class, "Unable to create {$configuration->filename()}.");
+            $contents = $this->maintainerSecretsTemplate->contents($email);
         } else {
-            throw_unless(
-                $this->files->copy($template, $destination),
-                RuntimeException::class,
-                "Unable to create {$configuration->filename()}.",
-            );
+            $contents = $this->files->get($template);
         }
+
+        throw_if(
+            $this->files->put($destination, $this->format($contents)) === false,
+            RuntimeException::class,
+            "Unable to create {$configuration->filename()}.",
+        );
 
         return $destination;
     }
@@ -87,6 +89,14 @@ final readonly class ConfigurationFilePublisher
         );
 
         return $this->userConfigurationPath;
+    }
+
+    private function format(string $contents): string
+    {
+        $contents = str_replace(["\r\n", "\r"], "\n", $contents);
+        $contents = preg_replace('/[\t ]+$/m', '', $contents) ?? $contents;
+
+        return rtrim($contents)."\n";
     }
 
     private function userConfigurationName(PublishableConfiguration $configuration): string
