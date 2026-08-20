@@ -2,14 +2,15 @@
 
 use App\Support\Release\GitCliReleaseRepository;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+
+use function Illuminate\Filesystem\join_paths;
 
 it('fetches a GitHub release tag that is missing from the local clone', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-release-tag-'.Str::uuid();
-    $remote = $directory.DIRECTORY_SEPARATOR.'remote.git';
-    $project = $directory.DIRECTORY_SEPARATOR.'project';
+    $directory = temporaryTestDirectory('maintainer-release-tag-');
+    $remote = join_paths($directory, 'remote.git');
+    $project = join_paths($directory, 'project');
     $files->makeDirectory($project, recursive: true);
 
     try {

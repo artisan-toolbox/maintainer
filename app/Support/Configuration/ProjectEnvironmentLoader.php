@@ -9,6 +9,8 @@ use Illuminate\Filesystem\Filesystem;
 use RuntimeException;
 use Throwable;
 
+use function Illuminate\Filesystem\join_paths;
+
 #[Singleton]
 final class ProjectEnvironmentLoader
 {
@@ -32,7 +34,7 @@ final class ProjectEnvironmentLoader
             return;
         }
 
-        if (! $this->files->isFile($root.DIRECTORY_SEPARATOR.'.env')) {
+        if (! $this->files->isFile(join_paths($root, '.env'))) {
             $this->loadedRoots[$root] = true;
 
             return;

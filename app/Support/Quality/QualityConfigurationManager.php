@@ -6,6 +6,8 @@ use App\Support\Configuration\ConfigurationFilePublisher;
 use App\Support\Configuration\PublishableConfiguration;
 use Illuminate\Filesystem\Filesystem;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class QualityConfigurationManager
 {
     public function __construct(
@@ -16,7 +18,7 @@ final readonly class QualityConfigurationManager
     public function find(QualityTool $tool, string $projectRoot): ?string
     {
         foreach ($tool->configurationFilenames() as $filename) {
-            $path = $projectRoot.DIRECTORY_SEPARATOR.$filename;
+            $path = join_paths($projectRoot, $filename);
 
             if ($this->files->isFile($path)) {
                 return $path;

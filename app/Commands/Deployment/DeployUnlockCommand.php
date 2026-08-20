@@ -29,7 +29,6 @@ final class DeployUnlockCommand extends Command
         try {
             $this->components->twoColumnDetail('Unlocking Deployer', $projectRoot);
             $exitCode = $runner->run(
-                $projectRoot,
                 $this->deployerArguments(),
                 function (string $output): void {
                     $this->output->write($output);

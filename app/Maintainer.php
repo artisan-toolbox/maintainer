@@ -15,11 +15,9 @@ final class Maintainer implements BeforeVersioning, Versionable, WithReadmeBadge
 
     public static function beforeVersioning(string $current, string $next): void
     {
-        $projectRoot = dirname(__DIR__);
-
-        Process::path($projectRoot)
+        Process::path(base_path())
             ->forever()
-            ->run([PHP_BINARY, $projectRoot.DIRECTORY_SEPARATOR.'maintainer', 'app:build'])
+            ->run([PHP_BINARY, base_path('maintainer'), 'app:build'])
             ->throw();
     }
 }

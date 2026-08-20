@@ -3,11 +3,10 @@
 use App\Support\Quality\LaravelProjectType;
 use App\Support\Quality\LaravelProjectTypeDetector;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 it('detects Composer projects as applications and libraries as packages', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-type-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-type-');
     $files->makeDirectory($directory, recursive: true);
     $detector = new LaravelProjectTypeDetector($files);
 

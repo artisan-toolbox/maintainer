@@ -6,6 +6,8 @@ use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
 use Illuminate\Filesystem\Filesystem;
 use RuntimeException;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class ReadmeVersionBadge
 {
     private const string START = '<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->';
@@ -20,7 +22,7 @@ final readonly class ReadmeVersionBadge
             return false;
         }
 
-        $path = $projectRoot.DIRECTORY_SEPARATOR.'README.md';
+        $path = join_paths($projectRoot, 'README.md');
 
         throw_unless($this->files->isFile($path), RuntimeException::class, 'README.md is required when the versionable class implements WithReadmeBadgeVersion.');
 

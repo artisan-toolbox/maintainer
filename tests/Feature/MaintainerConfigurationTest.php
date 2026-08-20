@@ -4,13 +4,12 @@ use App\Support\Configuration\MaintainerConfiguration;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Env;
-use Illuminate\Support\Str;
 
 function withinTemporaryConfigurationProject(Closure $callback): void
 {
     $files = new Filesystem;
     $originalWorkingDirectory = getcwd();
-    $temporaryDirectory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-config-'.Str::uuid();
+    $temporaryDirectory = temporaryTestDirectory('maintainer-config-');
     $hadComposerAutoloadPath = array_key_exists('_composer_autoload_path', $GLOBALS);
     $originalComposerAutoloadPath = $GLOBALS['_composer_autoload_path'] ?? null;
 

@@ -3,11 +3,10 @@
 use App\Support\Ai\ChangelogEntry;
 use App\Support\Release\ChangelogWriter;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 it('creates and prepends detailed grouped changelog releases', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-changelog-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-changelog-');
     $files->makeDirectory($directory);
     $writer = new ChangelogWriter($files);
 

@@ -6,6 +6,8 @@ use App\Support\Quality\LaravelProjectType;
 use Illuminate\Filesystem\Filesystem;
 use RuntimeException;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class ConfigurationFilePublisher
 {
     public function __construct(
@@ -21,7 +23,7 @@ final readonly class ConfigurationFilePublisher
             return $this->userConfigurationPath($configuration)->path($this->userConfigurationName($configuration));
         }
 
-        return $projectRoot.DIRECTORY_SEPARATOR.$configuration->filename();
+        return join_paths($projectRoot, $configuration->filename());
     }
 
     public function relativeDestination(PublishableConfiguration $configuration): string
@@ -51,7 +53,7 @@ final readonly class ConfigurationFilePublisher
         $template = $configuration->isMaintainerConfiguration()
             ? config_path($configuration->filename())
             : $configuration->templatePath(
-                $this->templateRoot ?? dirname(__DIR__, 3).DIRECTORY_SEPARATOR.'resources',
+                $this->templateRoot ?? resource_path(),
                 $projectType,
             );
 

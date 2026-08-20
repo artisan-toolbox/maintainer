@@ -29,7 +29,6 @@ final class DeployCommand extends Command
         try {
             $this->components->twoColumnDetail('Running Deployer', $projectRoot);
             $exitCode = $runner->run(
-                $projectRoot,
                 $this->deployerArguments(),
                 function (string $output): void {
                     $this->output->write($output);

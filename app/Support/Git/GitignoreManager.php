@@ -5,6 +5,8 @@ namespace App\Support\Git;
 use Illuminate\Filesystem\Filesystem;
 use RuntimeException;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class GitignoreManager
 {
     public function __construct(private Filesystem $files) {}
@@ -17,7 +19,7 @@ final readonly class GitignoreManager
      */
     public function add(string $projectRoot, array $entries): array
     {
-        $path = $projectRoot.DIRECTORY_SEPARATOR.'.gitignore';
+        $path = join_paths($projectRoot, '.gitignore');
         $contents = $this->files->exists($path) ? $this->files->get($path) : '';
         $existingEntries = array_map(trim(...), preg_split('/\R/', $contents) ?: []);
         $missingEntries = [];

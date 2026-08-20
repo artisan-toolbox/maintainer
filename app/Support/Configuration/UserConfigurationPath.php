@@ -2,7 +2,6 @@
 
 namespace App\Support\Configuration;
 
-use App\Support\ProjectPath;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Foundation\Application;
 use RuntimeException;
@@ -10,14 +9,13 @@ use RuntimeException;
 final readonly class UserConfigurationPath
 {
     public function __construct(
-        private ProjectPath $projectPath,
         private Application $application,
         private Repository $configuration,
     ) {}
 
     public function path(string $name): string
     {
-        return $this->root().DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $this->relativePath($name));
+        return project_path($this->relativePath($name));
     }
 
     public function relativePath(string $name): string
@@ -27,16 +25,7 @@ final readonly class UserConfigurationPath
 
     public function legacyPath(string $filename): string
     {
-        return $this->root().DIRECTORY_SEPARATOR.$filename;
-    }
-
-    private function root(): string
-    {
-        $projectRoot = $this->projectPath->root();
-
-        throw_if($projectRoot === null, RuntimeException::class, 'Unable to locate the project root. Run Maintainer inside a Composer project.');
-
-        return $projectRoot;
+        return project_path($filename);
     }
 
     private function prefix(): string

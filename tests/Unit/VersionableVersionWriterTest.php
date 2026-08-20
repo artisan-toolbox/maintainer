@@ -3,11 +3,10 @@
 use App\Support\Release\VersionableClass;
 use App\Support\Release\VersionableVersionWriter;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 it('creates a typed version constant while preserving the class contents', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-version-writer-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-version-writer-');
     $path = $directory.'/ProjectVersion.php';
 
     $files->makeDirectory($directory);
@@ -42,7 +41,7 @@ PHP
 
 it('updates an existing version constant', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-version-writer-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-version-writer-');
     $path = $directory.'/ProjectVersion.php';
 
     $files->makeDirectory($directory);

@@ -6,6 +6,8 @@ use Closure;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class QualityToolRunner
 {
     /**
@@ -21,10 +23,7 @@ final readonly class QualityToolRunner
         Closure $output,
         array $additionalArguments = [],
     ): int {
-        $binary = $projectRoot
-            .DIRECTORY_SEPARATOR.'vendor'
-            .DIRECTORY_SEPARATOR.'bin'
-            .DIRECTORY_SEPARATOR.$tool->binaryFilename();
+        $binary = join_paths($projectRoot, 'vendor', 'bin', $tool->binaryFilename());
 
         if (PHP_OS_FAMILY === 'Windows' && is_file($binary.'.bat')) {
             $binary .= '.bat';

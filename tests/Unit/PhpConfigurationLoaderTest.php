@@ -2,11 +2,10 @@
 
 use App\Support\Configuration\PhpConfigurationLoader;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->files = new Filesystem;
-    $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-php-config-'.Str::uuid();
+    $this->directory = temporaryTestDirectory('maintainer-php-config-');
     $this->files->makeDirectory($this->directory, recursive: true);
 });
 

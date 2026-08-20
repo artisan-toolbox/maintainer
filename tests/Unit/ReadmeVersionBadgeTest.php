@@ -4,11 +4,10 @@ use App\Support\Release\ReadmeVersionBadge;
 use App\Support\Release\VersionableClass;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 it('inserts and replaces a protected static README version badge', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-badge-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-badge-');
     $files->makeDirectory($directory);
     $files->put($directory.'/README.md', "# Example\n\nDocumentation.\n");
     $versionable = new VersionableClass(
@@ -38,7 +37,7 @@ it('inserts and replaces a protected static README version badge', function () {
 
 it('uses HTML when the README already uses HTML badges', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-html-badge-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-html-badge-');
     $files->makeDirectory($directory);
     $files->put($directory.'/README.md', <<<'HTML'
 <h1>Example</h1>
@@ -79,7 +78,7 @@ it('does nothing when the versionable class does not request a README badge', fu
 
 it('ignores documented badge markers inside Markdown code fences', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-badge-docs-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-badge-docs-');
     $files->makeDirectory($directory);
     $files->put($directory.'/README.md', <<<'MARKDOWN'
 # Example

@@ -20,6 +20,8 @@ use PhpParser\PrettyPrinter\Standard;
 use RuntimeException;
 use SplFileInfo;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class VersionableImplementation
 {
     private Parser $parser;
@@ -63,7 +65,7 @@ final readonly class VersionableImplementation
      */
     private function psrFourMappings(string $projectRoot): array
     {
-        $manifestPath = $projectRoot.DIRECTORY_SEPARATOR.'composer.json';
+        $manifestPath = join_paths($projectRoot, 'composer.json');
 
         try {
             $manifest = json_decode($this->files->get($manifestPath), true, flags: JSON_THROW_ON_ERROR);
@@ -106,7 +108,7 @@ final readonly class VersionableImplementation
     {
         $path = $this->isAbsolutePath($directory)
             ? $directory
-            : $projectRoot.DIRECTORY_SEPARATOR.$directory;
+            : join_paths($projectRoot, $directory);
 
         if (! $this->files->isDirectory($path)) {
             return [];
@@ -218,7 +220,6 @@ final readonly class VersionableImplementation
 
     private function isAbsolutePath(string $path): bool
     {
-        return str_starts_with($path, DIRECTORY_SEPARATOR)
-            || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1;
+        return preg_match('/^(?:[\\\\\/]|[A-Za-z]:[\\\\\/])/', $path) === 1;
     }
 }

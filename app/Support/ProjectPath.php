@@ -4,6 +4,8 @@ namespace App\Support;
 
 use Illuminate\Filesystem\Filesystem;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class ProjectPath
 {
     public function __construct(private Filesystem $files) {}
@@ -35,7 +37,7 @@ final readonly class ProjectPath
         $directory = realpath($directory) ?: $directory;
 
         while (true) {
-            if ($this->files->isFile($directory.DIRECTORY_SEPARATOR.'composer.json')) {
+            if ($this->files->isFile(join_paths($directory, 'composer.json'))) {
                 return $directory;
             }
 

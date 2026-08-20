@@ -5,6 +5,8 @@ namespace App\Support\Quality;
 use Illuminate\Filesystem\Filesystem;
 use JsonException;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class LaravelProjectTypeDetector
 {
     public function __construct(private Filesystem $files) {}
@@ -13,7 +15,7 @@ final readonly class LaravelProjectTypeDetector
     {
         try {
             $decoded = json_decode(
-                $this->files->get($projectRoot.DIRECTORY_SEPARATOR.'composer.json'),
+                $this->files->get(join_paths($projectRoot, 'composer.json')),
                 true,
                 flags: JSON_THROW_ON_ERROR,
             );

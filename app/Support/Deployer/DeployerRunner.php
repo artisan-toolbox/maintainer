@@ -21,15 +21,12 @@ final readonly class DeployerRunner
      * @throws \Throwable
      */
     public function run(
-        string $projectRoot,
         array $arguments,
         Closure $output,
         bool $interactive,
     ): int {
-        $binary = $projectRoot
-            .DIRECTORY_SEPARATOR.'vendor'
-            .DIRECTORY_SEPARATOR.'bin'
-            .DIRECTORY_SEPARATOR.'dep';
+        $projectRoot = project_path();
+        $binary = project_path('vendor/bin/dep');
 
         if (PHP_OS_FAMILY === 'Windows' && is_file($binary.'.bat')) {
             $binary .= '.bat';
@@ -43,13 +40,7 @@ final readonly class DeployerRunner
 
         return $this->sshIdentity->using(function (?string $identityFile) use ($binary, $arguments, $projectRoot, $interactive, $output): int {
             $environment = [
-                'MAINTAINER_CONTRIB' => $projectRoot
-                    .DIRECTORY_SEPARATOR.'vendor'
-                    .DIRECTORY_SEPARATOR.'artisan-toolbox'
-                    .DIRECTORY_SEPARATOR.'maintainer'
-                    .DIRECTORY_SEPARATOR.'app'
-                    .DIRECTORY_SEPARATOR.'Deployer'
-                    .DIRECTORY_SEPARATOR.'contrib.php',
+                'MAINTAINER_CONTRIB' => project_path('vendor/artisan-toolbox/maintainer/app/Deployer/contrib.php'),
                 'MAINTAINER_SSH_IDENTITY_FILE' => false,
             ];
 

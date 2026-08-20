@@ -4,11 +4,10 @@ use App\Support\Configuration\ConfigurationFilePublisher;
 use App\Support\Configuration\PublishableConfiguration;
 use App\Support\Quality\LaravelProjectType;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->files = new Filesystem;
-    $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-publisher-'.Str::uuid();
+    $this->directory = temporaryTestDirectory('maintainer-publisher-');
     $this->files->makeDirectory($this->directory, recursive: true);
 });
 

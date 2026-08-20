@@ -5,7 +5,6 @@ use ArtisanToolbox\Maintainer\Maintainer;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 it('discovers Maintainer as its own versionable class', function () {
     $versionable = new VersionableImplementation(new Filesystem)->find(dirname(__DIR__, 2));
@@ -19,7 +18,7 @@ it('discovers Maintainer as its own versionable class', function () {
 
 it('returns the versionable class and its current version', function () {
     $files = new Filesystem;
-    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-versionable-'.Str::uuid();
+    $directory = temporaryTestDirectory('maintainer-versionable-');
 
     $files->makeDirectory($directory.'/src', recursive: true);
     $files->put($directory.'/composer.json', <<<'JSON'

@@ -26,6 +26,7 @@
 ### Refactoring
 
 - Organize console command classes into CI, Configuration, Deployment, and Versioning namespaces that mirror the interactive menu structure.
+- Centralize consuming-project path resolution in the Laravel-style `project_path()` helper. Relative paths accept either slash style and are normalized for the host operating system, while Maintainer-owned paths use Laravel's `base_path()`, `config_path()`, and `resource_path()` helpers.
 
 ## [1.0.0] - 2026-08-17
 

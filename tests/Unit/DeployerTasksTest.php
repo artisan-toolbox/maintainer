@@ -2,13 +2,13 @@
 
 use Deployer\Deployer;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Process\Process;
 
 use function Deployer\get;
 use function Deployer\import;
 use function Deployer\task;
+use function Illuminate\Filesystem\join_paths;
 
 function installFakePm2Binary(string $directory, Filesystem $files, string $processList): string
 {
@@ -89,7 +89,7 @@ function runPm2TaskRecipe(string $packageRoot, string $directory, string $recipe
 
 beforeEach(function () {
     $this->files = new Filesystem;
-    $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-deployer-'.Str::uuid();
+    $this->directory = temporaryTestDirectory('maintainer-deployer-');
     $this->originalIdentityFile = getenv('MAINTAINER_SSH_IDENTITY_FILE');
     $this->files->makeDirectory($this->directory, recursive: true);
     putenv('MAINTAINER_SSH_IDENTITY_FILE');
@@ -124,7 +124,7 @@ it('imports the Maintainer Deployer contribution recipe', function () {
 });
 
 it('configures the temporary Maintainer SSH identity for Deployer hosts', function () {
-    $identityFile = $this->directory.DIRECTORY_SEPARATOR.'identity';
+    $identityFile = join_paths($this->directory, 'identity');
     $this->files->put($identityFile, 'private key');
     putenv('MAINTAINER_SSH_IDENTITY_FILE='.$identityFile);
     new Deployer(new Application);

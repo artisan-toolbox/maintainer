@@ -6,6 +6,8 @@ use Illuminate\Support\Env;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
+use function Illuminate\Filesystem\join_paths;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -48,6 +50,11 @@ expect()->extend('toBeOne', function () {
 function something(): void
 {
     // ..
+}
+
+function temporaryTestDirectory(string $prefix): string
+{
+    return join_paths(sys_get_temp_dir(), $prefix.Str::uuid());
 }
 
 /**
@@ -125,9 +132,7 @@ function withinTemporaryProject(
 ): void {
     $files = new Filesystem;
     $originalWorkingDirectory = getcwd();
-    $temporaryDirectory = sys_get_temp_dir()
-        .DIRECTORY_SEPARATOR.'maintainer-'
-        .Str::uuid();
+    $temporaryDirectory = temporaryTestDirectory('maintainer-');
     $hadComposerAutoloadPath = array_key_exists('_composer_autoload_path', $GLOBALS);
     $originalComposerAutoloadPath = $GLOBALS['_composer_autoload_path'] ?? null;
 

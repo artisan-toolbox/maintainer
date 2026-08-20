@@ -5,6 +5,8 @@ namespace App\Support\Release;
 use App\Support\Ai\ChangelogEntry;
 use Illuminate\Filesystem\Filesystem;
 
+use function Illuminate\Filesystem\join_paths;
+
 final readonly class ChangelogWriter
 {
     private const array HEADINGS = [
@@ -26,7 +28,7 @@ final readonly class ChangelogWriter
     /** @param  list<ChangelogEntry>  $entries */
     public function write(string $projectRoot, string $version, array $entries): string
     {
-        $path = $projectRoot.DIRECTORY_SEPARATOR.'CHANGELOG.md';
+        $path = join_paths($projectRoot, 'CHANGELOG.md');
         $groups = [];
 
         foreach ($entries as $entry) {

@@ -2,12 +2,11 @@
 
 use App\Support\Git\GitCommitRepository;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
 beforeEach(function () {
     $this->files = new Filesystem;
-    $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-commit-'.Str::uuid();
+    $this->directory = temporaryTestDirectory('maintainer-commit-');
     $this->files->makeDirectory($this->directory, recursive: true);
     $this->files->put($this->directory.'/keep.txt', "original\n");
     $this->files->put($this->directory.'/rename-me.txt', "rename me\n");

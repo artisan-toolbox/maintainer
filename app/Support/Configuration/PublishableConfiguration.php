@@ -4,6 +4,8 @@ namespace App\Support\Configuration;
 
 use App\Support\Quality\LaravelProjectType;
 
+use function Illuminate\Filesystem\join_paths;
+
 enum PublishableConfiguration: string
 {
     case Maintainer = 'maintainer';
@@ -77,11 +79,10 @@ enum PublishableConfiguration: string
 
     public function templatePath(string $templateRoot, LaravelProjectType $projectType): string
     {
-        $directory = $this->hasProjectSpecificTemplate()
-            && $projectType === LaravelProjectType::Package
-                ? 'laravel-package'.DIRECTORY_SEPARATOR
-                : '';
+        $directory = $this->hasProjectSpecificTemplate() && $projectType === LaravelProjectType::Package
+            ? 'laravel-package'
+            : '';
 
-        return $templateRoot.DIRECTORY_SEPARATOR.$directory.$this->filename();
+        return join_paths($templateRoot, $directory, $this->filename());
     }
 }

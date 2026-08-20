@@ -2,11 +2,10 @@
 
 use App\Support\Git\GitignoreManager;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->files = new Filesystem;
-    $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-gitignore-'.Str::uuid();
+    $this->directory = temporaryTestDirectory('maintainer-gitignore-');
     $this->files->makeDirectory($this->directory, recursive: true);
 });
 

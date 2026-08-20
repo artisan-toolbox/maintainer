@@ -15,6 +15,7 @@ use JsonException;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 
+use function Illuminate\Filesystem\join_paths;
 use function Laravel\Prompts\spin;
 
 #[Signature('diff:html {base=HEAD : Base Git commit or reference} {target? : Target Git commit or reference; omit to compare with the working tree} {--output= : Path for the generated HTML file} {--no-open : Generate the HTML file without opening the browser}')]
@@ -109,7 +110,7 @@ final class CreateHtmlDiffCommand extends Command
         if (is_string($configuredPath) && $configuredPath !== '') {
             $path = $this->isAbsolutePath($configuredPath)
                 ? $configuredPath
-                : $projectRoot.DIRECTORY_SEPARATOR.$configuredPath;
+                : join_paths($projectRoot, $configuredPath);
 
             return str_ends_with(strtolower($path), '.html') ? $path : $path.'.html';
         }
@@ -120,10 +121,7 @@ final class CreateHtmlDiffCommand extends Command
             substr(hash('sha256', $diff), 0, 8),
         );
 
-        return sys_get_temp_dir()
-            .DIRECTORY_SEPARATOR.'maintainer'
-            .DIRECTORY_SEPARATOR.'diffs'
-            .DIRECTORY_SEPARATOR.$filename;
+        return join_paths(sys_get_temp_dir(), 'maintainer', 'diffs', $filename);
     }
 
     private function isAbsolutePath(string $path): bool

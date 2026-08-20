@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
 /**
@@ -11,7 +10,7 @@ function withinTemporaryGitDiffProject(Closure $callback): void
 {
     $files = new Filesystem;
     $originalWorkingDirectory = getcwd();
-    $temporaryDirectory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-diff-'.Str::uuid();
+    $temporaryDirectory = temporaryTestDirectory('maintainer-diff-');
     $hadComposerAutoloadPath = array_key_exists('_composer_autoload_path', $GLOBALS);
     $originalComposerAutoloadPath = $GLOBALS['_composer_autoload_path'] ?? null;
 

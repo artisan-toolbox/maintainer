@@ -16,7 +16,6 @@ use App\Support\Release\ReleaseGitRepository;
 use App\Support\Release\ReleaseVersionSelector;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Process\Process;
@@ -34,7 +33,7 @@ function withinTemporaryReleaseProject(Closure $callback): void
 {
     $files = new Filesystem;
     $originalWorkingDirectory = getcwd();
-    $temporaryDirectory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-release-'.Str::uuid();
+    $temporaryDirectory = temporaryTestDirectory('maintainer-release-');
     $hadComposerAutoloadPath = array_key_exists('_composer_autoload_path', $GLOBALS);
     $originalComposerAutoloadPath = $GLOBALS['_composer_autoload_path'] ?? null;
 

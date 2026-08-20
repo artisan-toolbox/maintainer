@@ -5,6 +5,8 @@ namespace App\Support\Git;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+use function Illuminate\Filesystem\join_paths;
+
 final class GitCommitRepository
 {
     /**
@@ -73,8 +75,8 @@ final class GitCommitRepository
         $stageablePaths = array_values(array_filter(
             $paths,
             static fn (string $path): bool => isset($tracked[$path])
-                || file_exists($projectRoot.DIRECTORY_SEPARATOR.$path)
-                || is_link($projectRoot.DIRECTORY_SEPARATOR.$path),
+                || file_exists(join_paths($projectRoot, $path))
+                || is_link(join_paths($projectRoot, $path)),
         ));
 
         if ($stageablePaths !== []) {

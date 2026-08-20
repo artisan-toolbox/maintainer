@@ -4,11 +4,12 @@ use App\Support\Quality\LaravelProjectType;
 use App\Support\Quality\QualityConfigurationManager;
 use App\Support\Quality\QualityTool;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
+
+use function Illuminate\Filesystem\join_paths;
 
 beforeEach(function () {
     $this->files = new Filesystem;
-    $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'maintainer-quality-'.Str::uuid();
+    $this->directory = temporaryTestDirectory('maintainer-quality-');
     $this->files->makeDirectory($this->directory, recursive: true);
 });
 
@@ -20,7 +21,7 @@ it('finds every supported project configuration filename', function (
     QualityTool $tool,
     string $filename,
 ) {
-    $path = $this->directory.DIRECTORY_SEPARATOR.$filename;
+    $path = join_paths($this->directory, $filename);
     $this->files->put($path, "configuration\n");
 
     $manager = new QualityConfigurationManager($this->files);
