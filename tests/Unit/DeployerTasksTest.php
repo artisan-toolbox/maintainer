@@ -10,14 +10,16 @@ use function Deployer\import;
 use function Deployer\task;
 use function Illuminate\Filesystem\join_paths;
 
+function quotePosixShellArgument(string $argument): string
+{
+    return "'".str_replace("'", "'\"'\"'", $argument)."'";
+}
+
 function installFakePm2Binary(string $directory, Filesystem $files, string $processList): string
 {
-    $windows = PHP_OS_FAMILY === 'Windows';
-    $binary = $directory.'/pm2'.($windows ? '.bat' : '');
-    $log = $directory.'/pm2.log';
-    $script = $windows
-        ? "@echo off\r\necho %*>>\"{$log}\"\r\nif \"%1\"==\"jlist\" echo {$processList}\r\nexit /b 0\r\n"
-        : "#!/bin/sh\nprintf '%s\\n' \"\$*\" >> ".escapeshellarg($log)."\nif [ \"\$1\" = 'jlist' ]; then\n    printf '%s\\n' ".escapeshellarg($processList)."\nfi\n";
+    $binary = str_replace('\\', '/', $directory.'/pm2');
+    $log = str_replace('\\', '/', $directory.'/pm2.log');
+    $script = "#!/bin/sh\nprintf '%s\\n' \"\$*\" >> ".quotePosixShellArgument($log)."\nif [ \"\$1\" = 'jlist' ]; then\n    printf '%s\\n' ".quotePosixShellArgument($processList)."\nfi\n";
 
     $files->put($binary, $script);
     chmod($binary, 0755);
@@ -27,12 +29,9 @@ function installFakePm2Binary(string $directory, Filesystem $files, string $proc
 
 function installFakeGitBinary(string $directory, Filesystem $files, string $references): string
 {
-    $windows = PHP_OS_FAMILY === 'Windows';
-    $binary = $directory.'/git'.($windows ? '.bat' : '');
-    $log = $directory.'/git.log';
-    $script = $windows
-        ? "@echo off\r\necho %*>>\"{$log}\"\r\necho {$references}\r\nexit /b 0\r\n"
-        : "#!/bin/sh\nprintf '%s\\n' \"\$*\" >> ".escapeshellarg($log)."\nprintf '%s\\n' ".escapeshellarg($references)."\n";
+    $binary = str_replace('\\', '/', $directory.'/git');
+    $log = str_replace('\\', '/', $directory.'/git.log');
+    $script = "#!/bin/sh\nprintf '%s\\n' \"\$*\" >> ".quotePosixShellArgument($log)."\nprintf '%s\\n' ".quotePosixShellArgument($references)."\n";
 
     $files->put($binary, $script);
     chmod($binary, 0755);

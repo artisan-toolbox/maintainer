@@ -19,9 +19,14 @@
 
 ### Fixes
 
+- Package only an explicit allowlist of distributed configuration files in the PHAR. Local `config/dev_maintainer.php` and `config/dev_maintainer_secrets.php` files are no longer collected by Box, and the committed build is checked for local configuration paths and common credential signatures.
 - Initialize the temporary Maintainer SSH identity silently while importing the shared Deployer contribution recipe. Every remote task in that invocation now receives the identity, including direct unlock, lock inspection, rollback, release listing, log, push, granular task, `--no-hooks`, and `--start-from` flows. The hidden hooks only report the selected identity after Deployer output is available.
 - Preserve comments and indentation in every published project template from the PHAR. The `resources` directory is now packaged without Box compactors, preventing PHP templates such as `deploy.php` and `rector.php` from being stripped before `config:publish` reads them.
 - Configure Deployer's temporary SSH `identity_file` without writing to its output service while the shared recipe is being imported. Deployer initializes console output only after loading recipes, so this prevents `Uninitialized "output" in Deployer container` before a deployment can start.
+
+### Tests
+
+- Keep the Maintainer test suite portable across Windows and POSIX runners. Deployer task fixtures now match Deployer's Bash execution environment, command assertions ignore Windows-only serialization quotes, and configuration path assertions use the host directory separator.
 
 ### Refactoring
 

@@ -64,7 +64,9 @@ it('runs the project Deployer binary with deployment options', function () {
             ->expectsOutputToContain('Deployer completed successfully.')
             ->assertSuccessful();
 
-        expect(trim($files->get($directory.'/deployer.log')))
+        $deployerArguments = str_replace('"', '', trim($files->get($directory.'/deployer.log')));
+
+        expect($deployerArguments)
             ->toBe(implode(' ', [
                 '--file=deploy.production.php',
                 'deploy',
@@ -147,7 +149,9 @@ it('unlocks a failed deployment through the project Deployer binary', function (
             ->expectsOutputToContain('Deployer deployment unlocked successfully.')
             ->assertSuccessful();
 
-        expect(trim($files->get($directory.'/deployer.log')))->toBe(implode(' ', [
+        $deployerArguments = str_replace('"', '', trim($files->get($directory.'/deployer.log')));
+
+        expect($deployerArguments)->toBe(implode(' ', [
             '--file=deploy.production.php',
             'deploy:unlock',
             '--limit=1',

@@ -5,14 +5,18 @@
     "directories": [
         "app",
         "bootstrap",
-        "config",
         "vendor"
     ],
     "directories-bin": [
         "resources"
     ],
     "files": [
-        "composer.json"
+        "composer.json",
+        "config/ai.php",
+        "config/app.php",
+        "config/commands.php",
+        "config/maintainer.php",
+        "config/maintainer_secrets.php"
     ],
     "exclude-composer-files": false,
     "exclude-dev-files": false,

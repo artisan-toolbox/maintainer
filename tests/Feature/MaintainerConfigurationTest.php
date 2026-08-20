@@ -5,6 +5,8 @@ use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Env;
 
+use function Illuminate\Filesystem\join_paths;
+
 function withinTemporaryConfigurationProject(Closure $callback): void
 {
     $files = new Filesystem;
@@ -48,7 +50,7 @@ it('reads PHP configuration values using dot notation and current defaults', fun
         $configuration = resolve(MaintainerConfiguration::class);
 
         expect($configuration->configMissing())->toBeFalse()
-            ->and($configuration->path())->toEndWith('/config/dev_maintainer.php')
+            ->and($configuration->path())->toEndWith(join_paths('config', 'dev_maintainer.php'))
             ->and($configuration->get('quality.phpstan.level'))->toBe(8)
             ->and($configuration->get('quality.phpstan.memory_limit'))->toBe('2G')
             ->and($configuration->get('git.diff.output_format'))->toBe('line_by_line')
@@ -90,7 +92,7 @@ it('removes the development prefix in the production environment used by builds'
 
         $configuration = resolve(MaintainerConfiguration::class);
 
-        expect($configuration->path())->toEndWith('/config/maintainer.php')
+        expect($configuration->path())->toEndWith(join_paths('config', 'maintainer.php'))
             ->and($configuration->get('version'))->toBe('production');
     });
 });
