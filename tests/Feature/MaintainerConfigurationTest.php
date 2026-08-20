@@ -3,6 +3,7 @@
 use App\Support\Configuration\MaintainerConfiguration;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Env;
 use Illuminate\Support\Str;
 
 function withinTemporaryConfigurationProject(Closure $callback): void
@@ -115,6 +116,46 @@ it('allows project PHP configuration to override defaults', function () {
         ]);
 
         expect(maintainer_config('git.diff.output_format'))->toBe('side_by_side');
+    });
+});
+
+it('loads Maintainer configuration values from the consuming project environment file', function () {
+    $variable = 'MAINTAINER_GIT_DIFF_OUTPUT_FORMAT';
+    forgetTestEnvironmentVariable($variable);
+
+    try {
+        withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+            $files->put($directory.'/.env', "MAINTAINER_GIT_DIFF_OUTPUT_FORMAT=side_by_side\n");
+
+            expect(maintainer_config('git.diff.output_format'))->toBe('side_by_side');
+        });
+    } finally {
+        forgetTestEnvironmentVariable($variable);
+    }
+});
+
+it('keeps system environment variables ahead of the project environment file', function () {
+    $variable = 'MAINTAINER_PHPSTAN_MEMORY_LIMIT';
+    forgetTestEnvironmentVariable($variable);
+    Env::getRepository()->set($variable, '6G');
+
+    try {
+        withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+            $files->put($directory.'/.env', "MAINTAINER_PHPSTAN_MEMORY_LIMIT=4G\n");
+
+            expect(maintainer_config('quality.phpstan.memory_limit'))->toBe('6G');
+        });
+    } finally {
+        forgetTestEnvironmentVariable($variable);
+    }
+});
+
+it('reports invalid consuming project environment files', function () {
+    withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+        $files->put($directory.'/.env', "BROKEN KEY=value\n");
+
+        expect(fn () => maintainer_config())
+            ->toThrow(RuntimeException::class, 'Unable to load the project environment file');
     });
 });
 

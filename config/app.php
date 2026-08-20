@@ -1,6 +1,7 @@
 <?php
 
 use App\Providers\AppServiceProvider;
+use App\Providers\EncryptionServiceProvider;
 use Laravel\Ai\AiServiceProvider;
 
 return [
@@ -70,6 +71,7 @@ return [
     */
 
     'providers' => [
+        EncryptionServiceProvider::class,
         AppServiceProvider::class,
         AiServiceProvider::class,
     ],

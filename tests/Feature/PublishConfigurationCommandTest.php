@@ -1,9 +1,11 @@
 <?php
 
+use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\MultiSelectPrompt;
 use Laravel\Prompts\SelectPrompt;
+use Laravel\Prompts\TextPrompt;
 
 const PUBLISHABLE_CONFIGURATION_OPTIONS = [
     'maintainer' => 'Maintainer settings (config/dev_maintainer.php)',
@@ -19,6 +21,7 @@ beforeEach(function () {
     MultiSelectPrompt::fallbackWhen(true);
     SelectPrompt::fallbackWhen(true);
     ConfirmPrompt::fallbackWhen(true);
+    TextPrompt::fallbackWhen(true);
 });
 
 it('requires interactive input for configuration selection and overwrite protection', function () {
@@ -55,26 +58,47 @@ it('publishes only selected configuration files and ignores them by default', fu
 });
 
 it('publishes Maintainer configuration with the development user prefix', function () {
-    withinTemporaryProject(function (string $directory, Filesystem $files) {
-        $this->artisan('config:publish')
-            ->expectsChoice(
-                'Which configuration files would you like to publish?',
-                ['maintainer', 'maintainer-secrets'],
-                PUBLISHABLE_CONFIGURATION_OPTIONS,
-            )
-            ->expectsConfirmation('Add the selected configuration files to .gitignore?', 'yes')
-            ->assertSuccessful();
+    forgetTestEnvironmentVariable('APP_KEY');
 
-        expect(require $directory.'/config/dev_maintainer.php')
-            ->toBe(defaultMaintainerConfigurationFixture())
-            ->and(require $directory.'/config/dev_maintainer_secrets.php')
-            ->toHaveKey('ai_providers.openai.key')
-            ->and($files->get($directory.'/.gitignore'))->toBe(implode("\n", [
-                'config/dev_maintainer.php',
-                'config/dev_maintainer_secrets.php',
-                '',
-            ]));
-    });
+    try {
+        withinTemporaryProject(function (string $directory, Filesystem $files) {
+            $files->put($directory.'/.env', 'APP_KEY=base64:'.base64_encode(random_bytes(32))."\n");
+
+            $this->artisan('config:publish')
+                ->expectsChoice(
+                    'Which configuration files would you like to publish?',
+                    ['maintainer', 'maintainer-secrets'],
+                    PUBLISHABLE_CONFIGURATION_OPTIONS,
+                )
+                ->expectsConfirmation('Add the selected configuration files to .gitignore?', 'yes')
+                ->expectsQuestion('Which email should identify the Maintainer SSH key?', 'developer@example.com')
+                ->assertSuccessful();
+
+            $secrets = require $directory.'/config/dev_maintainer_secrets.php';
+            $keys = resolve(MaintainerSshKeys::class);
+
+            expect(require $directory.'/config/dev_maintainer.php')
+                ->toBe(defaultMaintainerConfigurationFixture())
+                ->and($files->get($directory.'/config/dev_maintainer.php'))
+                ->toContain("env('MAINTAINER_GIT_DIFF_OUTPUT_FORMAT', 'line_by_line')")
+                ->and($secrets)->toHaveKey('key', env('APP_KEY'))
+                ->toHaveKey('ai_providers.openai.key')
+                ->and($secrets['rsa_key'])->toBeString()
+                ->not->toContain('OPENSSH PRIVATE KEY')
+                ->and($keys->privateKey())->toStartWith('-----BEGIN OPENSSH PRIVATE KEY-----')
+                ->and($keys->publicKey())->toStartWith('ssh-ed25519 ')
+                ->toEndWith(' developer@example.com')
+                ->and($files->get($directory.'/config/dev_maintainer_secrets.php'))
+                ->toContain("env('OPENAI_API_KEY', '')")
+                ->and($files->get($directory.'/.gitignore'))->toBe(implode("\n", [
+                    'config/dev_maintainer.php',
+                    'config/dev_maintainer_secrets.php',
+                    '',
+                ]));
+        });
+    } finally {
+        forgetTestEnvironmentVariable('APP_KEY');
+    }
 });
 
 it('publishes unprefixed Maintainer configuration in the production build environment', function () {
@@ -95,6 +119,46 @@ it('publishes unprefixed Maintainer configuration in the production build enviro
 
         expect($files->exists($directory.'/config/maintainer.php'))->toBeTrue()
             ->and($files->exists($directory.'/config/dev_maintainer.php'))->toBeFalse();
+    });
+});
+
+it('requires an encryption key before publishing Maintainer secrets', function () {
+    forgetTestEnvironmentVariable('APP_KEY');
+
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        $this->artisan('config:publish')
+            ->expectsChoice(
+                'Which configuration files would you like to publish?',
+                ['maintainer-secrets'],
+                PUBLISHABLE_CONFIGURATION_OPTIONS,
+            )
+            ->expectsConfirmation('Add the selected configuration files to .gitignore?', 'no')
+            ->expectsQuestion('Which email should identify the Maintainer SSH key?', 'developer@example.com')
+            ->expectsOutputToContain('No Maintainer encryption key has been specified')
+            ->assertFailed();
+
+        expect($files->exists($directory.'/config/dev_maintainer_secrets.php'))->toBeFalse();
+    });
+});
+
+it('does not request an email or rotate a key when secrets overwrite is declined', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer_secrets.php', [
+            'rsa_key' => 'keep-encrypted-key',
+        ]);
+
+        $this->artisan('config:publish')
+            ->expectsChoice(
+                'Which configuration files would you like to publish?',
+                ['maintainer-secrets'],
+                PUBLISHABLE_CONFIGURATION_OPTIONS,
+            )
+            ->expectsConfirmation('Add the selected configuration files to .gitignore?', 'no')
+            ->expectsConfirmation('ARE YOU SURE you want to overwrite config/dev_maintainer_secrets.php?', 'no')
+            ->assertSuccessful();
+
+        expect(require $directory.'/config/dev_maintainer_secrets.php')
+            ->toHaveKey('rsa_key', 'keep-encrypted-key');
     });
 });
 

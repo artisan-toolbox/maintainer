@@ -13,6 +13,8 @@ use App\Support\Ai\ReleaseChangelogGenerator;
 use App\Support\Ai\ReleaseNotesGenerator;
 use App\Support\Ai\ReleaseVersionRecommender;
 use App\Support\Configuration\ConfigurationFilePublisher;
+use App\Support\Configuration\MaintainerSecrets;
+use App\Support\Configuration\MaintainerSecretsTemplate;
 use App\Support\Configuration\UserConfigurationPath;
 use App\Support\Release\GitCliReleaseRepository;
 use App\Support\Release\GitHubCliReleasePublisher;
@@ -20,6 +22,8 @@ use App\Support\Release\GitHubCliReleaseSource;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
 use App\Support\Release\ReleaseGitRepository;
+use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
+use Illuminate\Contracts\Encryption\StringEncrypter;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\ServiceProvider;
@@ -44,6 +48,14 @@ class AppServiceProvider extends ServiceProvider
             fn (Application $application): ConfigurationFilePublisher => new ConfigurationFilePublisher(
                 $application->make(Filesystem::class),
                 $application->make(UserConfigurationPath::class),
+                maintainerSecretsTemplate: $application->make(MaintainerSecretsTemplate::class),
+            ),
+        );
+        $this->app->bind(
+            MaintainerSshKeys::class,
+            fn (Application $application): MaintainerSshKeys => MaintainerSshKeys::fromResolvers(
+                fn (): StringEncrypter => $application->make(StringEncrypter::class),
+                fn (): string => $application->make(MaintainerSecrets::class)->rsaKey(),
             ),
         );
         $this->app->bind(CommitMessageGenerator::class, LaravelAiCommitMessageGenerator::class);

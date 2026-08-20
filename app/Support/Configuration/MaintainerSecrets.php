@@ -3,6 +3,7 @@
 namespace App\Support\Configuration;
 
 use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Encryption\MissingAppKeyException;
 use Illuminate\Filesystem\Filesystem;
 use RuntimeException;
 
@@ -12,6 +13,8 @@ final readonly class MaintainerSecrets
     public function __construct(
         private Filesystem $files,
         private UserConfigurationPath $userConfigurationPath,
+        private ProjectEnvironmentLoader $environment,
+        private DefaultMaintainerSecrets $defaults,
         private PhpConfigurationLoader $loader,
         private LegacyJsonConfigurationLoader $legacyLoader,
     ) {}
@@ -52,6 +55,26 @@ final readonly class MaintainerSecrets
         return $configuration;
     }
 
+    public function rsaKey(): string
+    {
+        throw_if($this->missing(), RuntimeException::class, $this->userConfigurationPath->relativePath('maintainer_secrets').' is missing. Publish the Maintainer secrets configuration first.');
+
+        $rsaKey = $this->load()['rsa_key'] ?? null;
+
+        throw_unless(is_string($rsaKey) && $rsaKey !== '', RuntimeException::class, 'Maintainer secrets do not contain an encrypted rsa_key. Publish the Maintainer secrets configuration to generate one.');
+
+        return $rsaKey;
+    }
+
+    public function key(): string
+    {
+        $key = $this->load()['key'] ?? null;
+
+        throw_unless(is_string($key) && $key !== '', MissingAppKeyException::class, 'No Maintainer encryption key has been specified. Configure maintainer_secrets.key or APP_KEY.');
+
+        return $key;
+    }
+
     public function path(): string
     {
         return $this->userConfigurationPath->path('maintainer_secrets');
@@ -62,11 +85,25 @@ final readonly class MaintainerSecrets
      */
     private function load(): array
     {
+        $this->environment->load();
+
+        $defaults = $this->defaults->all();
+
         if ($this->files->isFile($this->path())) {
-            return $this->loader->load($this->path(), $this->userConfigurationPath->relativePath('maintainer_secrets'));
+            return array_replace_recursive(
+                $defaults,
+                $this->loader->load($this->path(), $this->userConfigurationPath->relativePath('maintainer_secrets')),
+            );
         }
 
-        return $this->legacyLoader->load($this->legacyPath(), 'maintainer_secrets.json');
+        if (! $this->files->isFile($this->legacyPath())) {
+            return $defaults;
+        }
+
+        return array_replace_recursive(
+            $defaults,
+            $this->legacyLoader->load($this->legacyPath(), 'maintainer_secrets.json'),
+        );
     }
 
     private function legacyPath(): string

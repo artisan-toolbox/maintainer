@@ -29,6 +29,35 @@ it('loads the configured text provider credentials from the secrets file', funct
     });
 });
 
+it('loads AI credentials from the consuming project environment file', function () {
+    $variable = 'MAINTAINER_TEST_OPENAI_KEY';
+    forgetTestEnvironmentVariable($variable);
+
+    try {
+        withinTemporaryProject(function (string $directory, Filesystem $files) {
+            $files->put($directory.'/.env', "MAINTAINER_TEST_OPENAI_KEY=project-secret\n");
+            $files->ensureDirectoryExists($directory.'/config');
+            $files->put($directory.'/config/dev_maintainer_secrets.php', <<<'PHP'
+                <?php
+
+                return [
+                    'ai_providers' => [
+                        'openai' => [
+                            'key' => env('MAINTAINER_TEST_OPENAI_KEY', ''),
+                        ],
+                    ],
+                ];
+                PHP.PHP_EOL);
+
+            resolve(ConfiguredAiProvider::class)->for('commit_message');
+
+            expect(config('ai.providers.openai.key'))->toBe('project-secret');
+        });
+    } finally {
+        forgetTestEnvironmentVariable($variable);
+    }
+});
+
 it('rejects providers that do not support text generation', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [

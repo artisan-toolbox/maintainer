@@ -15,6 +15,7 @@ final class MaintainerConfiguration
     public function __construct(
         private readonly Filesystem $files,
         private readonly UserConfigurationPath $userConfigurationPath,
+        private readonly ProjectEnvironmentLoader $environment,
         private readonly DefaultMaintainerConfiguration $defaults,
         private readonly PhpConfigurationLoader $loader,
         private readonly LegacyJsonConfigurationLoader $legacyLoader,
@@ -74,6 +75,8 @@ final class MaintainerConfiguration
      */
     private function load(): array
     {
+        $this->environment->load();
+
         $defaults = $this->defaults->all();
 
         if ($this->files->isFile($this->path())) {

@@ -72,7 +72,10 @@ final class InitCommand extends Command
             if (! $files->exists($secretsPath)) {
                 $migratedSecrets = $files->isFile($legacySecretsPath);
                 $secretsContents = $migratedSecrets
-                    ? $exporter->export($legacyLoader->load($legacySecretsPath, 'maintainer_secrets.json'))
+                    ? $this->migrateSecrets(
+                        $legacyLoader->load($legacySecretsPath, 'maintainer_secrets.json'),
+                        $exporter,
+                    )
                     : $defaultSecrets->contents();
 
                 throw_if($files->put($secretsPath, $secretsContents) === false, RuntimeException::class, "Unable to write {$secretsRelativePath}.");
@@ -95,5 +98,25 @@ final class InitCommand extends Command
         $this->components->success("Created Maintainer configuration at {$configurationRelativePath} and protected its secrets file.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $secrets
+     */
+    private function migrateSecrets(array $secrets, PhpConfigurationExporter $exporter): string
+    {
+        if (array_key_exists('key', $secrets)) {
+            return $exporter->export($secrets);
+        }
+
+        if ($secrets === []) {
+            return "<?php\n\nreturn [\n    'key' => env('APP_KEY'),\n];\n";
+        }
+
+        return str_replace(
+            "return [\n",
+            "return [\n    'key' => env('APP_KEY'),\n",
+            $exporter->export($secrets),
+        );
     }
 }

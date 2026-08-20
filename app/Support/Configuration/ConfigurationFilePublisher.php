@@ -12,6 +12,7 @@ final readonly class ConfigurationFilePublisher
         private Filesystem $files,
         private ?UserConfigurationPath $userConfigurationPath = null,
         private ?string $templateRoot = null,
+        private ?MaintainerSecretsTemplate $maintainerSecretsTemplate = null,
     ) {}
 
     public function destination(PublishableConfiguration $configuration, string $projectRoot): string
@@ -37,6 +38,7 @@ final readonly class ConfigurationFilePublisher
         string $projectRoot,
         LaravelProjectType $projectType,
         bool $overwrite = false,
+        ?string $email = null,
     ): string {
         $destination = $this->destination($configuration, $projectRoot);
 
@@ -61,11 +63,17 @@ final readonly class ConfigurationFilePublisher
 
         $this->files->ensureDirectoryExists(dirname($destination));
 
-        throw_unless(
-            $this->files->copy($template, $destination),
-            RuntimeException::class,
-            "Unable to create {$configuration->filename()}.",
-        );
+        if ($configuration === PublishableConfiguration::MaintainerSecrets) {
+            throw_if($email === null || $email === '', RuntimeException::class, 'An email address is required to generate the Maintainer SSH key.');
+            throw_if($this->maintainerSecretsTemplate === null, RuntimeException::class, 'The Maintainer secrets publisher is unavailable.');
+            throw_if($this->files->put($destination, $this->maintainerSecretsTemplate->contents($email)) === false, RuntimeException::class, "Unable to create {$configuration->filename()}.");
+        } else {
+            throw_unless(
+                $this->files->copy($template, $destination),
+                RuntimeException::class,
+                "Unable to create {$configuration->filename()}.",
+            );
+        }
 
         return $destination;
     }

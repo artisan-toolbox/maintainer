@@ -1,5 +1,7 @@
 <?php
 
+use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
+
 it('exports only the public Maintainer namespace to consumers', function () {
     $manifest = json_decode(
         file_get_contents(dirname(__DIR__, 2).'/composer.json'),
@@ -11,6 +13,12 @@ it('exports only the public Maintainer namespace to consumers', function () {
         ->toBe([
             'ArtisanToolbox\\Maintainer\\' => 'app/',
         ])
+        ->and($manifest['autoload']['files'])->toBe([
+            'app/Support/client_helpers.php',
+        ])
+        ->and(class_exists(MaintainerSshKeys::class))->toBeTrue()
+        ->and(function_exists('maintainer_rsa_key'))->toBeTrue()
+        ->and(function_exists('maintainer_rsa_public_key'))->toBeTrue()
         ->and($manifest['autoload-dev']['psr-4'])
         ->toHaveKeys([
             'App\\Ai\\',

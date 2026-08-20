@@ -18,6 +18,7 @@ use RuntimeException;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
+use function Laravel\Prompts\text;
 
 #[Signature('config:publish')]
 #[Description('Publish selected project configuration files')]
@@ -73,7 +74,10 @@ final class PublishConfigurationCommand extends Command
                     }
                 }
 
-                $path = $publisher->publish($configuration, $projectRoot, $projectType, $overwrite);
+                $email = $configuration === PublishableConfiguration::MaintainerSecrets
+                    ? $this->sshKeyEmail()
+                    : null;
+                $path = $publisher->publish($configuration, $projectRoot, $projectType, $overwrite, $email);
                 $this->components->twoColumnDetail("Published {$relativeDestination}", $path);
             }
 
@@ -159,5 +163,17 @@ final class PublishConfigurationCommand extends Command
         );
 
         return LaravelProjectType::from($selected);
+    }
+
+    private function sshKeyEmail(): string
+    {
+        return text(
+            label: 'Which email should identify the Maintainer SSH key?',
+            placeholder: 'developer@example.com',
+            required: 'An email address is required to generate the SSH key.',
+            validate: static fn (string $email): ?string => filter_var($email, FILTER_VALIDATE_EMAIL) !== false
+                ? null
+                : 'Enter a valid email address.',
+        );
     }
 }

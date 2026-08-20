@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Env;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -88,6 +90,14 @@ function putPhpConfiguration(
         $path,
         "<?php\n\nreturn ".var_export($configuration, true).";\n",
     );
+}
+
+function forgetTestEnvironmentVariable(string $name): void
+{
+    Env::getRepository()->clear($name);
+    putenv($name);
+    Arr::forget($_ENV, $name);
+    Arr::forget($_SERVER, $name);
 }
 
 function deleteTemporaryDirectory(string $directory): void

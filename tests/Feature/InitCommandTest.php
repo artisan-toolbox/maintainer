@@ -16,8 +16,11 @@ it('creates PHP configuration files in the project config directory', function (
         expect($configuration)
             ->toBe(defaultMaintainerConfigurationFixture())
             ->and($files->get($configurationPath))->toStartWith("<?php\n\nreturn [")
+            ->and($files->get($configurationPath))->toContain("env('MAINTAINER_GIT_DIFF_OUTPUT_FORMAT', 'line_by_line')")
             ->and($secretsPath)->toBeFile()
+            ->and($files->get($secretsPath))->toContain("'key' => env('APP_KEY')")
             ->and($secrets)->toHaveKey('ai_providers.anthropic.key')
+            ->and($files->get($secretsPath))->toContain("env('OPENAI_API_KEY', '')")
             ->and($files->get($directory.'/.gitignore'))
             ->toBe("config/dev_maintainer_secrets.php\n")
             ->and($files->exists($directory.'/maintainer.json'))->toBeFalse()
@@ -148,6 +151,9 @@ it('migrates legacy JSON configuration and secrets without losing values', funct
             ->toHaveKey('quality.phpstan.memory_limit', '4G')
             ->and(require $directory.'/config/dev_maintainer_secrets.php')
             ->toHaveKey('ai_providers.openai.key', 'keep-me')
+            ->toHaveKey('key', env('APP_KEY'))
+            ->and($files->get($directory.'/config/dev_maintainer_secrets.php'))
+            ->toContain("'key' => env('APP_KEY')")
             ->and($files->exists($directory.'/maintainer.json'))->toBeFalse()
             ->and($files->exists($directory.'/maintainer_secrets.json'))->toBeFalse();
     });
