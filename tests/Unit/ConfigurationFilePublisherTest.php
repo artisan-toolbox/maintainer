@@ -35,7 +35,11 @@ it('refuses to overwrite a destination unless explicitly allowed', function () {
         overwrite: true,
     );
 
-    expect($this->files->get($path))->toContain("require 'recipe/laravel.php';");
+    expect($this->files->get($path))->toContain(
+        "require 'recipe/laravel.php';",
+        "require 'contrib/npm.php';",
+        "import(getenv('MAINTAINER_TASKS_PATH'));",
+    );
 });
 
 it('normalizes published configuration formatting', function () {

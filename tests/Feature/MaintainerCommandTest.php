@@ -19,6 +19,7 @@ it('offers the available maintenance workflows', function () {
     $workflows = new ReflectionClass(MaintainerCommand::class)->getConstant('WORKFLOWS');
 
     expect($workflows)->toBe([
+        'deploy' => 'Deploy the project with Deployer',
         'commit' => 'Create a Git commit',
         'quality' => 'Run Pint, Rector, PHPStan, and Pest',
         'config:publish' => 'Publish configuration files',

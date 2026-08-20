@@ -47,7 +47,11 @@ it('publishes only selected configuration files and ignores them by default', fu
             ->assertSuccessful();
 
         expect($files->get($directory.'/pint.json'))->toContain('"preset": "laravel"')
-            ->and($files->get($directory.'/deploy.php'))->toContain("require 'recipe/laravel.php';")
+            ->and($files->get($directory.'/deploy.php'))->toContain(
+                "require 'recipe/laravel.php';",
+                "require 'contrib/npm.php';",
+                "import(getenv('MAINTAINER_TASKS_PATH'));",
+            )
             ->and($files->exists($directory.'/rector.php'))->toBeFalse()
             ->and($files->get($directory.'/.gitignore'))->toBe(implode("\n", [
                 'pint.json',

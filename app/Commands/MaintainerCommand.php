@@ -19,6 +19,7 @@ final class MaintainerCommand extends Command
      * @var array<string, string>
      */
     private const array WORKFLOWS = [
+        'deploy' => 'Deploy the project with Deployer',
         'commit' => 'Create a Git commit',
         'quality' => 'Run Pint, Rector, PHPStan, and Pest',
         'config:publish' => 'Publish configuration files',
@@ -43,9 +44,11 @@ final class MaintainerCommand extends Command
             label: 'Which workflow would you like to run?',
             options: self::WORKFLOWS,
             default: 'release:create',
+            scroll: count(self::WORKFLOWS),
         );
 
         return match ($command) {
+            'deploy' => $this->call('deploy'),
             'commit' => $this->call('commit'),
             'quality' => $this->call('quality'),
             'config:publish' => $this->call('config:publish'),
