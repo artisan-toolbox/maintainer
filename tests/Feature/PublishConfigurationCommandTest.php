@@ -87,6 +87,7 @@ it('publishes Maintainer configuration with the development user prefix', functi
                 ->toBe(defaultMaintainerConfigurationFixture())
                 ->and($files->get($directory.'/config/dev_maintainer.php'))
                 ->toContain("env('MAINTAINER_GIT_DIFF_OUTPUT_FORMAT', 'line_by_line')")
+                ->toContain("env('MAINTAINER_PEST_PARALLEL', false)")
                 ->and($secrets)->toHaveKey('key', env('APP_KEY'))
                 ->toHaveKey('ai_providers.openai.key')
                 ->and($secrets['ssh_key'])->toBeString()

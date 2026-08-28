@@ -228,9 +228,34 @@ final class RunQualityCommand extends Command
         QualityTool $tool,
         MaintainerConfiguration $configuration,
     ): array {
-        if ($tool !== QualityTool::PhpStan) {
-            return [];
-        }
+        return match ($tool) {
+            QualityTool::Pest => $this->pestArguments($configuration),
+            QualityTool::PhpStan => $this->phpStanArguments($configuration),
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pestArguments(MaintainerConfiguration $configuration): array
+    {
+        $parallel = $configuration->get('quality.pest.parallel');
+
+        throw_unless(
+            is_bool($parallel),
+            RuntimeException::class,
+            'quality.pest.parallel must be true or false.',
+        );
+
+        return $parallel ? ['--parallel'] : [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function phpStanArguments(MaintainerConfiguration $configuration): array
+    {
 
         $memoryLimit = $configuration->get('quality.phpstan.memory_limit');
 

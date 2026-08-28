@@ -20,7 +20,8 @@ final class ReleaseNotesAgent implements Agent, HasStructuredOutput
     {
         return <<<'INSTRUCTIONS'
             Write GitHub release notes from the supplied version, commit summary, and validated changelog context.
-            The title must be concise but specific enough to identify the release's main outcome.
+            Return a concise title that describes only the release's main outcome. Do not include the version
+            or tag in the title because the caller adds the exact release tag deterministically.
             The body must be clear, detailed Markdown organized by relevant sections such as Added,
             Changed, Fixed, Removed, Performance, Documentation, Testing, or Internal Maintenance.
             Include only sections supported by the input. Explain user-visible behavior, compatibility,
@@ -34,7 +35,7 @@ final class ReleaseNotesAgent implements Agent, HasStructuredOutput
     public function schema(JsonSchema $schema): array
     {
         return [
-            'title' => $schema->string()->description('A concise and descriptive GitHub release title.')->required(),
+            'title' => $schema->string()->description('A compact description of the release outcome without its version or tag.')->required(),
             'body' => $schema->string()->description('Detailed GitHub-flavored Markdown release notes.')->required(),
         ];
     }

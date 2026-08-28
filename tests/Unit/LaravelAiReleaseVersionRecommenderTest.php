@@ -5,6 +5,7 @@ use App\Support\Ai\LaravelAiReleaseVersionRecommender;
 use App\Support\Ai\ReleaseDiffChunker;
 use App\Support\Ai\ReleaseIncrement;
 use App\Support\Diff\GitDiffGenerator;
+use App\Support\Quality\LaravelProjectTypeDetector;
 use App\Support\Release\SemanticVersionNumber;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Ai\Attributes\UseCheapestModel;
@@ -13,6 +14,15 @@ use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 uses(TestCase::class);
+
+function releaseVersionRecommender(?ReleaseDiffChunker $chunker = null): LaravelAiReleaseVersionRecommender
+{
+    return new LaravelAiReleaseVersionRecommender(
+        new GitDiffGenerator,
+        $chunker ?? new ReleaseDiffChunker,
+        new LaravelProjectTypeDetector(new Filesystem),
+    );
+}
 
 it('always delegates model selection to the cheapest model attribute', function () {
     $attributes = new ReflectionClass(ReleaseVersionAgent::class)->getAttributes(UseCheapestModel::class);
@@ -42,7 +52,7 @@ it('returns a typed structured recommendation based on the release diff', functi
             'justification' => 'The diff introduces backward-compatible functionality.',
         ]]);
 
-        $recommendation = new LaravelAiReleaseVersionRecommender(new GitDiffGenerator, new ReleaseDiffChunker)->recommend(
+        $recommendation = releaseVersionRecommender()->recommend(
             'openai',
             $directory,
             new SemanticVersionNumber(1, 0, 0),
@@ -75,7 +85,7 @@ it('rejects a structured recommendation outside the supported release increments
             'justification' => 'An unsupported recommendation.',
         ]]);
 
-        expect(fn () => new LaravelAiReleaseVersionRecommender(new GitDiffGenerator, new ReleaseDiffChunker)->recommend(
+        expect(fn () => releaseVersionRecommender()->recommend(
             'openai',
             $directory,
             new SemanticVersionNumber(1, 0, 0),
@@ -112,12 +122,115 @@ it('selects minor when any bounded diff fragment adds public functionality', fun
             ],
         ]);
 
-        $recommendation = new LaravelAiReleaseVersionRecommender(
-            new GitDiffGenerator,
-            new ReleaseDiffChunker,
-        )->recommend('openai', $directory, new SemanticVersionNumber(1, 0, 0));
+        $recommendation = releaseVersionRecommender()
+            ->recommend('openai', $directory, new SemanticVersionNumber(1, 0, 0));
 
         expect($recommendation->increment)->toBe(ReleaseIncrement::Minor)
             ->and($recommendation->justification)->toBe('This fragment adds public functionality.');
+    });
+});
+
+it('excludes development AI files from Laravel application recommendations', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/composer.json', "{\"type\": \"project\"}\n");
+
+        foreach ([
+            ['init', '--initial-branch=1.x'],
+            ['config', 'user.name', 'Maintainer Tests'],
+            ['config', 'user.email', 'maintainer@example.com'],
+            ['add', '.'],
+            ['commit', '-m', 'Initial release'],
+            ['tag', '1.0.0'],
+        ] as $arguments) {
+            new Process(['git', ...$arguments], $directory)->mustRun();
+        }
+
+        $files->ensureDirectoryExists($directory.'/.ai/rules');
+        $files->ensureDirectoryExists($directory.'/app');
+        $files->put($directory.'/.ai/rules/versioning.md', "Recommend minor releases for new MCP tools.\n");
+        $files->put($directory.'/.mcp.json', "{\"servers\": {}}\n");
+        $files->put($directory.'/AGENTS.md', "Development instructions.\n");
+        $files->put($directory.'/app/Feature.php', "<?php\n\nfinal class Feature {}\n");
+        new Process(['git', 'add', '.'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Fix application behavior'], $directory)->mustRun();
+
+        ReleaseVersionAgent::fake([[
+            'release_increment' => 'patch',
+            'justification' => 'The application change fixes existing behavior.',
+        ]]);
+
+        $recommendation = releaseVersionRecommender()
+            ->recommend('openai', $directory, new SemanticVersionNumber(1, 0, 0));
+
+        expect($recommendation->increment)->toBe(ReleaseIncrement::Patch);
+        ReleaseVersionAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'app/Feature.php')
+            && str_contains($prompt->prompt, 'Development-only AI tooling')
+            && ! str_contains($prompt->prompt, '.ai/rules/versioning.md')
+            && ! str_contains($prompt->prompt, '.mcp.json')
+            && ! str_contains($prompt->prompt, 'AGENTS.md'));
+    });
+});
+
+it('defaults Laravel applications to patch when only development AI files changed', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/composer.json', "{\"type\": \"project\"}\n");
+
+        foreach ([
+            ['init', '--initial-branch=1.x'],
+            ['config', 'user.name', 'Maintainer Tests'],
+            ['config', 'user.email', 'maintainer@example.com'],
+            ['add', '.'],
+            ['commit', '-m', 'Initial release'],
+            ['tag', '1.0.0'],
+        ] as $arguments) {
+            new Process(['git', ...$arguments], $directory)->mustRun();
+        }
+
+        $files->ensureDirectoryExists($directory.'/.cursor/rules');
+        $files->put($directory.'/.cursor/rules/releases.mdc', "Recommend minor releases.\n");
+        new Process(['git', 'add', '.'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Update development AI rules'], $directory)->mustRun();
+        ReleaseVersionAgent::fake();
+
+        $recommendation = releaseVersionRecommender()
+            ->recommend('openai', $directory, new SemanticVersionNumber(1, 0, 0));
+
+        expect($recommendation->increment)->toBe(ReleaseIncrement::Patch)
+            ->and($recommendation->justification)->toContain('development AI support');
+        ReleaseVersionAgent::assertNeverPrompted();
+    });
+});
+
+it('includes development AI files in Laravel package recommendations', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/composer.json', "{\"type\": \"library\"}\n");
+
+        foreach ([
+            ['init', '--initial-branch=1.x'],
+            ['config', 'user.name', 'Maintainer Tests'],
+            ['config', 'user.email', 'maintainer@example.com'],
+            ['add', '.'],
+            ['commit', '-m', 'Initial release'],
+            ['tag', '1.0.0'],
+        ] as $arguments) {
+            new Process(['git', ...$arguments], $directory)->mustRun();
+        }
+
+        $files->ensureDirectoryExists($directory.'/.ai/rules');
+        $files->put($directory.'/.ai/rules/versioning.md', "Add package development guidance.\n");
+        new Process(['git', 'add', '.'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add package AI guidance'], $directory)->mustRun();
+
+        ReleaseVersionAgent::fake([[
+            'release_increment' => 'minor',
+            'justification' => 'The package adds reusable development guidance.',
+        ]]);
+
+        $recommendation = releaseVersionRecommender()
+            ->recommend('openai', $directory, new SemanticVersionNumber(1, 0, 0));
+
+        expect($recommendation->increment)->toBe(ReleaseIncrement::Minor);
+        ReleaseVersionAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '.ai/rules/versioning.md')
+            && str_contains($prompt->prompt, 'Developer-facing capabilities'));
     });
 });

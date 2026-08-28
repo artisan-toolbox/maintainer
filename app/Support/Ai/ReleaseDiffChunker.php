@@ -13,7 +13,7 @@ final readonly class ReleaseDiffChunker
         private int $maxChunks = self::DEFAULT_MAX_CHUNKS,
     ) {}
 
-    public function chunk(string $diff): ReleaseDiffContext
+    public function chunk(string $diff, bool $omitDevelopmentAiFiles = false): ReleaseDiffContext
     {
         $sections = preg_split('/(?=^diff --git )/m', trim($diff), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $chunks = [];
@@ -23,7 +23,7 @@ final readonly class ReleaseDiffChunker
         foreach ($sections as $section) {
             $path = $this->path($section);
 
-            if ($path !== null && $this->shouldOmit($path)) {
+            if ($path !== null && $this->shouldOmit($path, $omitDevelopmentAiFiles)) {
                 $omittedFiles[] = $path;
 
                 continue;
@@ -40,11 +40,18 @@ final readonly class ReleaseDiffChunker
             }
         }
 
-        if ($chunks === []) {
+        $hasAnalyzableChanges = $chunks !== [];
+
+        if (! $hasAnalyzableChanges) {
             $chunks[] = 'No textual source diff remains after generated files and dependency lock files were omitted.';
         }
 
-        return new ReleaseDiffContext($chunks, array_values(array_unique($omittedFiles)), $truncated);
+        return new ReleaseDiffContext(
+            $chunks,
+            array_values(array_unique($omittedFiles)),
+            $truncated,
+            $hasAnalyzableChanges,
+        );
     }
 
     private function path(string $section): ?string
@@ -56,10 +63,17 @@ final readonly class ReleaseDiffChunker
         return $matches[1];
     }
 
-    private function shouldOmit(string $path): bool
+    private function shouldOmit(string $path, bool $omitDevelopmentAiFiles): bool
     {
-        return preg_match(
+        if (preg_match(
             '/(?:^|\/)(?:vendor|node_modules|builds|dist|coverage)\/|(?:^|\/)(?:composer\.lock|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$|\.min\.(?:css|js)$/i',
+            $path,
+        ) === 1) {
+            return true;
+        }
+
+        return $omitDevelopmentAiFiles && preg_match(
+            '/^(?:(?:AGENTS|CLAUDE|GEMINI)\.md|boost\.json|\.mcp\.json|mcp\.json|\.cursorrules|\.windsurfrules|(?:\.ai|\.agents|\.claude|\.codex|\.cursor|\.gemini|\.junie|\.windsurf)\/|\.github\/(?:copilot-instructions\.md|instructions\/|prompts\/)|\.vscode\/mcp\.json)/i',
             $path,
         ) === 1;
     }

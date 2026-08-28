@@ -77,6 +77,9 @@ function defaultMaintainerConfigurationFixture(): array
             ],
         ],
         'quality' => [
+            'pest' => [
+                'parallel' => false,
+            ],
             'phpstan' => [
                 'memory_limit' => '2G',
             ],

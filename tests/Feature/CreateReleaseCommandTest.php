@@ -175,6 +175,7 @@ it('continues when the Git working tree is clean', function () {
             ->and(resolve(FakeGitHubReleasePublisher::class)->published)->toMatchArray([
                 'version' => '1.0.1',
                 'target' => '1.x',
+                'title' => '1.0.1 - Improve the release workflow',
                 'prerelease' => false,
             ]);
 

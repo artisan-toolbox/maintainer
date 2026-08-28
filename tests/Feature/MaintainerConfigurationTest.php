@@ -53,6 +53,7 @@ it('reads PHP configuration values using dot notation and current defaults', fun
             ->and($configuration->path())->toEndWith(join_paths('config', 'dev_maintainer.php'))
             ->and($configuration->get('quality.phpstan.level'))->toBe(8)
             ->and($configuration->get('quality.phpstan.memory_limit'))->toBe('2G')
+            ->and($configuration->get('quality.pest.parallel'))->toBeFalse()
             ->and($configuration->get('git.diff.output_format'))->toBe('line_by_line')
             ->and($configuration->get('quality.pint.preset', 'laravel'))->toBe('laravel')
             ->and($configuration->has('quality.phpstan.level'))->toBeTrue()
@@ -129,6 +130,21 @@ it('loads Maintainer configuration values from the consuming project environment
             $files->put($directory.'/.env', "MAINTAINER_GIT_DIFF_OUTPUT_FORMAT=side_by_side\n");
 
             expect(maintainer_config('git.diff.output_format'))->toBe('side_by_side');
+        });
+    } finally {
+        forgetTestEnvironmentVariable($variable);
+    }
+});
+
+it('enables parallel Pest execution from the consuming project environment file', function () {
+    $variable = 'MAINTAINER_PEST_PARALLEL';
+    forgetTestEnvironmentVariable($variable);
+
+    try {
+        withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
+            $files->put($directory.'/.env', "MAINTAINER_PEST_PARALLEL=true\n");
+
+            expect(maintainer_config('quality.pest.parallel'))->toBeTrue();
         });
     } finally {
         forgetTestEnvironmentVariable($variable);

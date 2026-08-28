@@ -15,6 +15,9 @@ return [
         ],
     ],
     'quality' => [
+        'pest' => [
+            'parallel' => env('MAINTAINER_PEST_PARALLEL', false),
+        ],
         'phpstan' => [
             'memory_limit' => env('MAINTAINER_PHPSTAN_MEMORY_LIMIT', '2G'),
         ],

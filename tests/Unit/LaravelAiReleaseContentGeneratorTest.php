@@ -19,12 +19,27 @@ it('returns structured GitHub release notes from the release changes', function 
 
     $notes = (new LaravelAiReleaseNotesGenerator)->generate('openai', '2.1.0', $changes);
 
-    expect($notes->title)->toBe('Complete GitHub release automation')
+    expect($notes->title)->toBe('2.1.0 - Complete GitHub release automation')
         ->and($notes->body)->toContain('rollback protection');
 
     ReleaseNotesAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'version 2.1.0')
         && str_contains($prompt->prompt, 'abc1234 Add release automation')
         && str_contains($prompt->prompt, 'release diff'));
+});
+
+it('normalizes an AI title that already contains the release tag', function () {
+    ReleaseNotesAgent::fake([[
+        'title' => 'v2.1.0 — Complete GitHub release automation',
+        'body' => "## Added\n\nAutomated publishing with rollback protection.",
+    ]]);
+
+    $notes = (new LaravelAiReleaseNotesGenerator)->generate(
+        'openai',
+        '2.1.0',
+        new ReleaseChangeSet('release diff', 'abc1234 Add release automation'),
+    );
+
+    expect($notes->title)->toBe('2.1.0 - Complete GitHub release automation');
 });
 
 it('returns validated structured changelog entries', function () {

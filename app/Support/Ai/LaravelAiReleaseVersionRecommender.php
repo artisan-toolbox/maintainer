@@ -4,6 +4,8 @@ namespace App\Support\Ai;
 
 use App\Ai\Agents\ReleaseVersionAgent;
 use App\Support\Diff\GitDiffGenerator;
+use App\Support\Quality\LaravelProjectType;
+use App\Support\Quality\LaravelProjectTypeDetector;
 use App\Support\Release\SemanticVersionNumber;
 use Illuminate\Support\Str;
 use Laravel\Ai\Responses\StructuredAgentResponse;
@@ -14,6 +16,7 @@ final readonly class LaravelAiReleaseVersionRecommender implements ReleaseVersio
     public function __construct(
         private GitDiffGenerator $diffGenerator,
         private ReleaseDiffChunker $chunker,
+        private LaravelProjectTypeDetector $projectTypeDetector,
     ) {}
 
     public function recommend(
@@ -22,7 +25,19 @@ final readonly class LaravelAiReleaseVersionRecommender implements ReleaseVersio
         SemanticVersionNumber $latestVersion,
     ): ReleaseVersionRecommendation {
         $diff = $this->diffGenerator->generate($projectRoot, $latestVersion->value());
-        $context = $this->chunker->chunk($diff);
+        $isApplication = $this->projectTypeDetector->detect($projectRoot) === LaravelProjectType::Application;
+        $context = $this->chunker->chunk($diff, omitDevelopmentAiFiles: $isApplication);
+        $projectScope = $isApplication
+            ? 'This is a final Laravel application. Development-only AI tooling, MCP integrations, instructions, static analysis, and test support are internal maintenance and must never be evidence for a minor release. Recommend minor only for new backward-compatible behavior delivered by the running application.'
+            : 'This is a reusable Laravel package. Developer-facing capabilities, including relevant AI or MCP integration, can be public package functionality and should be evaluated from the supplied diff.';
+
+        if ($isApplication && ! $context->hasAnalyzableChanges) {
+            return new ReleaseVersionRecommendation(
+                ReleaseIncrement::Patch,
+                'Only development AI support, generated, dependency, or lock files remain after filtering the application diff; patch is the safest default.',
+            );
+        }
+
         $recommendations = [];
 
         foreach ($context->chunks as $index => $chunk) {
@@ -31,6 +46,9 @@ final readonly class LaravelAiReleaseVersionRecommender implements ReleaseVersio
             $response = ReleaseVersionAgent::make()->prompt(
                 <<<PROMPT
                 Recommend the next stable release increment for fragment {$number} of {$total} since {$latestVersion->value()}.
+
+                PROJECT RELEASE SCOPE
+                {$projectScope}
 
                 GIT DIFF FRAGMENT
                 {$chunk}

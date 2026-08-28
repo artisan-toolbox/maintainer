@@ -197,6 +197,62 @@ it('passes a project-specific memory limit to PHPStan', function () {
     });
 });
 
+it('runs Pest in parallel when configured', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeQualityBinaries($directory, $files);
+        $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'pest' => [
+                    'parallel' => true,
+                ],
+            ],
+        ]);
+
+        $this->artisan('quality', [
+            '--tool' => ['pest'],
+            '--no-interaction' => true,
+        ])->assertSuccessful();
+
+        $resolvedDirectory = realpath($directory);
+        assert(is_string($resolvedDirectory));
+        $qualityLog = str_replace(
+            ['\\', '"'],
+            ['/', ''],
+            $files->get($directory.'/quality.log'),
+        );
+
+        expect(trim($qualityLog))->toBe(
+            'pest --configuration '
+            .str_replace('\\', '/', $resolvedDirectory)
+            .'/phpunit.xml --parallel',
+        );
+    });
+});
+
+it('rejects an invalid Pest parallel setting', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeQualityBinaries($directory, $files);
+        $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'pest' => [
+                    'parallel' => 'sometimes',
+                ],
+            ],
+        ]);
+
+        $this->artisan('quality', [
+            '--tool' => ['pest'],
+            '--no-interaction' => true,
+        ])
+            ->expectsOutputToContain('quality.pest.parallel must be true or false.')
+            ->assertFailed();
+
+        expect($files->exists($directory.'/quality.log'))->toBeFalse();
+    });
+});
+
 it('rejects an invalid PHPStan memory limit', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         installFakeQualityBinaries($directory, $files);

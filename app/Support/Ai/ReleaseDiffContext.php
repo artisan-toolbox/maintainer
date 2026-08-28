@@ -12,5 +12,6 @@ final readonly class ReleaseDiffContext
         public array $chunks,
         public array $omittedFiles,
         public bool $truncated,
+        public bool $hasAnalyzableChanges,
     ) {}
 }
