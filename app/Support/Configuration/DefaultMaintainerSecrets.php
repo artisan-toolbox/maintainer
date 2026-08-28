@@ -17,9 +17,9 @@ final readonly class DefaultMaintainerSecrets
      */
     public function all(): array
     {
-        $this->environment->load();
-
-        return $this->loader->load($this->path(), 'The default Maintainer secrets file');
+        return $this->environment->load(
+            fn (): array => $this->loader->load($this->path(), 'The default Maintainer secrets file'),
+        );
     }
 
     private function path(): string

@@ -35,10 +35,13 @@ final readonly class QualityToolRunner
             "{$tool->label()} is not installed in the project. Install its Composer development dependency first.",
         );
 
-        $process = new Process(
-            $tool->command($binary, $configurationPath, $additionalArguments),
-            $projectRoot,
-        );
+        $command = $tool->command($binary, $configurationPath, $additionalArguments);
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            array_unshift($command, PHP_BINARY);
+        }
+
+        $process = new Process($command, $projectRoot);
         $process->setTimeout(null);
 
         return $process->run(static function (string $type, string $buffer) use ($output): void {

@@ -135,6 +135,29 @@ it('loads Maintainer configuration values from the consuming project environment
     }
 });
 
+it('restores the process environment after evaluating project configuration', function () {
+    $variable = 'MAINTAINER_TEST_SCOPED_VALUE';
+    forgetTestEnvironmentVariable($variable);
+
+    try {
+        withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) use ($variable) {
+            $files->put($directory.'/.env', "{$variable}=from-project\n");
+            $files->ensureDirectoryExists($directory.'/config');
+            $files->put(
+                $directory.'/config/dev_maintainer.php',
+                "<?php\n\nreturn ['scoped_value' => env('{$variable}')];\n",
+            );
+
+            expect(maintainer_config('scoped_value'))->toBe('from-project')
+                ->and(getenv($variable))->toBeFalse()
+                ->and($_ENV)->not->toHaveKey($variable)
+                ->and($_SERVER)->not->toHaveKey($variable);
+        });
+    } finally {
+        forgetTestEnvironmentVariable($variable);
+    }
+});
+
 it('keeps system environment variables ahead of the project environment file', function () {
     $variable = 'MAINTAINER_PHPSTAN_MEMORY_LIMIT';
     forgetTestEnvironmentVariable($variable);

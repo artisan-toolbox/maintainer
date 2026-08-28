@@ -59,6 +59,8 @@
 
 ### Fixes
 
+- Scope values loaded from a consuming project's `.env` to Maintainer configuration evaluation. Project variables no longer leak into later quality-tool or deployment subprocesses, preventing PHPStan from causing a following Pest run to inherit the application's local environment instead of PHPUnit's testing environment. Existing operating-system and CI variables keep their precedence.
+- Run project quality binaries with the same PHP interpreter that started Maintainer on POSIX systems. This prevents Pint, Rector, PHPStan, or Pest from selecting a different or broken PHP installation through their `env php` shebang. No configuration or migration is required.
 - Package only an explicit allowlist of distributed configuration files in the PHAR. Local `config/dev_maintainer.php` and `config/dev_maintainer_secrets.php` files are no longer collected by Box, and the committed build is checked for local configuration paths and common credential signatures.
 - Initialize the temporary Maintainer SSH identity silently while importing the shared Deployer contribution recipe. Every remote task in that invocation now receives the identity, including direct unlock, lock inspection, rollback, release listing, log, push, granular task, `--no-hooks`, and `--start-from` flows. The hidden hooks only report the selected identity after Deployer output is available.
 - Preserve comments and indentation in every published project template from the PHAR. The `resources` directory is now packaged without Box compactors, preventing PHP templates such as `deploy.php` and `rector.php` from being stripped before `config:publish` reads them.

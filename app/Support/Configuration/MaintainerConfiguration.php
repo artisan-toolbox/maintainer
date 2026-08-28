@@ -75,25 +75,25 @@ final class MaintainerConfiguration
      */
     private function load(): array
     {
-        $this->environment->load();
+        return $this->environment->load(function (): array {
+            $defaults = $this->defaults->all();
 
-        $defaults = $this->defaults->all();
+            if ($this->files->isFile($this->path())) {
+                return array_replace_recursive(
+                    $defaults,
+                    $this->loader->load($this->path(), $this->userConfigurationPath->relativePath('maintainer')),
+                );
+            }
 
-        if ($this->files->isFile($this->path())) {
+            if (! $this->files->isFile($this->legacyPath())) {
+                return $defaults;
+            }
+
             return array_replace_recursive(
                 $defaults,
-                $this->loader->load($this->path(), $this->userConfigurationPath->relativePath('maintainer')),
+                $this->legacyLoader->load($this->legacyPath(), 'maintainer.json'),
             );
-        }
-
-        if (! $this->files->isFile($this->legacyPath())) {
-            return $defaults;
-        }
-
-        return array_replace_recursive(
-            $defaults,
-            $this->legacyLoader->load($this->legacyPath(), 'maintainer.json'),
-        );
+        });
     }
 
     private function legacyPath(): string

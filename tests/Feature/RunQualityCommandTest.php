@@ -9,7 +9,11 @@ function installFakeQualityBinaries(string $directory, Filesystem $files): void
         $path = $directory.'/vendor/bin/'.$binary.($windows ? '.bat' : '');
         $script = $windows
             ? "@echo off\r\necho {$binary} %*>>\"{$directory}/quality.log\"\r\n"
-            : "#!/bin/sh\nprintf '%s %s\\n' '".$binary."' \"\$*\" >> '".$directory."/quality.log'\n";
+            : "#!/missing/php\n<?php\nfile_put_contents("
+                .var_export($directory.'/quality.log', true)
+                .", '"
+                .$binary
+                ." '.implode(' ', array_slice(\$argv, 1)).PHP_EOL, FILE_APPEND);\n";
         $files->put($path, $script);
         chmod($path, 0755);
     }
