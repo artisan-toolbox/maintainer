@@ -69,6 +69,7 @@ Compatibility/migration: no configuration keys or public APIs are described as c
 
 ### Features
 
+- Present generated commit messages and GitHub release titles in editable Laravel Prompts textareas before using them. Manual commit messages use the same editor, while edited release titles must preserve the exact `TAG - compact outcome` format.
 - Add opt-in parallel Pest execution through `quality.pest.parallel` or `MAINTAINER_PEST_PARALLEL`. The default remains `false`; when enabled, the quality workflow passes Pest's native `--parallel` flag.
 - Prefix every generated GitHub release title with the exact selected tag using `TAG - compact outcome`. AI output is normalized so an already-present version is not duplicated, and the outcome portion is bounded for concise release listings.
 - Scope SemVer recommendations by Laravel project type. Package recommendations continue to consider development AI instructions and MCP configuration, while Laravel applications omit conventional AI-assistant rules, prompts, skills, and MCP files because they do not change the delivered application. An application release containing only omitted development-AI or generated/dependency changes now defaults deterministically to patch without prompting AI.

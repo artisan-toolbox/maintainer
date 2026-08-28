@@ -5,6 +5,7 @@ namespace App\Commands\Versioning;
 use App\Support\Ai\CommitMessageGenerator;
 use App\Support\Ai\ConfiguredAiProvider;
 use App\Support\Git\CommitMessageMode;
+use App\Support\Git\CommitMessageReviewer;
 use App\Support\Git\GitCommitRepository;
 use App\Support\Git\GitFileSelector;
 use App\Support\ProjectPath;
@@ -31,6 +32,7 @@ final class CreateCommitCommand extends Command
         ProjectPath $projectPath,
         GitCommitRepository $repository,
         GitFileSelector $fileSelector,
+        CommitMessageReviewer $messageReviewer,
         ConfiguredAiProvider $configuredAiProvider,
         CommitMessageGenerator $messageGenerator,
     ): int {
@@ -97,6 +99,7 @@ final class CreateCommitCommand extends Command
                 $mode,
                 $status,
                 $diff,
+                $messageReviewer,
                 $configuredAiProvider,
                 $messageGenerator,
             );
@@ -132,40 +135,33 @@ final class CreateCommitCommand extends Command
         CommitMessageMode $mode,
         string $status,
         string $diff,
+        CommitMessageReviewer $messageReviewer,
         ConfiguredAiProvider $configuredAiProvider,
         CommitMessageGenerator $messageGenerator,
     ): string {
-        if ($mode === CommitMessageMode::Manual) {
-            return trim(textarea(
-                label: 'Write the commit message',
-                placeholder: 'feat(scope): describe the change',
-                required: 'A commit message is required.',
-                validate: static fn (string $value): ?string => trim($value) === ''
-                    ? 'A commit message is required.'
-                    : null,
-                hint: 'Press Ctrl+D to finish editing.',
-                rows: 8,
-            ));
+        $generatedMessage = '';
+
+        if ($mode !== CommitMessageMode::Manual) {
+            $context = $mode === CommitMessageMode::AiWithContext
+                ? textarea(
+                    label: 'What additional context should the AI consider?',
+                    placeholder: 'Explain the intent, trade-offs, tests, issue references, or breaking changes.',
+                    required: 'Context is required for this option.',
+                    validate: static fn (string $value): ?string => trim($value) === ''
+                        ? 'Context is required for this option.'
+                        : null,
+                    hint: 'Press Ctrl+D to finish editing.',
+                    rows: 8,
+                )
+                : null;
+            $provider = $configuredAiProvider->for('commit_message');
+            $generatedMessage = spin(
+                fn (): string => $messageGenerator->generate($provider, $status, $diff, $context),
+                "Generating the commit message with {$provider}...",
+            );
         }
 
-        $context = $mode === CommitMessageMode::AiWithContext
-            ? textarea(
-                label: 'What additional context should the AI consider?',
-                placeholder: 'Explain the intent, trade-offs, tests, issue references, or breaking changes.',
-                required: 'Context is required for this option.',
-                validate: static fn (string $value): ?string => trim($value) === ''
-                    ? 'Context is required for this option.'
-                    : null,
-                hint: 'Press Ctrl+D to finish editing.',
-                rows: 8,
-            )
-            : null;
-        $provider = $configuredAiProvider->for('commit_message');
-
-        return spin(
-            fn (): string => $messageGenerator->generate($provider, $status, $diff, $context),
-            "Generating the commit message with {$provider}...",
-        );
+        return $messageReviewer->review($generatedMessage, $mode !== CommitMessageMode::Manual);
     }
 
     private function commitSummary(string $output): string

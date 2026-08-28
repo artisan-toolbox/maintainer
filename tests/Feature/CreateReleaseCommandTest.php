@@ -13,10 +13,12 @@ use App\Support\Release\GitHubReleaseSource;
 use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
+use App\Support\Release\ReleaseTitleReviewer;
 use App\Support\Release\ReleaseVersionSelector;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Prompts\TextareaPrompt;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Process\Process;
 use Tests\Fakes\FakeBrowserLauncher;
@@ -102,6 +104,9 @@ PHP
     $versionSelector = new FakeReleaseVersionSelector;
     app()->instance(ReleaseVersionSelector::class, $versionSelector);
     app()->instance(FakeReleaseVersionSelector::class, $versionSelector);
+    app()->instance(ReleaseTitleReviewer::class, new ReleaseTitleReviewer(
+        static fn (TextareaPrompt $prompt): string => $prompt->default,
+    ));
     $browser = new FakeBrowserLauncher;
     app()->instance(BrowserLauncher::class, $browser);
     app()->instance(FakeBrowserLauncher::class, $browser);
@@ -181,6 +186,26 @@ it('continues when the Git working tree is clean', function () {
 
         ReleaseChangelogAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'Fragment 1: The release workflow changes project versioning behavior.'));
         ReleaseNotesAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '[feat] abc1234 Improve the release workflow'));
+    });
+});
+
+it('lets the user edit the generated GitHub release title before publishing', function () {
+    withinTemporaryReleaseProject(function (): void {
+        app()->instance(ReleaseTitleReviewer::class, new ReleaseTitleReviewer(
+            static function (TextareaPrompt $prompt): string {
+                expect($prompt->label)->toBe('Review the GitHub release title')
+                    ->and($prompt->default)->toBe('1.0.1 - Improve the release workflow');
+
+                return '1.0.1 - Let users polish generated release titles';
+            },
+        ));
+
+        $this->artisan('release:create')->assertSuccessful();
+
+        expect(resolve(FakeGitHubReleasePublisher::class)->published)->toMatchArray([
+            'version' => '1.0.1',
+            'title' => '1.0.1 - Let users polish generated release titles',
+        ]);
     });
 });
 

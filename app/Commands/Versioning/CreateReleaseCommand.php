@@ -19,6 +19,7 @@ use App\Support\Release\ReadmeVersionBadge;
 use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
+use App\Support\Release\ReleaseTitleReviewer;
 use App\Support\Release\ReleaseVersionOptions;
 use App\Support\Release\ReleaseVersionSelector;
 use App\Support\Release\ReleaseWorktreeRollback;
@@ -72,6 +73,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         GitHubReleasePublisher $publisher,
         ReleaseDiffReviewer $diffReviewer,
         ReleaseVersionSelector $versionSelector,
+        ReleaseTitleReviewer $titleReviewer,
         ReleaseWorktreeRollback $releaseRollback,
     ): int {
         $this->releaseRollback = $releaseRollback;
@@ -198,6 +200,8 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
                 ),
                 "Writing GitHub release notes with {$notesProvider}...",
             );
+            $operation = 'review the GitHub release title';
+            $releaseTitle = $titleReviewer->review($selectedVersion, $releaseNotes->title);
 
             $operation = 'update the README version badge';
             if ($readmeBadge->update($projectRoot, $versionableClass, $selectedVersion)) {
@@ -242,7 +246,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
                     $projectRoot,
                     $selectedVersion,
                     "{$major}.x",
-                    $releaseNotes->title,
+                    $releaseTitle,
                     $releaseNotes->body,
                     $selected?->prerelease !== null,
                 ),
