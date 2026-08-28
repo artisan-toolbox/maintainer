@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0] - 2026-08-28
+
+### Features
+
+- **Review generated commit messages before committing** (`e465810`)
+  Adds a new interactive step that reviews generated commit messages before they are finalized and committed. Generated commit messages are now always routed through a reviewer UI (a textarea prompt) where users can edit the suggested message; manual messages also use the same editing flow. Implementation-wise, the interactive flow in the commit command is refactored to use injected workflow/UX services: `CommitWorkflowPrompts` (for diff review, message mode selection, and push-to-origin decisions) and `CommitMessageReviewer` (for editing/validating commit message text). For non-manual AI modes, commit-message generation still happens (including optional additional context for `AiWithContext`), but the resulting suggested message is then presented for user editing rather than being used directly. User impact: commits no longer become immutable immediately after AI generation; users get an explicit “Review the generated commit message” editing step and validation (non-empty trimmed message). Compatibility/migration: no public API/CLI signature changes are indicated; however, users will see an additional interactive prompt when generating commit messages (AI modes), and release title editing is similarly handled in the release flow (see related changes in this release).
+
+### Refactoring
+
+- **Inject commit workflow prompts for deterministic tests** (`a12af19`)
+  Refactors the commit/release title generation and commit-message editing flows used during tests to remove platform-dependent prompt fallback behavior. This makes interactive review/generation-mode/push decisions deterministic on Windows by explicitly injecting the prompt behavior (review/generation-mode/push decisions) rather than relying on OS-specific prompt resolution. User impact: interactive CLI prompting behavior becomes more predictable in test and CI environments, without changing the CLI surface area. Compatibility/migration: no migration required; this is internal test determinism/behavioral consistency work.
+
 ## [1.3.0] - 2026-08-28
 
 ### Features
