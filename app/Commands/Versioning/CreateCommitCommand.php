@@ -6,6 +6,7 @@ use App\Support\Ai\CommitMessageGenerator;
 use App\Support\Ai\ConfiguredAiProvider;
 use App\Support\Git\CommitMessageMode;
 use App\Support\Git\CommitMessageReviewer;
+use App\Support\Git\CommitWorkflowPrompts;
 use App\Support\Git\GitCommitRepository;
 use App\Support\Git\GitFileSelector;
 use App\Support\ProjectPath;
@@ -14,10 +15,8 @@ use Illuminate\Console\Attributes\Signature;
 use LaravelZero\Framework\Commands\Command;
 use Throwable;
 
-use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\pause;
-use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\textarea;
 
@@ -33,6 +32,7 @@ final class CreateCommitCommand extends Command
         GitCommitRepository $repository,
         GitFileSelector $fileSelector,
         CommitMessageReviewer $messageReviewer,
+        CommitWorkflowPrompts $workflowPrompts,
         ConfiguredAiProvider $configuredAiProvider,
         CommitMessageGenerator $messageGenerator,
     ): int {
@@ -59,7 +59,7 @@ final class CreateCommitCommand extends Command
                 return self::SUCCESS;
             }
 
-            if (confirm('Would you like to review the complete Git diff in your browser before selecting files?', true)) {
+            if ($workflowPrompts->shouldReviewDiff()) {
                 if ($this->call('diff:html') !== self::SUCCESS) {
                     return self::FAILURE;
                 }
@@ -85,15 +85,7 @@ final class CreateCommitCommand extends Command
                 return self::FAILURE;
             }
 
-            $mode = CommitMessageMode::from(select(
-                label: 'How should the commit message be created?',
-                options: [
-                    CommitMessageMode::Manual->value => 'Write it manually',
-                    CommitMessageMode::Ai->value => 'Generate it with AI',
-                    CommitMessageMode::AiWithContext->value => 'Generate it with AI and additional context',
-                ],
-                default: CommitMessageMode::Ai->value,
-            ));
+            $mode = $workflowPrompts->messageMode();
 
             $message = $this->commitMessage(
                 $mode,
@@ -114,7 +106,7 @@ final class CreateCommitCommand extends Command
             $this->components->twoColumnDetail('Commit', $this->commitSummary($commitOutput));
             $this->components->success('Created the Git commit.');
 
-            if (confirm('Push this commit to origin?', false)) {
+            if ($workflowPrompts->shouldPushCommit()) {
                 spin(
                     fn (): string => $repository->pushToOrigin($projectRoot),
                     'Pushing the commit to origin...',

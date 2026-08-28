@@ -1,15 +1,15 @@
 <?php
 
 use App\Support\Ai\CommitMessageGenerator;
-use App\Support\BrowserLauncher;
+use App\Support\Git\CommitMessageMode;
 use App\Support\Git\CommitMessageReviewer;
+use App\Support\Git\CommitWorkflowPrompts;
 use App\Support\Git\GitFileSelector;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Prompts\MultiSearchPrompt;
 use Laravel\Prompts\TextareaPrompt;
 use Symfony\Component\Process\Process;
-use Tests\Fakes\FakeBrowserLauncher;
 
 it('registers the create commit command', function () {
     $commands = $this->app->make(Kernel::class)->all();
@@ -51,9 +51,11 @@ it('lets the user edit an AI-generated commit message before committing', functi
         app()->instance(GitFileSelector::class, new GitFileSelector(
             static fn (MultiSearchPrompt $prompt): array => array_keys($prompt->values),
         ));
-        $browser = new FakeBrowserLauncher;
-        app()->instance(BrowserLauncher::class, $browser);
-        app()->instance(FakeBrowserLauncher::class, $browser);
+        app()->instance(CommitWorkflowPrompts::class, new CommitWorkflowPrompts(
+            reviewDiff: static fn (): bool => false,
+            messageMode: static fn (): CommitMessageMode => CommitMessageMode::Ai,
+            pushCommit: static fn (): bool => false,
+        ));
         app()->instance(CommitMessageReviewer::class, new CommitMessageReviewer(
             static function (TextareaPrompt $prompt): string {
                 expect($prompt->label)->toBe('Review the generated commit message')
