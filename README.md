@@ -4,7 +4,7 @@
 
 <p align="center">
 <!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->
-<a href="VERSION"><img src="https://img.shields.io/badge/version-1.2.0-blue?style=flat-square" alt="version"></a>
+<a href="VERSION"><img src="https://img.shields.io/badge/version-1.3.0-blue?style=flat-square" alt="version"></a>
 <!-- MAINTAINER:VERSION_BADGE:END -->
 <a href="https://packagist.org/packages/artisan-toolbox/maintainer"><img src="https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square" alt="Packagist"></a>
 <a href="https://github.com/artisan-toolbox/maintainer/actions"><img src="https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&amp;label=Tests&amp;style=flat-square" alt="Tests"></a>
