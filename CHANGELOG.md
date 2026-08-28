@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.2.0] - 2026-08-28
+
+### Fixes
+
+- **Scope project .env variables during maintainer configuration evaluation** (`d126185`)
+  This release fixes an environment-leakage issue during Maintainer’s evaluation of a consuming project’s configuration. Maintainer now scopes values loaded from the consuming project’s `.env` so they are only used while evaluating maintainer configuration, and are prevented from persisting into subsequent quality-tool and deployment subprocess environments.
+
+Why it matters: previously, `.env`-loaded values could bleed into later subprocesses, which could cause quality tools to run with the wrong environment. A concrete impact mentioned is PHPStan causing a subsequent Pest run to inherit the app’s local environment instead of the PHPUnit/test environment.
+
+In addition, the fix includes related execution and packaging hardening:
+- Quality binaries are now executed with the same PHP interpreter that started Maintainer on POSIX systems, avoiding interpreter mismatches that could occur when using `env php` shebang resolution.
+- PHAR packaging now includes only an explicit allowlist of distributed configuration files; local development config files (e.g., `config/dev_maintainer.php`, `config/dev_maintainer_secrets.php`) are no longer bundled. The build is also checked for local config path/credential signatures to prevent accidental inclusion.
+- Maintainer SSH identity handling is mentioned as part of the broader fix set.
+
+User impact: users running Maintainer in projects with `.env` files should see fewer unexpected side effects where later tools (tests/quality/deployment) inherit the wrong environment variables.
+
+Compatibility/migration: no configuration keys or public APIs are described as changed; this is primarily a behavioral correction. If any workflows implicitly relied on the old (leaky) behavior, they may need adjustment to explicitly pass required environment variables to the subprocesses.
+
 ## [1.1.0] - 2026-08-20
 
 ### Features
