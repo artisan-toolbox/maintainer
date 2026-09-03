@@ -57,9 +57,7 @@ it('reads PHP configuration values using dot notation and current defaults', fun
             ->and($configuration->get('git.diff.output_format'))->toBe('line_by_line')
             ->and($configuration->get('quality.pint.preset', 'laravel'))->toBe('laravel')
             ->and($configuration->has('quality.phpstan.level'))->toBeTrue()
-            ->and(maintainer_config('quality.phpstan.level'))->toBe(8)
-            ->and(maintainer_config('missing', 'fallback'))->toBe('fallback')
-            ->and(maintainer_config_missing())->toBeFalse();
+            ->and($configuration->get('missing', 'fallback'))->toBe('fallback');
     });
 });
 
@@ -78,9 +76,7 @@ it('uses the current default configuration when the project file is missing', fu
         $defaults = defaultMaintainerConfigurationFixture();
 
         expect($configuration->configMissing())->toBeTrue()
-            ->and($configuration->all())->toBe($defaults)
-            ->and(maintainer_config())->toBe($defaults)
-            ->and(maintainer_config_missing())->toBeTrue();
+            ->and($configuration->all())->toBe($defaults);
     });
 });
 
@@ -117,7 +113,7 @@ it('allows project PHP configuration to override defaults', function () {
             ],
         ]);
 
-        expect(maintainer_config('git.diff.output_format'))->toBe('side_by_side');
+        expect(resolve(MaintainerConfiguration::class)->get('git.diff.output_format'))->toBe('side_by_side');
     });
 });
 
@@ -129,7 +125,7 @@ it('loads Maintainer configuration values from the consuming project environment
         withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
             $files->put($directory.'/.env', "MAINTAINER_GIT_DIFF_OUTPUT_FORMAT=side_by_side\n");
 
-            expect(maintainer_config('git.diff.output_format'))->toBe('side_by_side');
+            expect(resolve(MaintainerConfiguration::class)->get('git.diff.output_format'))->toBe('side_by_side');
         });
     } finally {
         forgetTestEnvironmentVariable($variable);
@@ -144,7 +140,7 @@ it('enables parallel Pest execution from the consuming project environment file'
         withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
             $files->put($directory.'/.env', "MAINTAINER_PEST_PARALLEL=true\n");
 
-            expect(maintainer_config('quality.pest.parallel'))->toBeTrue();
+            expect(resolve(MaintainerConfiguration::class)->get('quality.pest.parallel'))->toBeTrue();
         });
     } finally {
         forgetTestEnvironmentVariable($variable);
@@ -164,7 +160,7 @@ it('restores the process environment after evaluating project configuration', fu
                 "<?php\n\nreturn ['scoped_value' => env('{$variable}')];\n",
             );
 
-            expect(maintainer_config('scoped_value'))->toBe('from-project')
+            expect(resolve(MaintainerConfiguration::class)->get('scoped_value'))->toBe('from-project')
                 ->and(getenv($variable))->toBeFalse()
                 ->and($_ENV)->not->toHaveKey($variable)
                 ->and($_SERVER)->not->toHaveKey($variable);
@@ -183,7 +179,7 @@ it('keeps system environment variables ahead of the project environment file', f
         withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
             $files->put($directory.'/.env', "MAINTAINER_PHPSTAN_MEMORY_LIMIT=4G\n");
 
-            expect(maintainer_config('quality.phpstan.memory_limit'))->toBe('6G');
+            expect(resolve(MaintainerConfiguration::class)->get('quality.phpstan.memory_limit'))->toBe('6G');
         });
     } finally {
         forgetTestEnvironmentVariable($variable);
@@ -194,7 +190,7 @@ it('reports invalid consuming project environment files', function () {
     withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
         $files->put($directory.'/.env', "BROKEN KEY=value\n");
 
-        expect(fn () => maintainer_config())
+        expect(fn () => resolve(MaintainerConfiguration::class)->all())
             ->toThrow(RuntimeException::class, 'Unable to load the project environment file');
     });
 });
@@ -225,7 +221,7 @@ it('rejects a PHP configuration that does not return an associative array', func
         $files->ensureDirectoryExists($directory.'/config');
         $files->put($directory.'/config/dev_maintainer.php', "<?php\n\nreturn 'invalid';\n");
 
-        expect(fn () => maintainer_config())
+        expect(fn () => resolve(MaintainerConfiguration::class)->all())
             ->toThrow(RuntimeException::class, 'config/dev_maintainer.php must return an associative array.');
     });
 });
@@ -242,9 +238,11 @@ it('continues reading legacy JSON configuration during migration', function () {
             }
             JSON.PHP_EOL);
 
-        expect(maintainer_config('quality.phpstan.level'))->toBe(7)
-            ->and(maintainer_config('quality.phpstan.memory_limit'))->toBe('2G')
-            ->and(maintainer_config_missing())->toBeFalse();
+        $configuration = resolve(MaintainerConfiguration::class);
+
+        expect($configuration->get('quality.phpstan.level'))->toBe(7)
+            ->and($configuration->get('quality.phpstan.memory_limit'))->toBe('2G')
+            ->and($configuration->configMissing())->toBeFalse();
     });
 });
 
@@ -252,7 +250,7 @@ it('rejects invalid legacy JSON', function () {
     withinTemporaryConfigurationProject(function (string $directory, Filesystem $files) {
         $files->put($directory.'/maintainer.json', '{invalid');
 
-        expect(fn () => maintainer_config())
+        expect(fn () => resolve(MaintainerConfiguration::class)->all())
             ->toThrow(RuntimeException::class, 'maintainer.json contains invalid JSON');
     });
 });

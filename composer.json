@@ -52,8 +52,15 @@
             "app/Support/client_helpers.php"
         ],
         "psr-4": {
-            "ArtisanToolbox\\Maintainer\\": "app/"
-        }
+            "ArtisanToolbox\\Maintainer\\Deployer\\": "app/Deployer/",
+            "ArtisanToolbox\\Maintainer\\Encryption\\": "app/Encryption/",
+            "ArtisanToolbox\\Maintainer\\Quality\\Contracts\\": "app/Quality/Contracts/",
+            "ArtisanToolbox\\Maintainer\\Ssh\\": "app/Ssh/",
+            "ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\": "app/Versionable/Contracts/"
+        },
+        "classmap": [
+            "app/Maintainer.php"
+        ]
     },
     "autoload-dev": {
         "files": [

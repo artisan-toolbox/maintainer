@@ -75,10 +75,16 @@ final class PublishConfigurationCommand extends Command
                 }
 
                 $email = $configuration === PublishableConfiguration::MaintainerSecrets
+                    && $projectType === LaravelProjectType::Application
                     ? $this->sshKeyEmail()
                     : null;
                 $path = $publisher->publish($configuration, $projectRoot, $projectType, $overwrite, $email);
                 $this->components->twoColumnDetail("Published {$relativeDestination}", $path);
+
+                if ($configuration === PublishableConfiguration::MaintainerSecrets
+                    && $projectType === LaravelProjectType::Package) {
+                    $this->components->info('Skipped Maintainer SSH key generation because Laravel packages do not require an application encryption key.');
+                }
             }
 
             if ($shouldIgnore) {

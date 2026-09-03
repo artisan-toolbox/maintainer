@@ -1,6 +1,12 @@
 <?php
 
 use App\Commands\MaintainerCommand;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPestCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPhpStanCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPintCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusTest;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVueTscCheck;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Prompts\MultiSelectPrompt;
@@ -64,7 +70,7 @@ it('registers the Maintainer workflow menu as the default command', function () 
 
 it('groups the available maintenance workflows into sections', function () {
     expect(array_keys(maintainerMenuOptions('SECTIONS')))->toBe([
-        'ci',
+        'quality',
         'configuration',
         'deployment',
         'versioning',
@@ -77,11 +83,9 @@ it('groups the available maintenance workflows into sections', function () {
         'config:publish',
         'ssh:key',
         'ssh:public',
-    ])->and(array_keys(maintainerMenuOptions('CI_WORKFLOWS')))->toBe([
-        'pint',
-        'rector',
-        'phpstan',
-        'pest',
+    ])->and(array_keys(maintainerMenuOptions('CODE_QUALITY_WORKFLOWS')))->toBe([
+        'quality:fix',
+        'quality:check',
     ])->and(array_keys(maintainerMenuOptions('DEPLOYMENT_WORKFLOWS')))->toBe([
         'deploy',
         'deploy:unlock',
@@ -99,20 +103,33 @@ it('returns from a cancelled submenu to the main menu', function () {
         ->assertSuccessful();
 });
 
-it('runs the CI tools selected in the submenu', function () {
+it('runs the selected code-quality workflow and tools', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         installMaintainerMenuQualityBinaries($directory, $files);
         $files->put($directory.'/pint.json', "{}\n");
         $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
 
+        $toolOptions = [
+            RunsPestCheck::class => 'Pest',
+            RunsPintCheck::class => 'Pint test',
+            RunsVitePlusCheck::class => 'Vite+ Check',
+            RunsVitePlusTest::class => 'Vite+ Test',
+            RunsVueTscCheck::class => 'vue-tsc',
+            RunsPhpStanCheck::class => 'PHPStan',
+        ];
+
         $this->artisan('maintainer')
-            ->expectsChoice('What would you like to manage?', 'ci', maintainerMenuOptions('SECTIONS'))
-            ->expectsChoice('Choose CI tools to run', ['pint', 'pest'], maintainerMenuOptions('CI_WORKFLOWS'))
-            ->expectsOutputToContain('Main Menu › CI')
-            ->expectsOutputToContain('Pint and Pest completed successfully.')
+            ->expectsChoice('What would you like to manage?', 'quality', maintainerMenuOptions('SECTIONS'))
+            ->expectsChoice('Choose a code-quality workflow', 'quality:check', maintainerMenuOptions('CODE_QUALITY_WORKFLOWS'))
+            ->expectsChoice('Choose tools for CI checks', [
+                RunsPestCheck::class,
+                RunsPintCheck::class,
+            ], $toolOptions)
+            ->expectsOutputToContain('Main Menu › Code Quality')
+            ->expectsOutputToContain('CI checks completed successfully: 2 run, 0 skipped.')
             ->assertSuccessful();
 
-        $this->assertCommandCalled('quality', ['--tool' => ['pint', 'pest']]);
+        $this->assertCommandCalled('quality:check');
     });
 });
 

@@ -15,6 +15,8 @@ final class FakeReleaseGitRepository implements ReleaseGitRepository
 
     public bool $rolledBack = false;
 
+    public ?string $changelogWhenStaged = null;
+
     /** @var list<string> */
     public array $ensuredReferences = [];
 
@@ -38,6 +40,9 @@ final class FakeReleaseGitRepository implements ReleaseGitRepository
 
     public function stageAll(string $projectRoot): void
     {
+        $path = $projectRoot.'/CHANGELOG.md';
+        $contents = is_file($path) ? file_get_contents($path) : null;
+        $this->changelogWhenStaged = is_string($contents) ? $contents : null;
         $this->staged = true;
     }
 

@@ -1,6 +1,11 @@
 <?php
 
+use ArtisanToolbox\Maintainer\Deployer\GitTagSelector;
+use ArtisanToolbox\Maintainer\Encryption\MaintainerEncrypterFactory;
+use ArtisanToolbox\Maintainer\Maintainer;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPintFix;
 use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 
 function distributedPharInternalPath(string $pharPath, string $entryPath): string
 {
@@ -16,7 +21,7 @@ function distributedPharInternalPath(string $pharPath, string $entryPath): strin
     return substr($entryPath, strlen($prefix));
 }
 
-it('exports only the public Maintainer namespace to consumers', function () {
+it('exports only explicit Maintainer integration surfaces to consumers', function () {
     $manifest = json_decode(
         file_get_contents(dirname(__DIR__, 2).'/composer.json'),
         true,
@@ -25,12 +30,24 @@ it('exports only the public Maintainer namespace to consumers', function () {
 
     expect($manifest['autoload']['psr-4'])
         ->toBe([
-            'ArtisanToolbox\\Maintainer\\' => 'app/',
+            'ArtisanToolbox\\Maintainer\\Deployer\\' => 'app/Deployer/',
+            'ArtisanToolbox\\Maintainer\\Encryption\\' => 'app/Encryption/',
+            'ArtisanToolbox\\Maintainer\\Quality\\Contracts\\' => 'app/Quality/Contracts/',
+            'ArtisanToolbox\\Maintainer\\Ssh\\' => 'app/Ssh/',
+            'ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\' => 'app/Versionable/Contracts/',
+        ])
+        ->and($manifest['autoload']['classmap'])->toBe([
+            'app/Maintainer.php',
         ])
         ->and($manifest['autoload']['files'])->toBe([
             'app/Support/client_helpers.php',
         ])
+        ->and(class_exists(Maintainer::class))->toBeTrue()
+        ->and(class_exists(GitTagSelector::class))->toBeTrue()
+        ->and(class_exists(MaintainerEncrypterFactory::class))->toBeTrue()
+        ->and(interface_exists(RunsPintFix::class))->toBeTrue()
         ->and(class_exists(MaintainerSshKeys::class))->toBeTrue()
+        ->and(interface_exists(Versionable::class))->toBeTrue()
         ->and(function_exists('maintainer_ssh_key'))->toBeTrue()
         ->and(function_exists('maintainer_ssh_public_key'))->toBeTrue()
         ->and($manifest['autoload-dev']['psr-4'])

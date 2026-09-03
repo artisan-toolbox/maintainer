@@ -32,32 +32,52 @@ final readonly class VersionableImplementation
     }
 
     /**
-     * Find a class directly in a production PSR-4 namespace that implements Versionable.
+     * Find a class exposed by the production Composer autoloader that implements Versionable.
      */
     public function find(string $projectRoot): ?VersionableClass
     {
         $invalidImplementation = null;
         $implementationWithoutVersion = null;
 
-        foreach ($this->psrFourMappings($projectRoot) as $namespace => $directories) {
-            foreach ($directories as $directory) {
-                foreach ($this->phpFiles($projectRoot, $directory) as $file) {
-                    foreach ($this->implementationsIn($file, $namespace) as $implementation) {
-                        if ($implementation->version !== null) {
-                            return $implementation;
-                        }
+        foreach ($this->autoloadedPhpFiles($projectRoot) as [$file, $baseNamespace]) {
+            foreach ($this->implementationsIn($file, $baseNamespace) as $implementation) {
+                if ($implementation->version !== null) {
+                    return $implementation;
+                }
 
-                        if ($implementation->hasVersionConstant) {
-                            $invalidImplementation ??= $implementation;
-                        } else {
-                            $implementationWithoutVersion ??= $implementation;
-                        }
-                    }
+                if ($implementation->hasVersionConstant) {
+                    $invalidImplementation ??= $implementation;
+                } else {
+                    $implementationWithoutVersion ??= $implementation;
                 }
             }
         }
 
         return $invalidImplementation ?? $implementationWithoutVersion;
+    }
+
+    /**
+     * @return list<array{SplFileInfo, string|null}>
+     */
+    private function autoloadedPhpFiles(string $projectRoot): array
+    {
+        $files = [];
+
+        foreach ($this->psrFourMappings($projectRoot) as $namespace => $directories) {
+            foreach ($directories as $directory) {
+                foreach ($this->phpFiles($projectRoot, $directory) as $file) {
+                    $files[$file->getPathname()] = [$file, $namespace];
+                }
+            }
+        }
+
+        foreach ($this->classmapEntries($projectRoot) as $entry) {
+            foreach ($this->classmapPhpFiles($projectRoot, $entry) as $file) {
+                $files[$file->getPathname()] = [$file, null];
+            }
+        }
+
+        return array_values($files);
     }
 
     /**
@@ -102,6 +122,28 @@ final readonly class VersionableImplementation
     }
 
     /**
+     * @return list<string>
+     */
+    private function classmapEntries(string $projectRoot): array
+    {
+        $manifestPath = join_paths($projectRoot, 'composer.json');
+
+        try {
+            $manifest = json_decode($this->files->get($manifestPath), true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException('The project composer.json contains invalid JSON.', previous: $exception);
+        }
+
+        $entries = $manifest['autoload']['classmap'] ?? [];
+
+        if (! is_array($entries)) {
+            return [];
+        }
+
+        return array_values(array_filter($entries, is_string(...)));
+    }
+
+    /**
      * @return list<SplFileInfo>
      */
     private function phpFiles(string $projectRoot, string $directory): array
@@ -121,9 +163,34 @@ final readonly class VersionableImplementation
     }
 
     /**
+     * @return list<SplFileInfo>
+     */
+    private function classmapPhpFiles(string $projectRoot, string $entry): array
+    {
+        $path = $this->isAbsolutePath($entry)
+            ? $entry
+            : join_paths($projectRoot, $entry);
+
+        if ($this->files->isFile($path)) {
+            return pathinfo($path, PATHINFO_EXTENSION) === 'php'
+                ? [new SplFileInfo($path)]
+                : [];
+        }
+
+        if (! $this->files->isDirectory($path)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $this->files->allFiles($path),
+            static fn (SplFileInfo $file): bool => $file->getExtension() === 'php',
+        ));
+    }
+
+    /**
      * @return list<VersionableClass>
      */
-    private function implementationsIn(SplFileInfo $file, string $baseNamespace): array
+    private function implementationsIn(SplFileInfo $file, ?string $baseNamespace): array
     {
         try {
             $statements = $this->parser->parse($this->files->get($file->getPathname())) ?? [];
@@ -148,7 +215,8 @@ final readonly class VersionableImplementation
 
             $className = $class->namespacedName?->toString();
 
-            if ($className === null || $this->namespaceOf($className) !== $baseNamespace) {
+            if ($className === null
+                || ($baseNamespace !== null && $this->namespaceOf($className) !== $baseNamespace)) {
                 continue;
             }
 

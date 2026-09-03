@@ -66,9 +66,13 @@ final readonly class ConfigurationFilePublisher
         $this->files->ensureDirectoryExists(dirname($destination));
 
         if ($configuration === PublishableConfiguration::MaintainerSecrets) {
-            throw_if($email === null || $email === '', RuntimeException::class, 'An email address is required to generate the Maintainer SSH key.');
-            throw_if($this->maintainerSecretsTemplate === null, RuntimeException::class, 'The Maintainer secrets publisher is unavailable.');
-            $contents = $this->maintainerSecretsTemplate->contents($email);
+            if ($projectType === LaravelProjectType::Package) {
+                $contents = $this->files->get($template);
+            } else {
+                throw_if($email === null || $email === '', RuntimeException::class, 'An email address is required to generate the Maintainer SSH key.');
+                throw_if($this->maintainerSecretsTemplate === null, RuntimeException::class, 'The Maintainer secrets publisher is unavailable.');
+                $contents = $this->maintainerSecretsTemplate->contents($email);
+            }
         } else {
             $contents = $this->files->get($template);
         }

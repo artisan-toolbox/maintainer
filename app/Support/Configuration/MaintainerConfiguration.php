@@ -79,7 +79,7 @@ final class MaintainerConfiguration
             $defaults = $this->defaults->all();
 
             if ($this->files->isFile($this->path())) {
-                return array_replace_recursive(
+                return $this->merge(
                     $defaults,
                     $this->loader->load($this->path(), $this->userConfigurationPath->relativePath('maintainer')),
                 );
@@ -89,11 +89,42 @@ final class MaintainerConfiguration
                 return $defaults;
             }
 
-            return array_replace_recursive(
+            return $this->merge(
                 $defaults,
                 $this->legacyLoader->load($this->legacyPath(), 'maintainer.json'),
             );
         });
+    }
+
+    /**
+     * Merge associative configuration while replacing ordered lists as complete values.
+     *
+     * @param  array<string, mixed>  $defaults
+     * @param  array<string, mixed>  $configured
+     * @return array<string, mixed>
+     */
+    private function merge(array $defaults, array $configured): array
+    {
+        foreach ($configured as $key => $value) {
+            if (
+                is_array($value)
+                && ! array_is_list($value)
+                && isset($defaults[$key])
+                && is_array($defaults[$key])
+                && ! array_is_list($defaults[$key])
+            ) {
+                /** @var array<string, mixed> $defaultValue */
+                $defaultValue = $defaults[$key];
+                /** @var array<string, mixed> $value */
+                $defaults[$key] = $this->merge($defaultValue, $value);
+
+                continue;
+            }
+
+            $defaults[$key] = $value;
+        }
+
+        return $defaults;
     }
 
     private function legacyPath(): string

@@ -12,7 +12,6 @@ use Throwable;
 
 use function Laravel\Prompts\clear;
 use function Laravel\Prompts\info;
-use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\select;
 
@@ -28,7 +27,7 @@ final class MaintainerCommand extends Command
      * @var array<string, string>
      */
     private const array SECTIONS = [
-        'ci' => '1 - CI',
+        'quality' => '1 - Code Quality',
         'configuration' => '2 - Configuration',
         'deployment' => '3 - Deployment',
         'versioning' => '4 - Versioning',
@@ -56,11 +55,9 @@ final class MaintainerCommand extends Command
     /**
      * @var array<string, string>
      */
-    private const array CI_WORKFLOWS = [
-        'pint' => '1 - Pint',
-        'rector' => '2 - Rector',
-        'phpstan' => '3 - PHPStan',
-        'pest' => '4 - Pest',
+    private const array CODE_QUALITY_WORKFLOWS = [
+        'quality:fix' => '1 - Fix',
+        'quality:check' => '2 - CI Check',
     ];
 
     /**
@@ -88,7 +85,7 @@ final class MaintainerCommand extends Command
             $section = select(
                 label: 'What would you like to manage?',
                 options: self::SECTIONS,
-                default: 'ci',
+                default: 'quality',
                 scroll: count(self::SECTIONS),
             );
 
@@ -99,7 +96,7 @@ final class MaintainerCommand extends Command
             $exitCode = match ($section) {
                 'versioning' => $this->runWorkflowMenu($banner, 'Main Menu › Versioning', 'Choose a versioning workflow', self::VERSIONING_WORKFLOWS),
                 'configuration' => $this->runWorkflowMenu($banner, 'Main Menu › Configuration', 'Choose a configuration workflow', self::CONFIGURATION_WORKFLOWS),
-                'ci' => $this->runCiMenu($banner),
+                'quality' => $this->runWorkflowMenu($banner, 'Main Menu › Code Quality', 'Choose a code-quality workflow', self::CODE_QUALITY_WORKFLOWS),
                 'deployment' => $this->runWorkflowMenu($banner, 'Main Menu › Deployment', 'Choose a deployment workflow', self::DEPLOYMENT_WORKFLOWS),
                 default => throw new LogicException('The selected Maintainer section is not supported.'),
             };
@@ -138,31 +135,6 @@ final class MaintainerCommand extends Command
         return $workflow === self::BACK_SIGNAL
             ? null
             : $this->call($workflow);
-    }
-
-    private function runCiMenu(MaintainerBanner $banner): ?int
-    {
-        $this->renderScreen($banner, 'Main Menu › CI');
-        Prompt::cancelUsing(static fn (): array => [self::BACK_SIGNAL]);
-
-        try {
-            $workflows = multiselect(
-                label: 'Choose CI tools to run',
-                options: self::CI_WORKFLOWS,
-                default: array_keys(self::CI_WORKFLOWS),
-                scroll: count(self::CI_WORKFLOWS),
-                required: true,
-                hint: 'Use Space to select tools. Press Ctrl+C to return to the main menu.',
-            );
-        } finally {
-            Prompt::cancelUsing(null);
-        }
-
-        if ($workflows === [self::BACK_SIGNAL]) {
-            return null;
-        }
-
-        return $this->call('quality', ['--tool' => $workflows]);
     }
 
     private function renderScreen(MaintainerBanner $banner, string $breadcrumb): void

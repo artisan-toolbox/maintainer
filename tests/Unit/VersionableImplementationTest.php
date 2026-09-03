@@ -56,3 +56,44 @@ PHP
         $files->deleteDirectory($directory);
     }
 });
+
+it('discovers a versionable class from the production Composer classmap', function () {
+    $files = new Filesystem;
+    $directory = temporaryTestDirectory('maintainer-versionable-classmap-');
+
+    $files->makeDirectory($directory.'/package', recursive: true);
+    $files->put($directory.'/composer.json', <<<'JSON'
+{
+    "autoload": {
+        "classmap": [
+            "package/ProjectVersion.php"
+        ]
+    }
+}
+JSON
+    );
+    $files->put($directory.'/package/ProjectVersion.php', <<<'PHP'
+<?php
+
+namespace Fixture\Release;
+
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+
+final class ProjectVersion implements Versionable
+{
+    public const string VERSION = '2.1.0';
+}
+PHP
+    );
+
+    try {
+        $versionable = new VersionableImplementation($files)->find($directory);
+
+        expect($versionable)
+            ->not->toBeNull()
+            ->name->toBe('Fixture\Release\ProjectVersion')
+            ->version->toBe('2.1.0');
+    } finally {
+        $files->deleteDirectory($directory);
+    }
+});

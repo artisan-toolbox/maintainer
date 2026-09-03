@@ -1,5 +1,15 @@
 <?php
 
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPestCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPhpStanCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPintCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPintFix;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsRectorFix;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusCheck;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusCheckFix;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusTest;
+use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVueTscCheck;
+
 return [
     'ai' => [
         'providers' => [
@@ -15,6 +25,19 @@ return [
         ],
     ],
     'quality' => [
+        'fix' => [
+            RunsPintFix::class,
+            RunsRectorFix::class,
+            RunsVitePlusCheckFix::class,
+        ],
+        'test' => [
+            RunsPestCheck::class,
+            RunsPintCheck::class,
+            RunsVitePlusCheck::class,
+            RunsVitePlusTest::class,
+            RunsVueTscCheck::class,
+            RunsPhpStanCheck::class,
+        ],
         'pest' => [
             'parallel' => env('MAINTAINER_PEST_PARALLEL', false),
         ],

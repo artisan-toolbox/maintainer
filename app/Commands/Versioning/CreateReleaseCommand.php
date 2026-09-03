@@ -12,6 +12,7 @@ use App\Support\Ai\ReleaseVersionRecommender;
 use App\Support\Git\GitWorkingTree;
 use App\Support\Git\ReleaseBranch;
 use App\Support\ProjectPath;
+use App\Support\Quality\QualityCheckPrompt;
 use App\Support\Release\ChangelogWriter;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\LatestGitHubRelease;
@@ -75,6 +76,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         ReleaseVersionSelector $versionSelector,
         ReleaseTitleReviewer $titleReviewer,
         ReleaseWorktreeRollback $releaseRollback,
+        QualityCheckPrompt $qualityCheckPrompt,
     ): int {
         $this->releaseRollback = $releaseRollback;
         $projectRoot = $projectPath->root();
@@ -212,6 +214,22 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $changelogPath = $changelogWriter->write($projectRoot, $selectedVersion, $changelogEntries);
             $this->components->twoColumnDetail('Changelog', $changelogPath);
 
+            $operation = 'apply automatic code-quality fixes';
+            throw_if(
+                $this->callNonInteractively('quality:fix') !== self::SUCCESS,
+                RuntimeException::class,
+                'The configured code-quality fixes did not complete successfully.',
+            );
+
+            if ($qualityCheckPrompt->shouldRun()) {
+                $operation = 'run code-quality checks';
+                throw_if(
+                    $this->callNonInteractively('quality:check') !== self::SUCCESS,
+                    RuntimeException::class,
+                    'The configured code-quality checks did not complete successfully.',
+                );
+            }
+
             $operation = 'stage the release files';
             $git->stageAll($projectRoot);
 
@@ -294,6 +312,16 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         return [self::SIGTERM];
     }
 
+    private function callNonInteractively(string $command): int
+    {
+        try {
+            return $this->call($command, ['--no-interaction' => true]);
+        } finally {
+            $this->input->setInteractive(true);
+            $this->configurePrompts($this->input);
+        }
+    }
+
     public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
     {
         if ($signal !== self::SIGTERM) {
@@ -354,7 +382,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
 
         if ($versionable === null) {
             throw new RuntimeException(sprintf(
-                'No class directly in a production PSR-4 namespace implements %s.',
+                'No class exposed by the production Composer autoloader implements %s.',
                 Versionable::class,
             ));
         }

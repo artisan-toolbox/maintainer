@@ -68,6 +68,7 @@ it('publishes Maintainer configuration with the development user prefix', functi
 
     try {
         withinTemporaryProject(function (string $directory, Filesystem $files) {
+            $files->put($directory.'/composer.json', "{\"type\": \"project\"}\n");
             $files->put($directory.'/.env', 'APP_KEY=base64:'.base64_encode(random_bytes(32))."\n");
 
             $this->artisan('config:publish')
@@ -134,6 +135,8 @@ it('requires an encryption key before publishing Maintainer secrets', function (
     forgetTestEnvironmentVariable('APP_KEY');
 
     withinTemporaryProject(function (string $directory, Filesystem $files) {
+        $files->put($directory.'/composer.json', "{\"type\": \"project\"}\n");
+
         $this->artisan('config:publish')
             ->expectsChoice(
                 'Which configuration files would you like to publish?',
@@ -146,6 +149,29 @@ it('requires an encryption key before publishing Maintainer secrets', function (
             ->assertFailed();
 
         expect($files->exists($directory.'/config/dev_maintainer_secrets.php'))->toBeFalse();
+    });
+});
+
+it('publishes Maintainer secrets without generating an SSH key for Laravel packages', function () {
+    forgetTestEnvironmentVariable('APP_KEY');
+
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        $this->artisan('config:publish')
+            ->expectsChoice(
+                'Which configuration files would you like to publish?',
+                ['maintainer-secrets'],
+                PUBLISHABLE_CONFIGURATION_OPTIONS,
+            )
+            ->expectsConfirmation('Add the selected configuration files to .gitignore?', 'no')
+            ->expectsOutputToContain('Skipped Maintainer SSH key generation')
+            ->assertSuccessful();
+
+        expect(require $directory.'/config/dev_maintainer_secrets.php')
+            ->toHaveKey('key', null)
+            ->toHaveKey('ssh_key', null)
+            ->and($files->get($directory.'/config/dev_maintainer_secrets.php'))
+            ->toContain("'key' => env('APP_KEY')")
+            ->toContain("'ssh_key' => null");
     });
 });
 

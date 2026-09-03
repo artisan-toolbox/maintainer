@@ -7,6 +7,11 @@ use App\Ai\Agents\ReleaseVersionAgent;
 use App\Commands\Versioning\CreateReleaseCommand;
 use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\BrowserLauncher;
+use App\Support\Configuration\MaintainerConfiguration;
+use App\Support\Quality\QualityCheckPrompt;
+use App\Support\Quality\QualityCommand;
+use App\Support\Quality\QualityCommandAvailability;
+use App\Support\Quality\QualityTool;
 use App\Support\Release\GitCliReleaseRepository;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
@@ -27,6 +32,57 @@ use Tests\Fakes\FakeGitHubReleaseSource;
 use Tests\Fakes\FakeReleaseDiffReviewer;
 use Tests\Fakes\FakeReleaseGitRepository;
 use Tests\Fakes\FakeReleaseVersionSelector;
+
+final class ReleaseFixCommandFixture implements QualityCommand
+{
+    /** @var list<int> */
+    private static array $exitCodes = [0];
+
+    private static int $invocations = 0;
+
+    public static function returnExitCodes(int ...$exitCodes): void
+    {
+        self::$exitCodes = $exitCodes;
+        self::$invocations = 0;
+    }
+
+    public function name(): string
+    {
+        return 'release-fix';
+    }
+
+    public function label(): string
+    {
+        return 'Release formatter';
+    }
+
+    public function availability(string $projectRoot): QualityCommandAvailability
+    {
+        return QualityCommandAvailability::available();
+    }
+
+    public function configurationTool(): ?QualityTool
+    {
+        return null;
+    }
+
+    public function command(
+        string $projectRoot,
+        ?string $configurationPath,
+        MaintainerConfiguration $configuration,
+    ): array {
+        $exitCode = self::$exitCodes[self::$invocations] ?? 0;
+        self::$invocations++;
+
+        return [
+            PHP_BINARY,
+            '-r',
+            '$path = $argv[1].\'/CHANGELOG.md\'; $contents = file_get_contents($path); if (str_contains($contents, \'<!-- formatted before release commit -->\')) { echo "CHECKED_FORMATTED_CHANGELOG\\n"; } else { file_put_contents($path, rtrim($contents)."\\n\\n<!-- formatted before release commit -->\\n"); } exit((int) $argv[2]);',
+            $projectRoot,
+            (string) $exitCode,
+        ];
+    }
+}
 
 /**
  * @param  Closure(string, Filesystem): void  $callback
@@ -101,6 +157,9 @@ PHP
     $diffReviewer = new FakeReleaseDiffReviewer;
     app()->instance(ReleaseDiffReviewer::class, $diffReviewer);
     app()->instance(FakeReleaseDiffReviewer::class, $diffReviewer);
+    app()->instance(QualityCheckPrompt::class, new QualityCheckPrompt(
+        static fn (): bool => false,
+    ));
     $versionSelector = new FakeReleaseVersionSelector;
     app()->instance(ReleaseVersionSelector::class, $versionSelector);
     app()->instance(FakeReleaseVersionSelector::class, $versionSelector);
@@ -168,6 +227,7 @@ it('continues when the Git working tree is clean', function () {
             ->expectsOutputToContain('Release branch')
             ->expectsOutputToContain('Latest GitHub version')
             ->expectsOutputToContain('Selected version')
+            ->doesntExpectOutputToContain('CI checks completed successfully')
             ->assertSuccessful();
 
         expect($files->get($directory.'/src/ProjectVersion.php'))
@@ -187,6 +247,105 @@ it('continues when the Git working tree is clean', function () {
         ReleaseChangelogAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'Fragment 1: The release workflow changes project versioning behavior.'));
         ReleaseNotesAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '[feat] abc1234 Improve the release workflow'));
     });
+});
+
+it('runs configured fixes after writing the changelog and before staging the release', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        ReleaseFixCommandFixture::returnExitCodes(0);
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'fix' => [ReleaseFixCommandFixture::class],
+            ],
+        ]);
+        new Process(['git', 'add', 'config/dev_maintainer.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Configure release formatter'], $directory)->mustRun();
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('Running Release formatter')
+            ->expectsOutputToContain('Code quality fixes completed successfully: 1 run, 0 skipped.')
+            ->assertSuccessful();
+
+        expect(resolve(FakeReleaseGitRepository::class)->changelogWhenStaged)
+            ->toContain('<!-- formatted before release commit -->');
+    });
+});
+
+it('aborts and rolls back the release when a configured fix fails', function () {
+    try {
+        withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+            ReleaseFixCommandFixture::returnExitCodes(7);
+            putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+                'quality' => [
+                    'fix' => [ReleaseFixCommandFixture::class],
+                ],
+            ]);
+            new Process(['git', 'add', 'config/dev_maintainer.php'], $directory)->mustRun();
+            new Process(['git', 'commit', '-m', 'Configure failing release formatter'], $directory)->mustRun();
+
+            $this->artisan('release:create')
+                ->expectsOutputToContain('Release formatter failed with exit code 7.')
+                ->expectsOutputToContain('Unable to apply automatic code-quality fixes')
+                ->assertFailed();
+
+            expect(resolve(FakeReleaseGitRepository::class)->committed)->toBeFalse()
+                ->and(resolve(FakeReleaseGitRepository::class)->rolledBack)->toBeTrue();
+        });
+    } finally {
+        ReleaseFixCommandFixture::returnExitCodes(0);
+    }
+});
+
+it('runs configured checks after fixes when the user confirms', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        ReleaseFixCommandFixture::returnExitCodes(0, 0);
+        app()->instance(QualityCheckPrompt::class, new QualityCheckPrompt(
+            static fn (): bool => true,
+        ));
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'fix' => [ReleaseFixCommandFixture::class],
+                'test' => [ReleaseFixCommandFixture::class],
+            ],
+        ]);
+        new Process(['git', 'add', 'config/dev_maintainer.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Configure release quality workflows'], $directory)->mustRun();
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('CHECKED_FORMATTED_CHANGELOG')
+            ->expectsOutputToContain('CI checks completed successfully: 1 run, 0 skipped.')
+            ->assertSuccessful();
+
+        expect(resolve(FakeReleaseGitRepository::class)->committed)->toBeTrue();
+    });
+});
+
+it('aborts and rolls back the release when an accepted quality check fails', function () {
+    try {
+        withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+            ReleaseFixCommandFixture::returnExitCodes(0, 8);
+            app()->instance(QualityCheckPrompt::class, new QualityCheckPrompt(
+                static fn (): bool => true,
+            ));
+            putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+                'quality' => [
+                    'fix' => [ReleaseFixCommandFixture::class],
+                    'test' => [ReleaseFixCommandFixture::class],
+                ],
+            ]);
+            new Process(['git', 'add', 'config/dev_maintainer.php'], $directory)->mustRun();
+            new Process(['git', 'commit', '-m', 'Configure failing release check'], $directory)->mustRun();
+
+            $this->artisan('release:create')
+                ->expectsOutputToContain('Release formatter failed with exit code 8.')
+                ->expectsOutputToContain('Unable to run code-quality checks')
+                ->assertFailed();
+
+            expect(resolve(FakeReleaseGitRepository::class)->committed)->toBeFalse()
+                ->and(resolve(FakeReleaseGitRepository::class)->rolledBack)->toBeTrue();
+        });
+    } finally {
+        ReleaseFixCommandFixture::returnExitCodes(0);
+    }
 });
 
 it('lets the user edit the generated GitHub release title before publishing', function () {
@@ -443,7 +602,7 @@ it('rejects a project without a versionable class in its base namespace', functi
         new Process(['git', 'commit', '-m', 'Remove version class'], $directory)->mustRun();
 
         $this->artisan('release:create')
-            ->expectsOutputToContain('No class directly in a production PSR-4 namespace implements')
+            ->expectsOutputToContain('No class exposed by the production Composer autoloader implements')
             ->assertFailed();
     });
 });
@@ -467,7 +626,7 @@ PHP
         new Process(['git', 'commit', '-m', 'Move version class'], $directory)->mustRun();
 
         $this->artisan('release:create')
-            ->expectsOutputToContain('No class directly in a production PSR-4 namespace implements')
+            ->expectsOutputToContain('No class exposed by the production Composer autoloader implements')
             ->assertFailed();
     });
 });
