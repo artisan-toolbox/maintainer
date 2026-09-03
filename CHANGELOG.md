@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.5.0] - 2026-09-03
+
+### Features
+
+- **Introduce contract-based code-quality workflows and fix** (`c993c64`)
+  This release introduces a contract-based approach to the code-quality workflows and “fix/check” command wiring, and adjusts how quality tooling is exposed to consumers.
+
+Key changes:
+- Replaces the previous quality workflow exports with explicit consumer integration surfaces built around quality “contract” FQCNs (e.g., `RunsPintFix` / `RunsPintCheck`, plus related SSH/encryption and Deployer/maintainer surfaces). This matters because it narrows what is publicly exportable/consumable, reducing accidental coupling to internal classes.
+- Updates quality tool selection and discovery around contract implementations rather than older console command classes. As a result, consumers should migrate any references from legacy `App\Support\Quality\Commands\...` entries used by `quality.fix` and `quality.test` to the corresponding `Runs...` contract FQCNs.
+- Improves Versionable class discovery by using both the production Composer `autoload.classmap` and direct production PSR-4 namespaces so that exact-file exports remain correct without expanding broader namespaces.
+- Refactors CI/menu/workflow UX by splitting the former single `quality` flow into two separate workflows and menu entries:
+  - `quality:fix` (defaults include Pint, Rector, and the package script invoking the fix workflow)
+  - `quality:check`
+  This changes how users select and run quality tooling (the prior multiselect/CI menu for individual tools is removed; users instead select `quality:fix` or `quality:check` and optionally narrow with `--tool=*`).
+
+Command and workflow behavior updates:
+- Deletes the old LaravelZero console command `app/Commands/CI/RunQualityCommand.php`, including its `quality {--tool=*}` interactive behavior (tool config creation, extra-arg derivation from maintainer config, and optional git commit prompting). Any external consumers invoking that command/behavior will break because it no longer exists.
+- Adds a new command `quality:check` (`app/Commands/CodeQuality/RunCheckCommand.php`) extending shared workflow logic; it is wired to `quality.test` configuration and targets CI code-quality checks.
+- Adds a new command `quality:fix` (`app/Commands/CodeQuality/RunFixCommand.php`) extending the shared workflow logic; it is wired to `quality.fix`, labeled appropriately, and indicates it can both create a commit and run checks. It supports `--tool=*` to run only selected configured tools.
+- Introduces a shared abstract workflow command `RunCodeQualityWorkflowCommand` implementing the core execution flow: validates project root, loads a list of configured `QualityCommand` contract implementations from the maintainer configuration provided by subclasses, supports interactive tool selection, checks tool availability per project root (skipping with warnings if unavailable), and resolves/uses tool-specific configuration when declared by each tool.
+
+Release and service integration changes:
+- Release creation now runs `quality:fix` non-interactively (failing the release command if it fails) and conditionally runs `quality:check` non-interactively based on `shouldRun()`. This is done with a helper that preserves prompt/input interactivity after `--no-interaction => true`.
+- The maintainer version constant is bumped to `1.5.0`.
+- Adds new container bindings for the quality fix/test contract types so the framework can resolve `RunsPintFix`, `RunsRectorFix`, `RunsPestCheck`, `RunsPintCheck`, `RunsPhpStanCheck`, `RunsVitePlusCheck`, `RunsVitePlusTest`, and `RunsVueTscCheck` to their concrete command implementations.
+
+Quality contract surface additions (new types):
+- Adds new quality contract marker interfaces under `App\Quality\Contracts` for code-quality typing/organization, including (at minimum) `RunsPestCheck`, `RunsPhpStanCheck`, `RunsPintCheck`, `RunsPintFix`, `RunsRectorFix`, and `RunsVitePlusCheck`. These interfaces are empty/marker-only.
+
+Migration / compatibility notes:
+- You must migrate any `quality.fix` / `quality.test` configuration entries that pointed to `App\Support\Quality\Commands\...` into the new `Runs...` contract FQCNs.
+- If you used or automated the removed `quality` command behavior (`app/Commands/CI/RunQualityCommand.php`), update scripts to use `quality:fix` and/or `quality:check` instead.
+- Package publishing behavior is adjusted to skip Maintainer SSH key email generation for Laravel package project types (no application encryption key dependency).
+
+Overall impact:
+- User-facing CLI workflow names and menu structure change (CI “quality” is split into `quality:fix` and `quality:check`).
+- External integrations relying on the deleted `quality {--tool=*}` command must be updated.
+- Release automation is strengthened by enforcing non-interactive quality runs during release creation.
+
 ## [1.4.0] - 2026-08-28
 
 ### Features

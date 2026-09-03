@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Process;
 
 final class Maintainer implements BeforeVersioning, Versionable, WithReadmeBadgeVersion
 {
-    public const string VERSION = '1.4.0';
+    public const string VERSION = '1.5.0';
 
     public static function beforeVersioning(string $current, string $next): void
     {
