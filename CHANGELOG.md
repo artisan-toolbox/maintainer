@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.1] - 2026-09-04
+
+### Fixes
+
+- **Preserve template indentation/layout in packaged PHAR** (`827e661`)
+  Updated the PHAR distribution process so that publishable templates keep their exact indentation and layout when shipped inside the PHAR. This matters because prior packaging behavior could alter whitespace/formatting, making configuration/template contents harder to diff, validate, or consume reliably.
+
+Concretely, the release/publishing pipeline was adjusted to package `config/maintainer.php` and `config/maintainer_secrets.php` as unmodified template files via a dedicated `files-bin` group in `box.json`, rather than through the broader `files` set. This change helps ensure JSON and other project templates remain packaged without modification.
+
+To prevent regressions, unit test coverage in `tests/Unit/ComposerManifestTest.php` was refined and expanded to verify:
+- `box.json` no longer includes `directories` for `config`/`resources` (ensuring configuration separation is explicit).
+- Config files are split correctly between compacted `boxManifest['files']` entries (e.g., `config/ai.php`, `config/app.php`, `config/commands.php`) and unmodified template entries in `boxManifest['files-bin']` (e.g., `config/maintainer.php`, `config/maintainer_secrets.php`).
+- Built PHAR contents preserve byte-for-byte template formatting by asserting `getContent()` for `config/maintainer.php`, `config/maintainer_secrets.php`, and `resources/pint.json` matches the repository-root files exactly.
+
+User impact: shipped PHAR distributions should now retain exact template formatting for the affected configuration/templates, improving consistency and reducing risk of whitespace/layout-related issues at runtime.
+
+Compatibility/Migration: no source-level migration is required for consumers; this is a packaging/publishing behavior fix. If you rely on non-standard assumptions about how these template files were previously formatted when installed from the PHAR, re-validate those assumptions.
+
 ## [Unreleased]
 
 ### Fixes
