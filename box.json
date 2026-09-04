@@ -14,7 +14,9 @@
         "composer.json",
         "config/ai.php",
         "config/app.php",
-        "config/commands.php",
+        "config/commands.php"
+    ],
+    "files-bin": [
         "config/maintainer.php",
         "config/maintainer_secrets.php"
     ],

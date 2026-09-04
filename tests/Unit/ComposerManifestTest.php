@@ -64,23 +64,29 @@ it('exports only explicit Maintainer integration surfaces to consumers', functio
         ->not->toHaveKey('App\\');
 });
 
-it('packages configuration and unmodified publishing templates in the PHAR', function () {
+it('packages runtime configuration and unmodified publishing templates in the PHAR', function () {
     $boxManifest = json_decode(
         file_get_contents(dirname(__DIR__, 2).'/box.json'),
         true,
         flags: JSON_THROW_ON_ERROR,
     );
-    $packagedConfiguration = array_values(array_filter(
+    $compactedConfiguration = array_values(array_filter(
         $boxManifest['files'],
+        fn (string $path): bool => str_starts_with($path, 'config/'),
+    ));
+    $unmodifiedConfiguration = array_values(array_filter(
+        $boxManifest['files-bin'],
         fn (string $path): bool => str_starts_with($path, 'config/'),
     ));
 
     expect($boxManifest['directories'])->not->toContain('config')
         ->not->toContain('resources')
-        ->and($packagedConfiguration)->toBe([
+        ->and($compactedConfiguration)->toBe([
             'config/ai.php',
             'config/app.php',
             'config/commands.php',
+        ])
+        ->and($unmodifiedConfiguration)->toBe([
             'config/maintainer.php',
             'config/maintainer_secrets.php',
         ])
@@ -153,5 +159,29 @@ it('excludes local configuration and credential signatures from the distributed 
     } finally {
         @unlink($pharPath);
         @unlink($temporaryFile);
+    }
+});
+
+it('preserves publishable PHP and JSON template formatting in the distributed PHAR', function () {
+    $projectRoot = dirname(__DIR__, 2);
+    $temporaryFile = tempnam(sys_get_temp_dir(), 'maintainer-phar-');
+    $pharPath = $temporaryFile.'.phar';
+
+    copy($projectRoot.'/builds/maintainer', $pharPath);
+
+    try {
+        $phar = new Phar($pharPath);
+
+        foreach ([
+            'config/maintainer.php',
+            'config/maintainer_secrets.php',
+            'resources/pint.json',
+        ] as $template) {
+            expect($phar[$template]->getContent())
+                ->toBe(file_get_contents($projectRoot.'/'.$template));
+        }
+    } finally {
+        unlink($pharPath);
+        unlink($temporaryFile);
     }
 });

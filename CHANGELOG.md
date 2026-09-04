@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+
+- Preserve the indentation and layout of the published `config/maintainer.php` and `config/maintainer_secrets.php` arrays in the distributed PHAR. JSON and other project templates remain packaged without modification.
+
 ## [1.5.0] - 2026-09-03
 
 ### Features
