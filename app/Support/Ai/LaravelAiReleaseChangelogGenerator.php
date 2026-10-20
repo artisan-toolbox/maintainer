@@ -80,7 +80,12 @@ final class LaravelAiReleaseChangelogGenerator implements ReleaseChangelogGenera
             return null;
         }
 
-        throw_unless(is_string($type) && in_array($type, self::TYPES, true), RuntimeException::class, 'The AI provider returned an invalid changelog type.');
+        throw_unless(is_string($type) && in_array($type, self::TYPES, true), RuntimeException::class, sprintf(
+            'The AI provider returned an invalid changelog type for commit %s: %s. Expected one of: %s.',
+            trim($hash),
+            is_string($type) ? Str::limit($type, 80) : get_debug_type($type),
+            implode(', ', self::TYPES),
+        ));
         throw_unless(is_string($title) && trim($title) !== '', RuntimeException::class, 'The AI provider returned an empty changelog title.');
         throw_unless(is_string($description) && trim($description) !== '', RuntimeException::class, 'The AI provider returned an empty changelog description.');
 

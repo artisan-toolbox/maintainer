@@ -5,10 +5,76 @@ use App\Ai\Agents\ReleaseNotesAgent;
 use App\Support\Ai\LaravelAiReleaseChangelogGenerator;
 use App\Support\Ai\LaravelAiReleaseNotesGenerator;
 use App\Support\Release\ReleaseChangeSet;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Tests\TestCase;
 
 uses(TestCase::class);
+
+it('requests strict changelog output with the allowed commit types', function () {
+    config()->set('ai.providers.openai.key', 'test-key');
+    Http::preventStrayRequests();
+    Http::fake([
+        '*' => Http::response([
+            'id' => 'resp_changelog',
+            'status' => 'completed',
+            'model' => 'gpt-5-nano',
+            'output' => [[
+                'type' => 'message',
+                'content' => [[
+                    'type' => 'output_text',
+                    'text' => json_encode(['entries' => [[
+                        'type' => 'feat',
+                        'hash' => 'abc1234',
+                        'title' => 'Automate releases',
+                        'description' => 'Adds the release workflow.',
+                    ]]], JSON_THROW_ON_ERROR),
+                ]],
+            ]],
+        ]),
+    ]);
+
+    $entries = (new LaravelAiReleaseChangelogGenerator)->generate(
+        'openai',
+        '2.1.0',
+        new ReleaseChangeSet('release summary', 'abc1234 feat: automate releases'),
+    );
+
+    expect($entries)->toHaveCount(1)
+        ->and($entries[0]->type)->toBe('feat');
+
+    Http::assertSent(function (Request $request): bool {
+        $format = $request['text']['format'];
+
+        return $format['type'] === 'json_schema'
+            && $format['strict'] === true
+            && $format['schema']['properties']['entries']['items']['properties']['type']['enum'] === [
+                'feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert',
+            ];
+    });
+});
+
+it('identifies the commit and invalid changelog type without accepting malformed output', function (mixed $type, string $received) {
+    ReleaseChangelogAgent::fake([[
+        'entries' => [[
+            'type' => $type,
+            'hash' => 'abc1234',
+            'title' => 'Automate releases',
+            'description' => 'Adds the release workflow.',
+        ]],
+    ]]);
+
+    expect(fn () => (new LaravelAiReleaseChangelogGenerator)->generate(
+        'openai',
+        '2.1.0',
+        new ReleaseChangeSet('release summary', 'abc1234 feat: automate releases'),
+    ))->toThrow(RuntimeException::class, "The AI provider returned an invalid changelog type for commit abc1234: {$received}. Expected one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.");
+})->with([
+    'unknown category' => ['feature', 'feature'],
+    'missing category' => [null, 'null'],
+    'non-string category' => [['feat'], 'array'],
+]);
 
 it('returns structured GitHub release notes from the release changes', function () {
     ReleaseNotesAgent::fake([[

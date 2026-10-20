@@ -22,6 +22,7 @@ Compatibility/Migration: no source-level migration is required for consumers; th
 
 ### Fixes
 
+- Request strict structured output for AI-generated release changelog entries so supported providers enforce the allowed Conventional Commit types. Invalid types still abort the release, with an error identifying the commit, received value, and allowed types.
 - Preserve the indentation and layout of the published `config/maintainer.php` and `config/maintainer_secrets.php` arrays in the distributed PHAR. JSON and other project templates remain packaged without modification.
 
 ## [1.5.0] - 2026-09-03
