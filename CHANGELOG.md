@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.5.2] - 2026-10-20
+
+### Features
+
+- **Enforce strict structured output for release changelog types** (`669e9f6`)
+  This update enforces strict structured output for AI-generated release changelog entries to ensure only supported Conventional Commit types are produced.
+
+Key changes:
+- Changelog configuration guidance: The release changelog documentation was updated to state that the release process now requests strict structured output from AI providers. If a provider returns an invalid changelog `type`, the release aborts with an error that includes (a) the originating commit identifier, (b) the received invalid value, and (c) the list of allowed types.
+- Strict agent execution: `ReleaseChangelogAgent` was updated to run in strict mode via the `#[Strict]` attribute (alongside the existing `#[UseCheapestModel]`). This affects how responses are validated/accepted and reduces the chance of providers emitting unexpected or non-conformant structures.
+- Improved error diagnostics: `LaravelAiReleaseChangelogGenerator` now enhances validation failure messaging when an AI provider returns an invalid changelog entry `type`. The thrown `RuntimeException` message now includes the commit hash, a debug/truncated representation of the returned `type`, and the full list of expected types (`self::TYPES`) instead of a generic message.
+- Test coverage: Unit tests were expanded to confirm:
+  - The generator requests strict output using an OpenAI JSON schema with `strict: true`, and that `entries[].type` is constrained to the allowed enum set: `feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert`.
+  - Invalid `type` values (unknown category, null, non-string) are rejected and cause `generate()` to throw a `RuntimeException` that includes the commit hash, the invalid received value, and the expected allowed types.
+
+Why it matters / user impact:
+- Release changelog generation becomes more reliable and deterministic across AI providers by preventing unsupported changelog entry types from being accepted.
+- Failures become easier to diagnose because exception messages now contain the commit identifier and the specific invalid value.
+
+Compatibility and migration:
+- The change is primarily about stricter validation. If any provider/configuration previously produced changelog `type` values outside the allowed set, the release process will now fail early instead of accepting them.
+- No public API/config keys are described as changed; migration is only relevant for any workflow that relies on previously non-compliant AI outputs.
+
 ## [1.5.1] - 2026-09-04
 
 ### Fixes
