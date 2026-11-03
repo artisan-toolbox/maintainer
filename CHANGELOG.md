@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Resolve bundled configuration paths inside the Maintainer PHAR on Windows.
+
 ## [1.6.0] - 2026-11-03
 
 ### Documentation

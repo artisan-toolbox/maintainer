@@ -1,5 +1,6 @@
 <?php
 
+use App\Foundation\Application;
 use ArtisanToolbox\Maintainer\Deployer\GitTagSelector;
 use ArtisanToolbox\Maintainer\Encryption\MaintainerEncrypterFactory;
 use ArtisanToolbox\Maintainer\Maintainer;
@@ -177,7 +178,11 @@ it('preserves publishable PHP and JSON template formatting in the distributed PH
             'config/maintainer_secrets.php',
             'resources/pint.json',
         ] as $template) {
-            expect($phar[$template]->getContent())
+            $archiveRoot = 'phar://'.str_replace('/', '\\', $pharPath);
+            $entry = new Application()->joinPaths($archiveRoot, $template);
+
+            expect(file_get_contents($entry))
+                ->toBe($phar[$template]->getContent())
                 ->toBe(file_get_contents($projectRoot.'/'.$template));
         }
     } finally {
