@@ -26,8 +26,8 @@ return [
     ],
     'quality' => [
         'fix' => [
-            RunsPintFix::class,
             RunsRectorFix::class,
+            RunsPintFix::class,
             RunsVitePlusCheckFix::class,
         ],
         'test' => [

@@ -5,7 +5,7 @@ use App\Support\Release\VersionableClass;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
 use Illuminate\Filesystem\Filesystem;
 
-it('inserts and replaces a protected static README version badge', function () {
+it('inserts and replaces a single-line README version badge', function () {
     $files = new Filesystem;
     $directory = temporaryTestDirectory('maintainer-badge-');
     $files->makeDirectory($directory);
@@ -26,10 +26,8 @@ it('inserts and replaces a protected static README version badge', function () {
         $contents = $files->get($directory.'/README.md');
 
         expect($contents)
-            ->toContain('User agents must not edit this section')
-            ->toContain('[![version](https://img.shields.io/badge/version-1.1.1-blue?style=flat-square)](VERSION)')
-            ->not->toContain('version-1.1.0-blue?style=flat-square')
-            ->and(substr_count($contents, 'MAINTAINER:VERSION_BADGE:START'))->toBe(1);
+            ->toBe("# Example\n\n[![version](https://img.shields.io/badge/version-1.1.1-blue?style=flat-square)](VERSION \"MAINTAINER_VERSION\")\n\nDocumentation.\n")
+            ->not->toContain('version-1.1.0-blue?style=flat-square');
     } finally {
         $files->deleteDirectory($directory);
     }
@@ -62,7 +60,7 @@ HTML
         $contents = $files->get($directory.'/README.md');
 
         expect($contents)
-            ->toContain('<a href="VERSION"><img src="https://img.shields.io/badge/version-1.1.1--beta.1-blue?style=flat-square" alt="version"></a>')
+            ->toContain('<a href="VERSION" title="MAINTAINER_VERSION"><img src="https://img.shields.io/badge/version-1.1.1--beta.1-blue?style=flat-square" alt="version"></a>')
             ->not->toContain('[![version]');
     } finally {
         $files->deleteDirectory($directory);
@@ -105,10 +103,31 @@ MARKDOWN
         $contents = $files->get($directory.'/README.md');
 
         expect($contents)
-            ->toContain('[![version](https://img.shields.io/badge/version-1.1.1--beta.1-blue?style=flat-square)](VERSION)')
+            ->toContain('[![version](https://img.shields.io/badge/version-1.1.1--beta.1-blue?style=flat-square)](VERSION "MAINTAINER_VERSION")')
             ->toContain('<a href="VERSION"><img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="version"></a>')
-            ->and(substr_count($contents, 'MAINTAINER:VERSION_BADGE:START'))->toBe(2);
+            ->and(substr_count($contents, 'MAINTAINER:VERSION_BADGE:START'))->toBe(1);
     } finally {
         $files->deleteDirectory($directory);
     }
+});
+
+it('migrates a legacy badge between neighboring badges without breaking their row', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        $readme = $directory.'/README.md';
+        $before = "# Example\r\n\r\n[![Tests](tests.svg)](tests)\r\n";
+        $after = "\r\n[![Coverage](coverage.svg)](coverage)\r\n";
+        $files->put($readme, $before.implode("\r\n", [
+            '<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->',
+            '',
+            '[![version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](VERSION)',
+            '<!-- MAINTAINER:VERSION_BADGE:END -->',
+        ]).$after);
+        $versionable = new VersionableClass('Example\\Version', $directory.'/Version.php', true, '1.0.0', [WithReadmeBadgeVersion::class]);
+        $badge = new ReadmeVersionBadge($files);
+
+        $badge->update($directory, $versionable, '1.1.0');
+        $badge->update($directory, $versionable, '1.1.0');
+
+        expect($files->get($readme))->toBe($before.'[![version](https://img.shields.io/badge/version-1.1.0-blue?style=flat-square)](VERSION "MAINTAINER_VERSION")'.$after);
+    });
 });

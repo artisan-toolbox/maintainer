@@ -10,6 +10,8 @@ use function Illuminate\Filesystem\join_paths;
 
 final readonly class ReadmeVersionBadge
 {
+    private const string MARKER = 'MAINTAINER_VERSION';
+
     private const string START = '<!-- MAINTAINER:VERSION_BADGE:START - Managed by Maintainer. User agents must not edit this section. -->';
 
     private const string END = '<!-- MAINTAINER:VERSION_BADGE:END -->';
@@ -29,18 +31,14 @@ final readonly class ReadmeVersionBadge
         $contents = $this->files->get($path);
         $lineEnding = str_contains($contents, "\r\n") ? "\r\n" : "\n";
         $badgeVersion = str_replace('-', '--', $version);
-        $managedBlock = $this->managedBlock($contents);
-        $badgeMarkup = $this->usesHtmlBadge($contents, $managedBlock)
-            ? "<a href=\"VERSION\"><img src=\"https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square\" alt=\"version\"></a>"
-            : "[![version](https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square)](VERSION)";
-        $badge = implode($lineEnding, [
-            self::START,
-            $badgeMarkup,
-            self::END,
-        ]);
+        $managedBadge = $this->managedBadge($contents);
+        $marker = self::MARKER;
+        $badge = $this->usesHtmlBadge($contents, $managedBadge)
+            ? "<a href=\"VERSION\" title=\"{$marker}\"><img src=\"https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square\" alt=\"version\"></a>"
+            : "[![version](https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square)](VERSION \"{$marker}\")";
 
-        if ($managedBlock !== null) {
-            $updated = substr_replace($contents, $badge, $managedBlock['offset'], $managedBlock['length']);
+        if ($managedBadge !== null) {
+            $updated = substr_replace($contents, $badge, $managedBadge['offset'], $managedBadge['length']);
         } elseif (preg_match('/\A# .+\R/', $contents, $heading) === 1) {
             $updated = substr_replace($contents, $heading[0].$lineEnding.$badge.$lineEnding, 0, strlen($heading[0]));
         } else {
@@ -55,14 +53,22 @@ final readonly class ReadmeVersionBadge
     /**
      * @return array{offset: int, length: int}|null
      */
-    private function managedBlock(string $contents): ?array
+    private function managedBadge(string $contents): ?array
     {
-        $pattern = '/'.preg_quote(self::START, '/').'.*?'.preg_quote(self::END, '/').'/s';
-        preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+        $marker = self::MARKER;
+        $url = 'https://img\.shields\.io/badge/version-[^\s"()]+';
+        $patterns = [
+            '~\[!\[version\]\('.$url.'\)\]\(VERSION "'.$marker.'"\)|<a href="VERSION" title="'.$marker.'"><img src="'.$url.'" alt="version"></a>~',
+            '/'.preg_quote(self::START, '/').'.*?'.preg_quote(self::END, '/').'/s',
+        ];
 
-        foreach ($matches[0] as [$block, $offset]) {
-            if (! $this->insideMarkdownFence($contents, $offset)) {
-                return ['offset' => $offset, 'length' => strlen($block)];
+        foreach ($patterns as $pattern) {
+            preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+
+            foreach ($matches[0] as [$badge, $offset]) {
+                if (! $this->insideMarkdownFence($contents, $offset)) {
+                    return ['offset' => $offset, 'length' => strlen($badge)];
+                }
             }
         }
 
@@ -70,12 +76,12 @@ final readonly class ReadmeVersionBadge
     }
 
     /**
-     * @param  array{offset: int, length: int}|null  $managedBlock
+     * @param  array{offset: int, length: int}|null  $managedBadge
      */
-    private function usesHtmlBadge(string $contents, ?array $managedBlock): bool
+    private function usesHtmlBadge(string $contents, ?array $managedBadge): bool
     {
-        if ($managedBlock !== null) {
-            $block = substr($contents, $managedBlock['offset'], $managedBlock['length']);
+        if ($managedBadge !== null) {
+            $block = substr($contents, $managedBadge['offset'], $managedBadge['length']);
 
             return preg_match('/<img\b/i', $block) === 1;
         }
@@ -104,7 +110,7 @@ final readonly class ReadmeVersionBadge
     private function insideMarkdownFence(string $contents, int $offset): bool
     {
         $prefix = substr($contents, 0, $offset);
-        preg_match_all('/^(?: {0,3})(`{3,}|~{3,})[^\r\n]*$/m', $prefix, $matches);
+        preg_match_all('/^(?: {0,3})(`{3,}|~{3,})[^\r\n]*\r?$/m', $prefix, $matches);
         $openFence = null;
 
         foreach ($matches[1] as $delimiter) {

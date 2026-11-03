@@ -6,6 +6,7 @@ use ArtisanToolbox\Maintainer\Maintainer;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPintFix;
 use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+use Illuminate\Filesystem\Filesystem;
 
 function distributedPharInternalPath(string $pharPath, string $entryPath): string
 {
@@ -157,8 +158,7 @@ it('excludes local configuration and credential signatures from the distributed 
             'The distributed PHAR contains potential credentials: '.implode(', ', $violations),
         );
     } finally {
-        @unlink($pharPath);
-        @unlink($temporaryFile);
+        new Filesystem()->delete([$pharPath, $temporaryFile]);
     }
 });
 
@@ -181,7 +181,6 @@ it('preserves publishable PHP and JSON template formatting in the distributed PH
                 ->toBe(file_get_contents($projectRoot.'/'.$template));
         }
     } finally {
-        unlink($pharPath);
-        unlink($temporaryFile);
+        new Filesystem()->delete([$pharPath, $temporaryFile]);
     }
 });

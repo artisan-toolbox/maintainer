@@ -62,6 +62,9 @@ it('runs every configured fixer and discovers package scripts by their contents'
             ],
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
 
+        $configuration = require dirname(__DIR__, 2).'/config/maintainer.php';
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', $configuration);
+
         $this->artisan('quality:fix', ['--no-interaction' => true])
             ->expectsOutputToContain('Code quality fixes completed successfully: 3 run, 0 skipped.')
             ->assertSuccessful();
@@ -71,8 +74,8 @@ it('runs every configured fixer and discovers package scripts by their contents'
         $normalizedDirectory = str_replace('\\', '/', $resolvedDirectory);
 
         expect(normalizedQualityLog($directory, $files))->toBe(implode("\n", [
-            "pint --config {$normalizedDirectory}/pint.json",
             "rector process --config {$normalizedDirectory}/rector.php",
+            "pint --config {$normalizedDirectory}/pint.json",
             'vp check --fix',
             '',
         ]));
@@ -277,7 +280,7 @@ it('rejects selected tools that are not configured for the workflow', function (
             '--tool' => ['phpstan'],
             '--no-interaction' => true,
         ])
-            ->expectsOutputToContain('Every selected tool must be one of: pint, rector, vite-plus-check.')
+            ->expectsOutputToContain('Every selected tool must be one of: rector, pint, vite-plus-check.')
             ->assertFailed();
     });
 });

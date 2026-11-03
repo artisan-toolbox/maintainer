@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Limit the AI commit prompt for large staged changes so oversized diffs are less likely to exceed the provider’s context window.
+- Run Rector before Pint in the default quality fix workflow so Pint formats Rector’s changes.
+- Keep managed README version badges on one line and migrate legacy comment blocks in place.
+
 ## [1.5.2] - 2026-10-20
 
 ### Features

@@ -2,6 +2,9 @@
 
 use App\Ai\Agents\CommitMessageAgent;
 use App\Support\Ai\LaravelAiCommitMessageGenerator;
+use GuzzleHttp\Psr7\Response as PsrResponse;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Tests\TestCase;
 
@@ -35,4 +38,41 @@ it('adds user context to the same prompt as the diff', function () {
 
     CommitMessageAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'This fixes issue #42')
         && str_contains($prompt->prompt, 'selected diff'));
+});
+
+it('bounds the prompt for oversized selected changes while retaining source details', function () {
+    CommitMessageAgent::fake(['fix(commit): preserve source context']);
+
+    $lockDiff = "diff --git a/composer.lock b/composer.lock\n".str_repeat("+generated dependency metadata\n", 10_000);
+    $sourceDiff = "diff --git a/app/Commit.php b/app/Commit.php\n+return true;\n".str_repeat("+São Paulo\n", 10_000);
+    $status = "M  composer.lock\nM  app/Commit.php\n".str_repeat("A  new-file.php\n", 10_000);
+    $context = 'Keep issue #42 in view. '.str_repeat('ã', 25_000);
+
+    (new LaravelAiCommitMessageGenerator)->generate('openai', $status, $lockDiff.$sourceDiff, $context);
+
+    CommitMessageAgent::assertPrompted(fn (AgentPrompt $prompt): bool => strlen($prompt->prompt) < 33_000
+        && mb_check_encoding($prompt->prompt, 'UTF-8')
+        && str_contains($prompt->prompt, 'Keep issue #42 in view.')
+        && str_contains($prompt->prompt, 'M  composer.lock')
+        && str_contains($prompt->prompt, '+return true;')
+        && str_contains($prompt->prompt, '[Additional diff content omitted.]')
+        && ! str_contains($prompt->prompt, '+generated dependency metadata'));
+});
+
+it('retries once with a smaller prompt when the provider rejects the context size', function () {
+    $prompts = [];
+    CommitMessageAgent::fake(function (string $prompt) use (&$prompts): string {
+        $prompts[] = $prompt;
+
+        throw_if(count($prompts) === 1, RequestException::class, new Response(new PsrResponse(400, [], '{"error":{"message":"Your input exceeds the context window of this model.","code":"context_length_exceeded"}}')));
+
+        return 'fix(commit): fit the provider context window';
+    });
+
+    $message = (new LaravelAiCommitMessageGenerator)->generate('openai', 'M  app/Commit.php', str_repeat("+selected diff\n", 900));
+
+    expect($message)->toBe('fix(commit): fit the provider context window')
+        ->and($prompts)->toHaveCount(2)
+        ->and(strlen($prompts[1]))->toBeLessThan(strlen($prompts[0]))
+        ->and($prompts[1])->toContain('M  app/Commit.php', '[Additional diff content omitted.]');
 });
