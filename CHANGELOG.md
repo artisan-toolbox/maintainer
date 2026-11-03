@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0] - 2026-11-03
+
+### Documentation
+
+- **Improve documentation** (`07b761f`)
+  Updated the documentation (CHANGELOG/docs) to reflect upcoming 1.6.0 changes and provide clearer guidance for maintainers/users. This includes documenting fixes such as AI commit prompt truncation to avoid provider context-length failures, the quality-fix execution order adjustment (Rector before Pint), and README version badge markup/behavior updates (including marker-based migration and single-line badge formatting). Also documented the underlying README badge maintenance behavior changes so users can better understand how version badges are inserted/updated and what to expect.
+
 ## Unreleased
 
 ### Fixed
