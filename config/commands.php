@@ -1,6 +1,16 @@
 <?php
 
+use App\Commands\CodeQuality\RunCheckCommand;
+use App\Commands\CodeQuality\RunFixCommand;
+use App\Commands\Configuration\PublishConfigurationCommand;
+use App\Commands\Configuration\SshPrivateKeyCommand;
+use App\Commands\Configuration\SshPublicKeyCommand;
+use App\Commands\Deployment\DeployCommand;
+use App\Commands\Deployment\DeployUnlockCommand;
 use App\Commands\MaintainerCommand;
+use App\Commands\Versioning\CreateCommitCommand;
+use App\Commands\Versioning\CreateHtmlDiffCommand;
+use App\Commands\Versioning\CreateReleaseCommand;
 use Illuminate\Console\Scheduling\ScheduleFinishCommand;
 use Illuminate\Console\Scheduling\ScheduleListCommand;
 use Illuminate\Console\Scheduling\ScheduleRunCommand;
@@ -36,7 +46,7 @@ return [
     |
     */
 
-    'paths' => [app_path('Commands')],
+    'paths' => [],
 
     /*
     |--------------------------------------------------------------------------
@@ -50,7 +60,16 @@ return [
     */
 
     'add' => [
-        //
+        RunCheckCommand::class,
+        RunFixCommand::class,
+        PublishConfigurationCommand::class,
+        SshPrivateKeyCommand::class,
+        SshPublicKeyCommand::class,
+        DeployCommand::class,
+        DeployUnlockCommand::class,
+        CreateCommitCommand::class,
+        CreateHtmlDiffCommand::class,
+        CreateReleaseCommand::class,
     ],
 
     /*

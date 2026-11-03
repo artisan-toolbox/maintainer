@@ -5,6 +5,7 @@
 ### Fixed
 
 - Resolve bundled configuration and publishing template paths inside the Maintainer PHAR on Windows.
+- Register bundled commands explicitly so the PHAR can resolve command names on Windows.
 
 ## [1.6.0] - 2026-11-03
 

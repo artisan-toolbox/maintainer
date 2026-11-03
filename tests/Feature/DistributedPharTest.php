@@ -8,6 +8,21 @@ function distributedMaintainerExecutable(): string
     return getenv('MAINTAINER_TEST_PHAR') ?: dirname(__DIR__, 2).'/builds/maintainer';
 }
 
+it('registers the public Maintainer commands in the distributed executable', function () {
+    withinTemporaryProject(function (string $directory): void {
+        $process = new Process([PHP_BINARY, distributedMaintainerExecutable(), 'list', '--raw'], $directory);
+        $process->mustRun();
+
+        $commands = preg_split('/\R/', $process->getOutput(), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $names = array_map(fn (string $line): string => explode(' ', $line, 2)[0], $commands);
+
+        expect($names)->toContain(
+            'maintainer', 'commit', 'config:publish', 'deploy', 'deploy:unlock', 'diff:html',
+            'quality:check', 'quality:fix', 'release:create', 'ssh:key', 'ssh:public',
+        );
+    });
+});
+
 it('loads the bundled defaults when checking a consuming project', function () {
     withinTemporaryProject(function (string $directory): void {
         $process = new Process([
@@ -22,8 +37,7 @@ it('loads the bundled defaults when checking a consuming project', function () {
 it('publishes configuration from the distributed executable in a consuming package', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files): void {
         $files->put($directory.'/composer.json', '{"type":"library"}');
-        $inputAdapter = $directory.'/prompt-input.php';
-        $files->put($inputAdapter, <<<'ADAPTER'
+        $files->put($directory.'/prompt-input.php', <<<'ADAPTER'
             <?php
 
             namespace Illuminate\Console\Concerns;
@@ -40,7 +54,7 @@ it('publishes configuration from the distributed executable in a consuming packa
             ADAPTER);
 
         $process = new Process([
-            PHP_BINARY, '-d', 'auto_prepend_file='.$inputAdapter, distributedMaintainerExecutable(), 'config:publish',
+            PHP_BINARY, '-d', 'auto_prepend_file=./prompt-input.php', distributedMaintainerExecutable(), 'config:publish',
         ], $directory, input: "maintainer,maintainer-secrets,pint,rector,phpstan,pest,deployer\nlaravel-package\nyes\n");
         $process->mustRun();
 
