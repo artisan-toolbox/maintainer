@@ -18,7 +18,7 @@ afterEach(function () {
 it('refuses to overwrite a destination unless explicitly allowed', function () {
     $path = $this->directory.'/deploy.php';
     $this->files->put($path, "custom deployment\n");
-    $publisher = new ConfigurationFilePublisher($this->files);
+    $publisher = new ConfigurationFilePublisher($this->files, templateRoot: dirname(__DIR__, 2).'/resources');
 
     expect(fn () => $publisher->publish(
         PublishableConfiguration::Deployer,

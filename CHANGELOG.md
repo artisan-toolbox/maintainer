@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Resolve bundled configuration paths inside the Maintainer PHAR on Windows.
+- Resolve bundled configuration and publishing template paths inside the Maintainer PHAR on Windows.
 
 ## [1.6.0] - 2026-11-03
 

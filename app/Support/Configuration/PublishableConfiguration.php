@@ -2,6 +2,7 @@
 
 namespace App\Support\Configuration;
 
+use App\Foundation\Application;
 use App\Support\Quality\LaravelProjectType;
 
 use function Illuminate\Filesystem\join_paths;
@@ -83,6 +84,6 @@ enum PublishableConfiguration: string
             ? 'laravel-package'
             : '';
 
-        return join_paths($templateRoot, $directory, $this->filename());
+        return Application::normalizeArchivePath(join_paths($templateRoot, $directory, $this->filename()));
     }
 }

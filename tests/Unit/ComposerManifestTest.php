@@ -1,12 +1,15 @@
 <?php
 
 use App\Foundation\Application;
+use App\Support\Configuration\PublishableConfiguration;
+use App\Support\Quality\LaravelProjectType;
 use ArtisanToolbox\Maintainer\Deployer\GitTagSelector;
 use ArtisanToolbox\Maintainer\Encryption\MaintainerEncrypterFactory;
 use ArtisanToolbox\Maintainer\Maintainer;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPintFix;
 use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+use Illuminate\Container\Container;
 use Illuminate\Filesystem\Filesystem;
 
 function distributedPharInternalPath(string $pharPath, string $entryPath): string
@@ -170,22 +173,29 @@ it('preserves publishable PHP and JSON template formatting in the distributed PH
 
     copy($projectRoot.'/builds/maintainer', $pharPath);
 
+    $previousContainer = Container::getInstance();
+
     try {
         $phar = new Phar($pharPath);
+        $application = new Application;
+        $archiveRoot = 'phar://'.str_replace('/', '\\', $pharPath);
 
         foreach ([
             'config/maintainer.php',
             'config/maintainer_secrets.php',
             'resources/pint.json',
         ] as $template) {
-            $archiveRoot = 'phar://'.str_replace('/', '\\', $pharPath);
-            $entry = new Application()->joinPaths($archiveRoot, $template);
+            $entry = $application->joinPaths($archiveRoot, $template);
 
             expect(file_get_contents($entry))
                 ->toBe($phar[$template]->getContent())
                 ->toBe(file_get_contents($projectRoot.'/'.$template));
         }
+        $template = PublishableConfiguration::Deployer->templatePath($archiveRoot.'/resources', LaravelProjectType::Application);
+
+        expect(file_get_contents($template))->toBe($phar['resources/deploy.php']->getContent());
     } finally {
+        Container::setInstance($previousContainer);
         new Filesystem()->delete([$pharPath, $temporaryFile]);
     }
 });

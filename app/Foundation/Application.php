@@ -8,9 +8,12 @@ final class Application extends LaravelZeroApplication
 {
     public function joinPaths($basePath, $path = ''): string
     {
-        $joined = parent::joinPaths($basePath, $path);
+        return self::normalizeArchivePath(parent::joinPaths($basePath, $path));
+    }
 
-        return str_starts_with($joined, 'phar://') ? str_replace('\\', '/', $joined) : $joined;
+    public static function normalizeArchivePath(string $path): string
+    {
+        return str_starts_with($path, 'phar://') ? str_replace('\\', '/', $path) : $path;
     }
 
     /**
