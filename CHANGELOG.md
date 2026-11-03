@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0] - 2026-11-03
+
+### Fixes
+
+- **Register bundled commands on Windows** (`8226bc2`)
+  Ensures bundled PHAR command discovery/registration works correctly on Windows by explicitly registering the packaged console commands so command-name resolution behaves consistently. This matters because Windows-specific path/module resolution differences can prevent auto-discovered commands from being available, breaking expected CLI behavior. User impact: Windows users running the bundled PHAR will see the expected command set instead of missing commands. Compatibility/migration: no public API changes; this is a behavior correction inside the bundled/packaged command registration logic.
+
+- **Normalize PHAR archive paths and add distributed PHAR tests** (`d638735`)
+  Normalizes PHAR archive paths (notably addressing Windows path separator differences such as backslashes) to ensure PHAR-internal path references resolve reliably. In the same change, adds tests validating distributed PHAR packaging/startup behavior, including a smoke path that checks the bundled defaults load as expected. This matters because incorrect archive path formatting can cause configuration templates or bundled defaults to fail to load, leading to runtime failures on Windows. User impact: improved reliability of PHAR execution—especially for distributed PHAR scenarios—across platforms. Compatibility/migration: aside from improved path robustness, this aligns runtime behavior with intended PHAR layout; consumers relying on non-normalized Windows separators inside phar:// paths should not exist, but if they do, they may now observe normalized path formatting consistent with PHAR requirements.
+
+- **Resolve bundled config paths in maintainer PHAR on Windows** (`7d324d0`)
+  Fixes Windows-specific handling of bundled configuration file paths inside the Maintainer PHAR so that the correct bundled config assets (e.g., configuration and publishing-related templates) are located and used when the PHAR runs. This matters because Windows path resolution differences can cause bundled config lookups to fail, preventing configuration publishing and other maintenance tasks from working. User impact: Windows users will be able to resolve and use the bundled configuration assets inside the Maintainer PHAR, restoring expected CLI functionality. Compatibility/migration: no public API changes; this corrects internal asset path resolution for Windows.
+
 ## Unreleased
 
 ### Fixed
