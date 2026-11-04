@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.9.0] - 2026-11-04
+
+### Features
+
+- **Manage README head via versioned release markers** (`f4cce85`)
+  Introduces a new mechanism for managing the README “head” section using versioned release markers (e.g., MAINTAINER:README_HEAD start/end region markers). Functionally, this shifts README header updates from older badge/link-only approaches to a structured, delimited region that can be reliably replaced during release creation and refreshed via a dedicated flow. User impact is primarily documentation/branding: the README header becomes consistently generated and can include an optional logo, title/description, and a set of badges associated with release/version state. Compatibility/migration: any prior implementation that depended on the old managed badge/header structure should migrate to the new README head management approach, since the header content is now controlled by the marker-delimited region rather than older placeholder anchors/markers.
+
+### Fixes
+
+- **Remove duplicate Packagist badge from maintainer header** (`bdf4c33`)
+  Removes a duplicated Packagist badge from the maintainer header portion of the project’s README. This aligns the maintainer/managed README header with the intended single-badge output, improving readability and preventing inconsistent badge duplication between header sections.
+
+### Documentation
+
+- **Remove duplicate Packagist badge from README** (`fea1313`)
+  Eliminates a duplicated Packagist badge in the repository README. This cleans up the README presentation so only one Packagist badge is shown, avoiding confusion and visual clutter for users viewing the project documentation on GitHub.
+
 ## Unreleased
 
 ### Added

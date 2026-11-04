@@ -5,7 +5,7 @@
 </div>
 
 <p id="maintainer-badges" align="center">
-<a href="https://github.com/artisan-toolbox/maintainer/releases"><img src="https://img.shields.io/badge/version-1.8.0-blue?style=flat-square" alt="version"></a>
+<a href="https://github.com/artisan-toolbox/maintainer/releases"><img src="https://img.shields.io/badge/version-1.9.0-blue?style=flat-square" alt="version"></a>
 <a href="https://packagist.org/packages/artisan-toolbox/maintainer"><img src="https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square" alt="Packagist"></a>
 <a href="https://github.com/artisan-toolbox/maintainer/actions"><img src="https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&amp;label=Tests&amp;style=flat-square" alt="Tests"></a>
 </p>
