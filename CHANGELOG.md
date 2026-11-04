@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add the Maintainer logo and show its icon in the repository README.
+- Add `Head::withLogo()` to render an optional logo above the README title with a configurable display width.
+- Add the `WithReadmeHead` contract and Composer-autoloadable `Head` and `Badge` types for managing a marked README header during release creation.
+- Add `Badge::releaseVersion()` for badges that display the selected release version. Maintainer uses the new header contract for its own README.
+- Add `readme:update` to the Versioning menu to refresh the managed README header outside a release.
+
+### Breaking changes
+
+- Remove `WithReadmeBadgeVersion` and its standalone badge updater. Migrate existing implementations to `WithReadmeHead` and place the new header markers around the content Maintainer should replace.
+
 ## [1.8.0] - 2026-11-04
 
 ### Features

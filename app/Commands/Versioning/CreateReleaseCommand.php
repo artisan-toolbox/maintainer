@@ -17,7 +17,7 @@ use App\Support\Release\ChangelogWriter;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\LatestGitHubRelease;
 use App\Support\Release\PackageJsonVersionWriter;
-use App\Support\Release\ReadmeVersionBadge;
+use App\Support\Release\ReadmeHeadWriter;
 use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
@@ -26,13 +26,11 @@ use App\Support\Release\ReleaseVersionOptions;
 use App\Support\Release\ReleaseVersionSelector;
 use App\Support\Release\ReleaseWorktreeRollback;
 use App\Support\Release\SemanticVersion;
-use App\Support\Release\VersionableClass;
 use App\Support\Release\VersionableImplementation;
 use App\Support\Release\VersionableVersionWriter;
 use App\Support\Release\VersioningLifecycle;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\AfterVersioning;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
-use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Support\Str;
@@ -68,7 +66,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         ConfiguredAiProvider $configuredAiProvider,
         ReleaseVersionRecommender $releaseVersionRecommender,
         VersioningLifecycle $lifecycle,
-        ReadmeVersionBadge $readmeBadge,
+        ReadmeHeadWriter $readmeHeadWriter,
         ReleaseGitRepository $git,
         ReleaseChangeAnalyzer $releaseChangeAnalyzer,
         ReleaseNotesGenerator $releaseNotesGenerator,
@@ -98,7 +96,9 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             }
 
             $major = $releaseBranch->major($projectRoot);
-            $versionableClass = $this->validatedVersionable($versionableImplementation, $semanticVersion, $projectRoot);
+            $versionableClass = $versionableImplementation->findValidated($projectRoot, $semanticVersion);
+            $this->components->twoColumnDetail('Versionable class', $versionableClass->name);
+            $this->components->twoColumnDetail('Current version', $versionableClass->version ?? 'Not declared');
         } catch (RuntimeException $exception) {
             $this->components->error('Unable to complete the initial release validation: '.$exception->getMessage());
 
@@ -214,9 +214,11 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $operation = 'review the GitHub release title';
             $releaseTitle = $titleReviewer->review($selectedVersion, $releaseNotes->title);
 
-            $operation = 'update the README version badge';
-            if ($readmeBadge->update($projectRoot, $versionableClass, $selectedVersion)) {
-                $this->components->twoColumnDetail('README badge', $selectedVersion);
+            $operation = 'update the README header';
+            $readmeHead = $lifecycle->readmeHead($versionableClass);
+
+            if ($readmeHead !== null && $readmeHeadWriter->update($projectRoot, $readmeHead, $selectedVersion)) {
+                $this->components->twoColumnDetail('README header', 'Updated');
             }
 
             $operation = 'write CHANGELOG.md';
@@ -380,37 +382,5 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             Str::limit($summary, 40_000, PHP_EOL.'… additional changelog entries omitted'),
             $changes->commits,
         );
-    }
-
-    private function validatedVersionable(
-        VersionableImplementation $implementation,
-        SemanticVersion $semanticVersion,
-        string $projectRoot,
-    ): VersionableClass {
-        $versionable = $implementation->find($projectRoot);
-
-        if ($versionable === null) {
-            throw new RuntimeException(sprintf(
-                'No class exposed by the production Composer autoloader implements %s.',
-                Versionable::class,
-            ));
-        }
-
-        if ($versionable->hasVersionConstant && $versionable->version === null) {
-            throw new RuntimeException("{$versionable->name} must declare public const string VERSION.");
-        }
-
-        if ($versionable->version !== null && ! $semanticVersion->isValid($versionable->version)) {
-            throw new RuntimeException(sprintf(
-                '%s::VERSION must use MAJOR.MINOR.PATCH with an optional alpha or beta prerelease. Received: %s',
-                $versionable->name,
-                $versionable->version,
-            ));
-        }
-
-        $this->components->twoColumnDetail('Versionable class', $versionable->name);
-        $this->components->twoColumnDetail('Current version', $versionable->version ?? 'Not declared');
-
-        return $versionable;
     }
 }

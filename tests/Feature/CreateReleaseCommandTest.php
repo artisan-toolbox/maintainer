@@ -517,7 +517,7 @@ it('does not ask AI for a release recommendation during a prerelease flow', func
     });
 });
 
-it('runs lifecycle callbacks and maintains the protected README badge', function () {
+it('runs lifecycle callbacks without changing the README when no head is configured', function () {
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
         $files->put($directory.'/src/ProjectVersion.php', <<<'PHP'
 <?php
@@ -527,9 +527,8 @@ namespace Fixture;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\AfterVersioning;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
-use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
 
-final class ProjectVersion implements Versionable, BeforeVersioning, AfterVersioning, WithReadmeBadgeVersion
+final class ProjectVersion implements Versionable, BeforeVersioning, AfterVersioning
 {
     public const string VERSION = '1.0.0';
 
@@ -550,14 +549,52 @@ PHP
         $this->artisan('release:create')
             ->expectsOutputToContain('Before versioning')
             ->expectsOutputToContain('After versioning')
-            ->expectsOutputToContain('README badge')
             ->assertSuccessful();
 
         expect($files->get($directory.'/before-versioning.txt'))->toBe('1.0.0->1.0.1:1.0.1')
             ->and($files->get($directory.'/after-versioning.txt'))->toBe('1.0.0->1.0.1')
-            ->and($files->get($directory.'/README.md'))->toContain(implode("\n", [
-                '[![version](https://img.shields.io/badge/version-1.0.1-blue?style=flat-square)](VERSION "MAINTAINER_VERSION")',
-            ]));
+            ->and($files->get($directory.'/README.md'))->toBe("# Fixture\n\nFixture documentation.\n");
+    });
+});
+
+it('writes the configured README head during release creation', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/src/ProjectVersion.php', <<<'PHP'
+<?php
+
+namespace Fixture;
+
+use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeHead;
+use ArtisanToolbox\Maintainer\Versionable\Readme\Badge;
+use ArtisanToolbox\Maintainer\Versionable\Readme\Head;
+
+final class ReadmeHeadProjectVersion implements Versionable, WithReadmeHead
+{
+    public const string VERSION = '1.0.0';
+
+    public function readmeHead(): Head
+    {
+        return (new Head)
+            ->withTitle('Fixture Package')
+            ->addBadge(Badge::releaseVersion('https://example.com/releases'));
+    }
+}
+PHP
+        );
+        new Process(['git', 'add', 'src/ProjectVersion.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Configure the README head'], $directory)->mustRun();
+        resolve(FakeReleaseVersionSelector::class)->selected = '1.1.0-beta.1';
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('README header')
+            ->assertSuccessful();
+
+        expect($files->get($directory.'/README.md'))
+            ->toContain('<h1>Fixture Package</h1>', 'https://img.shields.io/badge/version-1.1.0--beta.1-blue')
+            ->not->toContain('maintainer-description')
+            ->toEndWith("# Fixture\n\nFixture documentation.\n")
+            ->and(resolve(FakeReleaseGitRepository::class)->staged)->toBeTrue();
     });
 });
 

@@ -9,6 +9,9 @@ use ArtisanToolbox\Maintainer\Maintainer;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPintFix;
 use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeHead;
+use ArtisanToolbox\Maintainer\Versionable\Readme\Badge;
+use ArtisanToolbox\Maintainer\Versionable\Readme\Head;
 use Illuminate\Container\Container;
 use Illuminate\Filesystem\Filesystem;
 
@@ -40,6 +43,7 @@ it('exports only explicit Maintainer integration surfaces to consumers', functio
             'ArtisanToolbox\\Maintainer\\Quality\\Contracts\\' => 'app/Quality/Contracts/',
             'ArtisanToolbox\\Maintainer\\Ssh\\' => 'app/Ssh/',
             'ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\' => 'app/Versionable/Contracts/',
+            'ArtisanToolbox\\Maintainer\\Versionable\\Readme\\' => 'app/Versionable/Readme/',
         ])
         ->and($manifest['autoload']['classmap'])->toBe([
             'app/Maintainer.php',
@@ -53,6 +57,9 @@ it('exports only explicit Maintainer integration surfaces to consumers', functio
         ->and(interface_exists(RunsPintFix::class))->toBeTrue()
         ->and(class_exists(MaintainerSshKeys::class))->toBeTrue()
         ->and(interface_exists(Versionable::class))->toBeTrue()
+        ->and(interface_exists(WithReadmeHead::class))->toBeTrue()
+        ->and(class_exists(Head::class))->toBeTrue()
+        ->and(class_exists(Badge::class))->toBeTrue()
         ->and(function_exists('maintainer_ssh_key'))->toBeTrue()
         ->and(function_exists('maintainer_ssh_public_key'))->toBeTrue()
         ->and($manifest['autoload-dev']['psr-4'])

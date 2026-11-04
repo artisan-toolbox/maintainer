@@ -41,6 +41,7 @@ final class MaintainerCommand extends Command
         'commit' => '1 - New Git commit',
         'diff:html' => '2 - View Git diff',
         'release:create' => '3 - New GitHub release',
+        'readme:update' => '4 - Update README header',
     ];
 
     /**

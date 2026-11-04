@@ -79,6 +79,7 @@ it('groups the available maintenance workflows into sections', function () {
         'commit',
         'diff:html',
         'release:create',
+        'readme:update',
     ])->and(array_keys(maintainerMenuOptions('CONFIGURATION_WORKFLOWS')))->toBe([
         'config:publish',
         'ssh:key',
@@ -139,4 +140,50 @@ it('rejects non-interactive execution and explains how to run a workflow directl
         ->assertFailed();
 
     $this->assertCommandNotCalled('release:create');
+});
+
+it('updates the managed README from the versioning menu without running a release', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/composer.json', '{"autoload":{"psr-4":{"MenuFixture\\\\":"src/"}}}');
+        $files->makeDirectory($directory.'/src');
+        $files->put($directory.'/src/ProjectVersion.php', <<<'PHP'
+            <?php
+
+            namespace MenuFixture;
+
+            use ArtisanToolbox\Maintainer\Versionable\Contracts\Versionable;
+            use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeHead;
+            use ArtisanToolbox\Maintainer\Versionable\Readme\Badge;
+            use ArtisanToolbox\Maintainer\Versionable\Readme\Head;
+
+            final class ProjectVersion implements Versionable, WithReadmeHead
+            {
+                public const string VERSION = '1.2.0-beta.1';
+
+                public function readmeHead(): Head
+                {
+                    return (new Head)->withTitle('Menu Fixture')
+                        ->addBadge(Badge::releaseVersion('https://example.com/releases'));
+                }
+            }
+            PHP);
+        $readme = $directory.'/README.md';
+        $files->put($readme, "## Installation\n\nKeep these instructions.\n");
+
+        $this->artisan('maintainer')
+            ->expectsChoice('What would you like to manage?', 'versioning', maintainerMenuOptions('SECTIONS'))
+            ->expectsChoice('Choose a versioning workflow', 'readme:update', maintainerMenuOptions('VERSIONING_WORKFLOWS'))
+            ->expectsOutputToContain('Updated the README header.')
+            ->assertSuccessful();
+
+        $this->assertCommandCalled('readme:update');
+        $this->assertCommandNotCalled('release:create');
+        expect($files->get($readme))
+            ->toContain('<h1>Menu Fixture</h1>', 'version-1.2.0--beta.1-blue')
+            ->toEndWith("## Installation\n\nKeep these instructions.\n");
+
+        $this->artisan('readme:update', ['--no-interaction' => true])
+            ->expectsOutputToContain('The README header is already up to date.')
+            ->assertSuccessful();
+    });
 });

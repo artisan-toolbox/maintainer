@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Maintainer icon</title>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#20252B"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="13.25" fill="none" stroke="#FFFFFF" stroke-opacity=".16" stroke-width="1.5"/>
+  <g fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 45V20l16 16 16-16v25" stroke="#FFF7EF"/>
+    <path d="m25 29 7 7 16-16" stroke="#FF5947"/>
+  </g>
+</svg>

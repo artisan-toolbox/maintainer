@@ -56,7 +56,8 @@
             "ArtisanToolbox\\Maintainer\\Encryption\\": "app/Encryption/",
             "ArtisanToolbox\\Maintainer\\Quality\\Contracts\\": "app/Quality/Contracts/",
             "ArtisanToolbox\\Maintainer\\Ssh\\": "app/Ssh/",
-            "ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\": "app/Versionable/Contracts/"
+            "ArtisanToolbox\\Maintainer\\Versionable\\Contracts\\": "app/Versionable/Contracts/",
+            "ArtisanToolbox\\Maintainer\\Versionable\\Readme\\": "app/Versionable/Readme/"
         },
         "classmap": [
             "app/Maintainer.php"

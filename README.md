@@ -1,22 +1,25 @@
-<a href="VERSION" title="MAINTAINER_VERSION"><img src="https://img.shields.io/badge/version-1.8.0-blue?style=flat-square" alt="version"></a>
-
-<div align="center">
+<!-- MAINTAINER:README_HEAD:START -->
+<div id="maintainer-title" align="center">
+    <img src="logo/maintainer-icon.svg" alt="" width="88">
     <h1>Maintainer</h1>
 </div>
 
-<p align="center">
-<a href="VERSION" title="MAINTAINER_VERSION"><img src="https://img.shields.io/badge/version-1.7.0-blue?style=flat-square" alt="version"></a>
+<p id="maintainer-badges" align="center">
+<a href="https://github.com/artisan-toolbox/maintainer/releases"><img src="https://img.shields.io/badge/version-1.8.0-blue?style=flat-square" alt="version"></a>
+<a href="https://packagist.org/packages/artisan-toolbox/maintainer"><img src="https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square" alt="Packagist"></a>
 <a href="https://packagist.org/packages/artisan-toolbox/maintainer"><img src="https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square" alt="Packagist"></a>
 <a href="https://github.com/artisan-toolbox/maintainer/actions"><img src="https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&amp;label=Tests&amp;style=flat-square" alt="Tests"></a>
 </p>
 
-<p align="center">
+<p id="maintainer-description" align="center">
     Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.
 </p>
+<!-- MAINTAINER:README_HEAD:END -->
 
 ## Documentation
 
-The complete configuration, command, integration, versioning, and release documentation is available at [artisantoolbox.wsssoftware.com.br/packages/maintainer](https://artisantoolbox.wsssoftware.com.br/packages/maintainer/).
+The complete configuration, command, integration, versioning, and release documentation is available
+at [artisantoolbox.wsssoftware.com.br/packages/maintainer](https://artisantoolbox.wsssoftware.com.br/packages/maintainer/).
 
 ## Installation
 

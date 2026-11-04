@@ -4,6 +4,8 @@ namespace App\Support\Release;
 
 use ArtisanToolbox\Maintainer\Versionable\Contracts\AfterVersioning;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeHead;
+use ArtisanToolbox\Maintainer\Versionable\Readme\Head;
 use RuntimeException;
 
 final class VersioningLifecycle
@@ -32,6 +34,20 @@ final class VersioningLifecycle
         $class::afterVersioning($current, $next);
 
         return true;
+    }
+
+    public function readmeHead(VersionableClass $versionable): ?Head
+    {
+        if (! $versionable->implements(WithReadmeHead::class)) {
+            return null;
+        }
+
+        $this->load($versionable);
+        $class = $versionable->name;
+
+        throw_unless(is_a($class, WithReadmeHead::class, true), RuntimeException::class, "The loaded {$class} does not implement WithReadmeHead.");
+
+        return (new $class)->readmeHead();
     }
 
     private function load(VersionableClass $versionable): void

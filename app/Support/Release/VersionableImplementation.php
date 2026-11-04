@@ -56,6 +56,32 @@ final readonly class VersionableImplementation
         return $invalidImplementation ?? $implementationWithoutVersion;
     }
 
+    public function findValidated(string $projectRoot, SemanticVersion $semanticVersion): VersionableClass
+    {
+        $versionable = $this->find($projectRoot);
+
+        if ($versionable === null) {
+            throw new RuntimeException(sprintf(
+                'No class exposed by the production Composer autoloader implements %s.',
+                Versionable::class,
+            ));
+        }
+
+        if ($versionable->hasVersionConstant && $versionable->version === null) {
+            throw new RuntimeException("{$versionable->name} must declare public const string VERSION.");
+        }
+
+        if ($versionable->version !== null && ! $semanticVersion->isValid($versionable->version)) {
+            throw new RuntimeException(sprintf(
+                '%s::VERSION must use MAJOR.MINOR.PATCH with an optional alpha or beta prerelease. Received: %s',
+                $versionable->name,
+                $versionable->version,
+            ));
+        }
+
+        return $versionable;
+    }
+
     /**
      * @return list<array{SplFileInfo, string|null}>
      */

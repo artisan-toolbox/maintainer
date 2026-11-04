@@ -3,7 +3,7 @@
 use App\Support\Release\VersionableImplementation;
 use ArtisanToolbox\Maintainer\Maintainer;
 use ArtisanToolbox\Maintainer\Versionable\Contracts\BeforeVersioning;
-use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeBadgeVersion;
+use ArtisanToolbox\Maintainer\Versionable\Contracts\WithReadmeHead;
 use Illuminate\Filesystem\Filesystem;
 
 it('discovers Maintainer as its own versionable class', function () {
@@ -13,7 +13,7 @@ it('discovers Maintainer as its own versionable class', function () {
         ->not->toBeNull()
         ->name->toBe(Maintainer::class)
         ->and($versionable->implements(BeforeVersioning::class))->toBeTrue()
-        ->and($versionable->implements(WithReadmeBadgeVersion::class))->toBeTrue();
+        ->and($versionable->implements(WithReadmeHead::class))->toBeTrue();
 });
 
 it('returns the versionable class and its current version', function () {
