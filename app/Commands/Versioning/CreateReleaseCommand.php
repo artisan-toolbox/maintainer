@@ -16,6 +16,7 @@ use App\Support\Quality\QualityCheckPrompt;
 use App\Support\Release\ChangelogWriter;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\LatestGitHubRelease;
+use App\Support\Release\PackageJsonVersionWriter;
 use App\Support\Release\ReadmeVersionBadge;
 use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
@@ -40,6 +41,7 @@ use RuntimeException;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Throwable;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
 
 #[Signature('release:create')]
@@ -62,6 +64,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         LatestGitHubRelease $latestGitHubRelease,
         ReleaseVersionOptions $releaseVersionOptions,
         VersionableVersionWriter $versionWriter,
+        PackageJsonVersionWriter $packageVersionWriter,
         ConfiguredAiProvider $configuredAiProvider,
         ReleaseVersionRecommender $releaseVersionRecommender,
         VersioningLifecycle $lifecycle,
@@ -169,6 +172,12 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $operation = 'write the selected project version';
             $versionWriter->write($versionableClass, $selectedVersion);
             $this->components->twoColumnDetail('Version file', $versionableClass->file);
+
+            $operation = 'update the package.json version';
+            if ($packageVersionWriter->canUpdate($projectRoot) && confirm("Update package.json to {$selectedVersion}?", default: false)) {
+                $packageVersionWriter->write($projectRoot, $selectedVersion);
+                $this->components->twoColumnDetail('package.json version', $selectedVersion);
+            }
 
             if ($versionableClass->implements(BeforeVersioning::class)) {
                 $operation = 'run the before-versioning callback';

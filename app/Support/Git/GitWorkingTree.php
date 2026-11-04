@@ -28,4 +28,11 @@ final class GitWorkingTree
 
         return $process->getOutput() === '';
     }
+
+    public function isTracked(string $projectRoot, string $path): bool
+    {
+        $process = new Process(['git', 'ls-files', '-z', '--', $path], $projectRoot);
+
+        return $process->mustRun()->getOutput() !== '';
+    }
 }

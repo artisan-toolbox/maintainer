@@ -23,6 +23,7 @@ use App\Support\Release\ReleaseVersionSelector;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\TextareaPrompt;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Process\Process;
@@ -466,6 +467,39 @@ it('uses the version selected by the user instead of the suggested default', fun
     });
 });
 
+it('offers to set the root package.json version to the selected release version', function (string $answer, string $expectedVersion) {
+    ConfirmPrompt::fallbackWhen(true);
+
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files) use ($answer, $expectedVersion): void {
+        $manifest = <<<'JSON'
+{
+  "name": "@fixture/client",
+  "version": "0.1.0",
+  "config": {
+    "version": "independent"
+  },
+  "dependencies": {}
+}
+JSON;
+        $path = $directory.'/package.json';
+        $files->put($path, $manifest."\n");
+        new Process(['git', 'add', 'package.json'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add frontend manifest'], $directory)->mustRun();
+        resolve(FakeReleaseVersionSelector::class)->selected = '1.1.0-beta.1';
+
+        $this->artisan('release:create')
+            ->expectsConfirmation('Update package.json to 1.1.0-beta.1?', $answer)
+            ->assertSuccessful();
+
+        expect($files->get($path))->toBe(str_replace('0.1.0', $expectedVersion, $manifest)."\n")
+            ->and($files->get($directory.'/src/ProjectVersion.php'))
+            ->toContain("public const string VERSION = '1.1.0-beta.1';");
+    });
+})->with([
+    'accepted' => ['yes', '1.1.0-beta.1'],
+    'declined' => ['no', '0.1.0'],
+]);
+
 it('does not ask AI for a release recommendation during a prerelease flow', function () {
     withinTemporaryReleaseProject(function (): void {
         resolve(FakeGitHubReleaseSource::class)->releases = ['1.1.0-beta.1'];
@@ -528,7 +562,11 @@ PHP
 });
 
 it('rolls back the complete working tree when the before callback fails', function () {
+    ConfirmPrompt::fallbackWhen(true);
+
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        $manifest = "{\"name\":\"@fixture/client\"}\n";
+        $files->put($directory.'/package.json', $manifest);
         $files->put($directory.'/composer.json', <<<'JSON'
 {
     "autoload": {
@@ -556,7 +594,9 @@ final class ProjectVersion implements Versionable, BeforeVersioning
     {
         file_put_contents(getcwd().'/callback-change.txt', 'rollback me');
 
-        throw new RuntimeException('Preparation failed.');
+        $manifest = json_decode(file_get_contents(getcwd().'/package.json'));
+
+        throw new RuntimeException("Preparation failed for frontend version {$manifest->version}.");
     }
 }
 PHP
@@ -564,13 +604,16 @@ PHP
         new Process(['git', 'add', '--all'], $directory)->mustRun();
         new Process(['git', 'commit', '-m', 'Add failing lifecycle'], $directory)->mustRun();
         app()->instance(ReleaseGitRepository::class, new GitCliReleaseRepository);
+        resolve(FakeReleaseVersionSelector::class)->selected = '1.0.1';
 
         $this->artisan('release:create')
+            ->expectsConfirmation('Update package.json to 1.0.1?', 'yes')
             ->expectsOutputToContain('Rolled back all release changes')
-            ->expectsOutputToContain('Preparation failed.')
+            ->expectsOutputToContain('Preparation failed for frontend version 1.0.1.')
             ->assertFailed();
 
         expect($directory.'/callback-change.txt')->not->toBeFile()
+            ->and($files->get($directory.'/package.json'))->toBe($manifest)
             ->and(new Process(['git', 'status', '--porcelain'], $directory)->mustRun()->getOutput())->toBe('');
     });
 });

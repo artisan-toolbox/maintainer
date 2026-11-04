@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Offer to sync the root `package.json` version with the selected release version before running the before-versioning callback.
+
+### Fixed
+
+- Update README version badges with single-quoted titles in place and remove duplicate badges that previous releases inserted above them.
+
 ## [1.7.0] - 2026-11-03
 
 ### Fixes

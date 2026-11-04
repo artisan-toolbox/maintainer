@@ -31,7 +31,8 @@ final readonly class ReadmeVersionBadge
         $contents = $this->files->get($path);
         $lineEnding = str_contains($contents, "\r\n") ? "\r\n" : "\n";
         $badgeVersion = str_replace('-', '--', $version);
-        $managedBadge = $this->managedBadge($contents);
+        $managedBadges = $this->managedBadges($contents);
+        $managedBadge = array_pop($managedBadges);
         $marker = self::MARKER;
         $badge = $this->usesHtmlBadge($contents, $managedBadge)
             ? "<a href=\"VERSION\" title=\"{$marker}\"><img src=\"https://img.shields.io/badge/version-{$badgeVersion}-blue?style=flat-square\" alt=\"version\"></a>"
@@ -39,6 +40,10 @@ final readonly class ReadmeVersionBadge
 
         if ($managedBadge !== null) {
             $updated = substr_replace($contents, $badge, $managedBadge['offset'], $managedBadge['length']);
+
+            foreach (array_reverse($managedBadges) as $duplicate) {
+                $updated = $this->removeDuplicate($updated, $duplicate['offset'], $duplicate['length']);
+            }
         } elseif (preg_match('/\A# .+\R/', $contents, $heading) === 1) {
             $updated = substr_replace($contents, $heading[0].$lineEnding.$badge.$lineEnding, 0, strlen($heading[0]));
         } else {
@@ -51,28 +56,50 @@ final readonly class ReadmeVersionBadge
     }
 
     /**
-     * @return array{offset: int, length: int}|null
+     * @return list<array{offset: int, length: int}>
      */
-    private function managedBadge(string $contents): ?array
+    private function managedBadges(string $contents): array
     {
         $marker = self::MARKER;
         $url = 'https://img\.shields\.io/badge/version-[^\s"()]+';
+        $title = "(?:\"{$marker}\"|'{$marker}')";
         $patterns = [
-            '~\[!\[version\]\('.$url.'\)\]\(VERSION "'.$marker.'"\)|<a href="VERSION" title="'.$marker.'"><img src="'.$url.'" alt="version"></a>~',
+            '~\[!\[version\]\('.$url.'\)\]\(VERSION[ \t]+'.$title.'\)|<a href="VERSION" title="'.$title.'><img src="'.$url.'" alt="version"></a>~',
             '/'.preg_quote(self::START, '/').'.*?'.preg_quote(self::END, '/').'/s',
         ];
 
         foreach ($patterns as $pattern) {
             preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+            $badges = [];
 
             foreach ($matches[0] as [$badge, $offset]) {
                 if (! $this->insideMarkdownFence($contents, $offset)) {
-                    return ['offset' => $offset, 'length' => strlen($badge)];
+                    $badges[] = ['offset' => $offset, 'length' => strlen($badge)];
                 }
+            }
+
+            if ($badges !== []) {
+                return $badges;
             }
         }
 
-        return null;
+        return [];
+    }
+
+    private function removeDuplicate(string $contents, int $offset, int $length): string
+    {
+        $before = substr($contents, 0, $offset);
+        $after = substr($contents, $offset + $length);
+
+        if (($before === '' || str_ends_with($before, "\n")) && preg_match('/\A[ \t]*\r?\n/', $after, $lineEnding) === 1) {
+            $after = substr($after, strlen($lineEnding[0]));
+
+            if ($before === '' || preg_match('/(?:\A|\n)[ \t]*\r?\n\z/', $before) === 1) {
+                $after = preg_replace('/\A[ \t]*\r?\n/', '', $after) ?? $after;
+            }
+        }
+
+        return $before.$after;
     }
 
     /**

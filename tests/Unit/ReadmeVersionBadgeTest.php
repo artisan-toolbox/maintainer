@@ -33,6 +33,28 @@ it('inserts and replaces a single-line README version badge', function () {
     }
 });
 
+it('updates the original single-quoted version badge beside the other badges', function (string $duplicate) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($duplicate) {
+        $readme = $directory.'/README.md';
+        $heading = "# Example\n\n";
+        $badges = "[![codecov](coverage.svg)](coverage)\n[![tests](tests.svg)](tests)\n";
+        $original = "[![version](https://img.shields.io/badge/version-1.63.0-blue?style=flat-square)](VERSION 'MAINTAINER_VERSION')";
+        $updated = '[![version](https://img.shields.io/badge/version-1.65.0-blue?style=flat-square)](VERSION "MAINTAINER_VERSION")';
+        $files->put($readme, $heading.$duplicate.$badges.$original."\n");
+        $versionable = new VersionableClass('Example\\Version', $directory.'/Version.php', true, '1.64.0', [WithReadmeBadgeVersion::class]);
+        $badge = new ReadmeVersionBadge($files);
+
+        $badge->update($directory, $versionable, '1.65.0');
+        expect($files->get($readme))->toBe($heading.$badges.$updated."\n");
+
+        $badge->update($directory, $versionable, '1.65.0');
+        expect($files->get($readme))->toBe($heading.$badges.$updated."\n");
+    });
+})->with([
+    'original badge only' => [''],
+    'with a duplicate above the badge row' => ["[![version](https://img.shields.io/badge/version-1.64.0-blue?style=flat-square)](VERSION \"MAINTAINER_VERSION\")\n\n"],
+]);
+
 it('uses HTML when the README already uses HTML badges', function () {
     $files = new Filesystem;
     $directory = temporaryTestDirectory('maintainer-html-badge-');
