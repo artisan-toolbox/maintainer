@@ -21,6 +21,7 @@
 
 ### Added
 
+- Support multiple centered README description paragraphs with inline Markdown and `Head::appendDescriptionLine()`.
 - Add the Maintainer logo and show its icon in the repository README.
 - Add `Head::withLogo()` to render an optional logo above the README title with a configurable display width.
 - Add the `WithReadmeHead` contract and Composer-autoloadable `Head` and `Badge` types for managing a marked README header during release creation.

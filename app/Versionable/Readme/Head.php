@@ -13,7 +13,8 @@ final class Head
 
     private ?string $title = null;
 
-    private ?string $description = null;
+    /** @var list<string> */
+    private array $descriptionLines = [];
 
     /** @var list<Badge> */
     private array $badges = [];
@@ -36,9 +37,17 @@ final class Head
         return $this;
     }
 
-    public function withDescription(?string $description): self
+    /** @param string|array<array-key, string>|null $description */
+    public function withDescription(string|array|null $description): self
     {
-        $this->description = $description;
+        $this->descriptionLines = array_values((array) $description);
+
+        return $this;
+    }
+
+    public function appendDescriptionLine(string $line): self
+    {
+        $this->descriptionLines[] = $line;
 
         return $this;
     }
@@ -63,7 +72,13 @@ final class Head
 
     public function description(): ?string
     {
-        return $this->description;
+        return $this->descriptionLines === [] ? null : implode("\n\n", $this->descriptionLines);
+    }
+
+    /** @return list<string> */
+    public function descriptionLines(): array
+    {
+        return $this->descriptionLines;
     }
 
     /** @return list<Badge> */

@@ -5,6 +5,7 @@ namespace App\Support\Release;
 use ArtisanToolbox\Maintainer\Versionable\Readme\Badge;
 use ArtisanToolbox\Maintainer\Versionable\Readme\Head;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 use function Illuminate\Filesystem\join_paths;
@@ -68,7 +69,6 @@ final readonly class ReadmeHeadWriter
         $sections = [];
         $logo = $head->logo();
         $title = $head->title();
-        $description = $head->description();
         $badges = $head->badges();
 
         $heading = [];
@@ -101,10 +101,21 @@ final readonly class ReadmeHeadWriter
             ]);
         }
 
-        if ($description !== null && trim($description) !== '') {
+        $descriptionLines = array_values(array_filter(
+            $head->descriptionLines(),
+            static fn (string $line): bool => trim($line) !== '',
+        ));
+
+        foreach ($descriptionLines as $index => $line) {
+            $id = $index === 0 ? ' id="maintainer-description"' : '';
+            $html = Str::inlineMarkdown($line, [
+                'html_input' => 'escape',
+                'allow_unsafe_links' => false,
+            ]);
+
             $sections[] = implode($lineEnding, [
-                '<p id="maintainer-description" align="center">',
-                '    '.$this->escape($description),
+                "<p{$id} align=\"center\">",
+                '    '.preg_replace('/[ \t]*\r?\n[ \t\r\n]*/', ' ', rtrim($html, "\n")),
                 '</p>',
             ]);
         }

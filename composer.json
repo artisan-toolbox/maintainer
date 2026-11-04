@@ -41,6 +41,7 @@
         "laravel/ai": "^v0.10.3",
         "laravel/pint": "^1.30.4",
         "laravel/prompts": "^0.3.22",
+        "league/commonmark": "^2.7",
         "mockery/mockery": "^1.6.12",
         "nikic/php-parser": "^5.8",
         "pestphp/pest": "^5.0.3",

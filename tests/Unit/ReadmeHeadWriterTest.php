@@ -4,6 +4,7 @@ use App\Support\Release\ReadmeHeadWriter;
 use ArtisanToolbox\Maintainer\Versionable\Readme\Badge;
 use ArtisanToolbox\Maintainer\Versionable\Readme\Head;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
 
 it('prepends the centered header and renders badges in insertion order', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files): void {
@@ -44,6 +45,49 @@ Keep these instructions.
 
 HTML)
             ->and($writer->update($directory, $head, null))->toBeFalse();
+    });
+});
+
+it('renders description lines as centered paragraphs with inline Markdown', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files): void {
+        $readme = $directory.'/README.md';
+        $files->put($readme, "# Example\n");
+        $writer = new ReadmeHeadWriter($files);
+        $head = (new Head)->withDescription('Old description');
+
+        expect($head->description())->toBe('Old description')
+            ->and($head->withDescription([' ', 'Use **Laravel** and `artisan`.']))->toBe($head)
+            ->and($head->appendDescriptionLine('Read the [guide](https://example.com).'))->toBe($head)
+            ->and($writer->update($directory, $head, null))->toBeTrue()
+            ->and($files->get($readme))->toContain(<<<'HTML'
+<p id="maintainer-description" align="center">
+    Use <strong>Laravel</strong> and <code>artisan</code>.
+</p>
+
+<p align="center">
+    Read the <a href="https://example.com">guide</a>.
+</p>
+HTML)
+            ->not->toContain('Old description')
+            ->and($writer->update($directory, $head, null))->toBeFalse();
+
+        $head->withDescription(null);
+
+        expect($head->description())->toBeNull()
+            ->and($writer->update($directory, $head, null))->toBeTrue()
+            ->and($files->get($readme))->not->toContain('<p');
+    });
+});
+
+it('keeps Markdown block syntax inside the description paragraph after a blank line', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files): void {
+        $readme = $directory.'/README.md';
+        $files->put($readme, "# Example\r\n");
+        $head = (new Head)->withDescription("Line one.\r\n\r\n# Line two.");
+
+        expect(new ReadmeHeadWriter($files)->update($directory, $head, null))->toBeTrue()
+            ->and(Str::markdown($files->get($readme)))->toContain('Line one. # Line two.')
+            ->not->toContain('<h1>Line two.</h1>');
     });
 });
 
