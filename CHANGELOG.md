@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.8.0] - 2026-11-04
+
+### Features
+
+- **Optionally sync package.json version during release creation** (`744cd94`)
+  When running the frontend release creation command, the release workflow can now optionally update the root `package.json` `version` to match the selected release version.
+
+Implementation changes:
+- Introduced `App\Support\Release\PackageJsonVersionWriter` to safely update `package.json`.
+- Added `GitWorkingTree::isTracked()` to verify `package.json` is tracked by git before attempting an update.
+- Updated `app/Commands/Versioning/CreateReleaseCommand.php` to prompt the user: “Update package.json to {$selectedVersion}?”. The prompt defaults to `false` and the update only proceeds when `canUpdate($projectRoot)` allows it.
+- Enhanced release-side README version badge handling to better deal with multiple existing managed badges (replace the last match and remove duplicates).
+- Updated maintainer version constant to `1.8.0`.
+
+Why it matters / user impact:
+- Keeps the frontend `package.json` version aligned with the selected release version, but does so interactively to prevent unintended version changes.
+- Prevents updates in situations where the repo layout is unsuitable (missing, symlinked, or untracked `package.json`).
+- Improves README version badge correctness by avoiding duplicate version badges and supporting mixed badge formats.
+
+Compatibility and migration:
+- Behavior change: `release:create` may modify `package.json` version when the user confirms and the update writer determines it is safe; otherwise no change occurs.
+- If a README contains multiple managed version badges, only the last matching one is updated and earlier duplicates are removed. No user action is required beyond reviewing README changes if duplicates existed.
+
+Testing coverage:
+- Extended feature tests to validate the new confirmation prompt, `package.json` and `src/ProjectVersion.php` updates on confirmation, and improved failure messaging/rollback behavior (including ensuring the repository remains clean and `package.json` is unchanged when preparation fails).
+
 ## Unreleased
 
 ### Added

@@ -1,3 +1,5 @@
+<a href="VERSION" title="MAINTAINER_VERSION"><img src="https://img.shields.io/badge/version-1.8.0-blue?style=flat-square" alt="version"></a>
+
 <div align="center">
     <h1>Maintainer</h1>
 </div>
