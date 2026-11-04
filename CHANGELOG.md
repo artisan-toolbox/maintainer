@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0] - 2026-11-04
+
+### Features
+
+- **Support multiple centered README description paragraphs** (`5df28c8`)
+  Updated the README head rendering to support multiple centered description paragraphs instead of a single description string. The change documents the new capability via the “Added” section and implements it by introducing a multi-line description API on the README head model and teaching the README head writer how to render each paragraph as its own centered `<p>` block. Functionally, inline Markdown is converted per line (escaping HTML while allowing safe link handling), whitespace is normalized, and only the first paragraph retains `id="maintainer-description"` while subsequent paragraphs are rendered without that ID. This matters for users who want richer, paragraph-based centered descriptions in generated README output. Compatibility impact: assumes/introduces a `descriptionLines()` accessor and changes behavior from the previous single-`description` handling; callers relying on the old `withDescription(?string)` semantics or expecting a single description string (rather than paragraph joining with `"\n\n"`) will need to update to the new multi-line model (including using string arrays or `appendDescriptionLine()`). The writer update also removes the previous single-description HTML escaping path in favor of per-line inline Markdown conversion, which may affect exact output formatting compared to earlier versions.
+
 ## [1.9.0] - 2026-11-04
 
 ### Features
