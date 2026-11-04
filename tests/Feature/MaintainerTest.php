@@ -2,6 +2,7 @@
 
 use App\Support\Release\ReadmeHeadWriter;
 use ArtisanToolbox\Maintainer\Maintainer;
+use ArtisanToolbox\Maintainer\Versionable\Readme\Badge;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Process;
@@ -20,7 +21,7 @@ it('builds the Maintainer executable before versioning itself', function () {
     ] && $process->path === $projectRoot && $process->timeout === null);
 });
 
-it('manages its own README header with the selected version', function () {
+it('keeps its README badges tied to the published release', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files): void {
         $readme = $directory.'/README.md';
         $contents = $files->get(dirname(__DIR__, 2).'/README.md');
@@ -29,11 +30,15 @@ it('manages its own README header with the selected version', function () {
         $head = (new Maintainer)->readmeHead();
 
         expect($writer->update($directory, $head, Maintainer::VERSION))->toBeFalse()
-            ->and($writer->update($directory, $head, '2.0.0-beta.1'))->toBeTrue()
-            ->and($files->get($readme))->toBe(str_replace(
-                'version-'.Maintainer::VERSION.'-blue',
-                'version-2.0.0--beta.1-blue',
-                $contents,
-            ));
+            ->and($writer->update($directory, $head, '2.0.0-beta.1'))->toBeFalse()
+            ->and($files->get($readme))->toBe($contents)
+            ->and(array_map(static fn (Badge $badge): array => [
+                $badge->imgAlt(), $badge->link(), $badge->imgSrc(),
+            ], $head->badges()))->toBe([
+                ['Release', 'https://github.com/artisan-toolbox/maintainer/releases', 'https://img.shields.io/github/v/release/artisan-toolbox/maintainer?label=Release&style=flat-square'],
+                ['PHP', 'https://artisantoolbox.wsssoftware.com.br/packages/maintainer/#requirements', 'https://img.shields.io/badge/PHP-%5E8.5-777BB4?style=flat-square'],
+                ['Tests', 'https://github.com/artisan-toolbox/maintainer/actions/workflows/tests.yml?query=branch%3A1.x', 'https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&label=Tests&style=flat-square'],
+                ['Docs', 'https://artisantoolbox.wsssoftware.com.br/packages/maintainer/', 'https://img.shields.io/badge/Docs-Read-blue?style=flat-square'],
+            ]);
     });
 });

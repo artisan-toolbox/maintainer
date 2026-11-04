@@ -29,16 +29,25 @@ final class Maintainer implements BeforeVersioning, Versionable, WithReadmeHead
             ->withLogo(src: 'logo/maintainer-icon.svg', alt: '', width: 88)
             ->withTitle('Maintainer')
             ->withDescription('Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.')
-            ->addBadge(Badge::releaseVersion('https://github.com/artisan-toolbox/maintainer/releases'))
             ->addBadge(Badge::make(
-                link: 'https://packagist.org/packages/artisan-toolbox/maintainer',
-                imgSrc: 'https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square',
-                imgAlt: 'Packagist',
+                link: 'https://github.com/artisan-toolbox/maintainer/releases',
+                imgSrc: 'https://img.shields.io/github/v/release/artisan-toolbox/maintainer?label=Release&style=flat-square',
+                imgAlt: 'Release',
             ))
             ->addBadge(Badge::make(
-                link: 'https://github.com/artisan-toolbox/maintainer/actions',
+                link: 'https://artisantoolbox.wsssoftware.com.br/packages/maintainer/#requirements',
+                imgSrc: 'https://img.shields.io/badge/PHP-%5E8.5-777BB4?style=flat-square',
+                imgAlt: 'PHP',
+            ))
+            ->addBadge(Badge::make(
+                link: 'https://github.com/artisan-toolbox/maintainer/actions/workflows/tests.yml?query=branch%3A1.x',
                 imgSrc: 'https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&label=Tests&style=flat-square',
                 imgAlt: 'Tests',
+            ))
+            ->addBadge(Badge::make(
+                link: 'https://artisantoolbox.wsssoftware.com.br/packages/maintainer/',
+                imgSrc: 'https://img.shields.io/badge/Docs-Read-blue?style=flat-square',
+                imgAlt: 'Docs',
             ));
     }
 }
