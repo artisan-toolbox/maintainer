@@ -36,11 +36,6 @@ final class Maintainer implements BeforeVersioning, Versionable, WithReadmeHead
                 imgAlt: 'Packagist',
             ))
             ->addBadge(Badge::make(
-                link: 'https://packagist.org/packages/artisan-toolbox/maintainer',
-                imgSrc: 'https://img.shields.io/packagist/v/artisan-toolbox/maintainer.svg?style=flat-square',
-                imgAlt: 'Packagist',
-            ))
-            ->addBadge(Badge::make(
                 link: 'https://github.com/artisan-toolbox/maintainer/actions',
                 imgSrc: 'https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&label=Tests&style=flat-square',
                 imgAlt: 'Tests',
