@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- Search the interactive `deploy:run` task selector by name or description without matching letter case. Display up to ten tasks at once, with automatic height adjustment for smaller terminals.
+
 ## [1.11.0] - 2026-11-06
 
 ### Features

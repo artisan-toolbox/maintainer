@@ -7,10 +7,11 @@ use App\Support\Deployer\DeployerRunner;
 use App\Support\ProjectPath;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
+use Laravel\Prompts\SearchPrompt;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 
-use function Laravel\Prompts\select;
+use function Laravel\Prompts\search;
 use function Laravel\Prompts\spin;
 
 #[Signature('deploy:run {task? : Declared Deployer task to run} {selector?* : Host selectors and custom task options after --} {--file= : Alternative Deployer recipe path} {--tag= : Git tag to deploy} {--revision= : Git revision to deploy} {--branch= : Git branch to deploy} {--option=* : Override a Deployer configuration option} {--limit= : Maximum number of hosts running tasks in parallel} {--no-hooks : Run without Deployer hooks} {--plan : Display the task plan without executing it} {--start-from= : Start execution from a specific task} {--log= : Write the Deployer log to a file} {--profile= : Write the Deployer profile to a file}')]
@@ -54,7 +55,22 @@ final class DeployRunCommand extends Command
                     $choices["task:{$definition->name}"] = $definition->description === '' ? $definition->name : "{$definition->name} - {$definition->description}";
                 }
 
-                $selection = select('Which Deployer task should run?', $choices);
+                $selection = search(
+                    label: 'Which Deployer task should run?',
+                    options: static function (?string $search) use ($choices): array {
+                        $matches = array_filter(
+                            $choices,
+                            static fn (string $label): bool => str_contains(strtolower($label), strtolower($search ?? '')),
+                        );
+
+                        throw_if($matches === [] && SearchPrompt::shouldFallback(), RuntimeException::class, 'No Deployer tasks match the search. Run the command again with a broader search or leave it empty.');
+
+                        return $matches;
+                    },
+                    placeholder: 'Search tasks by name or description',
+                    scroll: 10,
+                    hint: 'Use the arrow keys to choose a task, then press Enter.',
+                );
                 throw_unless(is_string($selection), RuntimeException::class, 'The selected Deployer task is invalid.');
                 $task = substr($selection, strlen('task:'));
             }

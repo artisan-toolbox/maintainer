@@ -6,6 +6,8 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Crypt;
 use Laravel\Prompts\ConfirmPrompt;
+use Laravel\Prompts\Key;
+use Laravel\Prompts\SearchPrompt;
 use Laravel\Prompts\SelectPrompt;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
@@ -106,7 +108,7 @@ it('discovers visible recipe tasks and excludes hidden and built-in commands', f
         installTaskDeployerBinary($directory, $files);
 
         $this->artisan('deploy:run', ['--file' => 'ops/deploy.php', '--plan' => true])
-            ->expectsChoice('Which Deployer task should run?', 'task:server:apt:update', [
+            ->expectsSearch('Which Deployer task should run?', 'task:server:apt:update', '', [
                 'task:deploy' => 'deploy',
                 'task:server:apt:update' => 'server:apt:update - Refresh package lists',
             ])
@@ -117,6 +119,91 @@ it('discovers visible recipe tasks and excludes hidden and built-in commands', f
             ['--file=ops/deploy.php', 'list', '--format=json', '--no-ansi', '--no-interaction'],
             ['--file=ops/deploy.php', 'server:apt:update', '--plan'],
         ]);
+    });
+});
+
+it('lists all tasks when a fallback terminal returns a null search', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:run')
+            ->expectsSearch('Which Deployer task should run?', 'task:deploy', null, [
+                'task:deploy' => 'deploy',
+                'task:server:apt:update' => 'server:apt:update - Refresh package lists',
+            ])
+            ->assertSuccessful();
+
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['deploy']);
+    });
+});
+
+it('reports an unmatched fallback search without executing a task', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:run')
+            ->expectsQuestion('Which Deployer task should run?', 'missing')
+            ->expectsOutputToContain('No Deployer tasks match the search. Run the command again with a broader search or leave it empty.')
+            ->assertFailed();
+
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
+    });
+});
+
+it('searches task names and descriptions before running the selected task', function (array $keys, string $task) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($keys, $task) {
+        installTaskDeployerBinary($directory, $files, json_encode(['commands' => [
+            deployerTaskFixture('alpha'),
+            deployerTaskFixture('deploy'),
+            deployerTaskFixture('server:apt:update', 'Refresh package lists'),
+            deployerTaskFixture('0', 'Numeric task'),
+        ]], JSON_THROW_ON_ERROR));
+        $this->app->resolving(DeployerRunner::class, static function () use ($keys): void {
+            SearchPrompt::flushState();
+            SearchPrompt::fake($keys);
+        });
+
+        $this->artisan('deploy:run')->assertSuccessful()->run();
+
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe([$task]);
+    });
+})->with([
+    'case-insensitive task name' => [['APT:UP', Key::DOWN, Key::ENTER], 'server:apt:update'],
+    'case-insensitive description' => [['PACKAGE LISTS', Key::DOWN, Key::ENTER], 'server:apt:update'],
+    'numeric identity' => [['NUMERIC', Key::DOWN, Key::ENTER], '0'],
+    'cleared query restores all tasks' => [['apt', Key::BACKSPACE, Key::BACKSPACE, Key::BACKSPACE, Key::DOWN, Key::DOWN, Key::ENTER], 'alpha'],
+]);
+
+it('keeps searching after an unmatched query until a task is selected', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $this->app->resolving(DeployerRunner::class, static function (): void {
+            SearchPrompt::flushState();
+            SearchPrompt::fake(['missing', Key::DOWN, Key::ENTER, ...array_fill(0, 7, Key::BACKSPACE), 'apt', Key::DOWN, Key::ENTER]);
+        });
+
+        $this->artisan('deploy:run')->assertSuccessful()->run();
+
+        SearchPrompt::assertStrippedOutputContains('No results.');
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['server:apt:update']);
+    });
+});
+
+it('shows ten available tasks before scrolling', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        $tasks = array_map(fn (int $number): array => deployerTaskFixture(sprintf('task:%02d', $number)), range(1, 12));
+        installTaskDeployerBinary($directory, $files, json_encode(['commands' => $tasks], JSON_THROW_ON_ERROR));
+        $this->app->resolving(DeployerRunner::class, static function (): void {
+            SearchPrompt::flushState();
+            SearchPrompt::fake([Key::DOWN, Key::ENTER]);
+        });
+
+        $this->artisan('deploy:run')->assertSuccessful()->run();
+
+        foreach (range(1, 10) as $number) {
+            SearchPrompt::assertStrippedOutputContains(sprintf('task:%02d', $number));
+        }
+
+        SearchPrompt::assertStrippedOutputDoesntContain('task:11');
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['task:01']);
     });
 });
 
@@ -595,7 +682,7 @@ it('selects numeric task names without confusing option keys with labels', funct
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         installTaskDeployerBinary($directory, $files, json_encode(['commands' => [deployerTaskFixture('0', 'Numeric task')]], JSON_THROW_ON_ERROR));
         $this->artisan('deploy:run')
-            ->expectsChoice('Which Deployer task should run?', 'task:0', ['task:0' => '0 - Numeric task'])
+            ->expectsSearch('Which Deployer task should run?', 'task:0', '', ['task:0' => '0 - Numeric task'])
             ->assertSuccessful();
         expect(taskDeployerInvocations($directory, $files)[1])->toBe(['0']);
     });
