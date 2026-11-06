@@ -2,6 +2,7 @@
 
 use App\Support\Git\GitPushRepository;
 use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\Process;
 use Tests\Support\GitPushFixture;
 
 beforeEach(function () {
@@ -113,7 +114,10 @@ it('rejects a remote rewind that happens after review and before the push connec
     require AUTOLOAD_PATH;
     $arguments = array_slice($argv, 1);
     if (in_array('push', $arguments, true)) {
+        $before = trim((new Symfony\Component\Process\Process([REAL_GIT, '--git-dir='.REMOTE_PATH, 'rev-parse', 'refs/heads/main']))->mustRun()->getOutput());
         (new Symfony\Component\Process\Process([REAL_GIT, '--git-dir='.REMOTE_PATH, 'update-ref', 'refs/heads/main', ORIGINAL_TIP]))->mustRun();
+        $after = trim((new Symfony\Component\Process\Process([REAL_GIT, '--git-dir='.REMOTE_PATH, 'rev-parse', 'refs/heads/main']))->mustRun()->getOutput());
+        file_put_contents(RACE_PATH, json_encode(['before' => $before, 'after' => $after], JSON_THROW_ON_ERROR));
     }
     exit((new Symfony\Component\Process\Process([REAL_GIT, ...$arguments]))->run(static function (string $type, string $buffer): void {
         fwrite($type === 'err' ? STDERR : STDOUT, $buffer);
@@ -124,6 +128,7 @@ it('rejects a remote rewind that happens after review and before the push connec
         'REAL_GIT' => var_export($realGit, true),
         'REMOTE_PATH' => var_export($fixture->remote, true),
         'ORIGINAL_TIP' => var_export($original, true),
+        'RACE_PATH' => var_export($fixture->directory.'/race.json', true),
     ]);
     file_put_contents($wrapperDirectory.'/git.php', $wrapper);
 
@@ -134,16 +139,34 @@ it('rejects a remote rewind that happens after review and before the push connec
         chmod($wrapperDirectory.'/git', 0755);
     }
 
-    $originalPath = getenv('PATH');
-    putenv('PATH='.$wrapperDirectory.PATH_SEPARATOR.$originalPath);
-
+    $runner = <<<'PHP'
+    <?php
+    require AUTOLOAD_PATH;
+    $reviewed = new App\Support\Git\PendingGitPush(...json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR));
     try {
-        expect(fn () => $this->repository->push($fixture->local, $push))->toThrow(RuntimeException::class);
-    } finally {
-        $originalPath === false ? putenv('PATH') : putenv('PATH='.$originalPath);
+        (new App\Support\Git\GitPushRepository)->push(getcwd(), $reviewed);
+        echo json_encode(['exception' => null]);
+    } catch (\RuntimeException $exception) {
+        echo json_encode(['exception' => $exception::class, 'message' => $exception->getMessage()]);
+    }
+    PHP;
+    file_put_contents($wrapperDirectory.'/runner.php', str_replace('AUTOLOAD_PATH', var_export(dirname(__DIR__, 2).'/vendor/autoload.php', true), $runner));
+    file_put_contents($fixture->directory.'/review.json', json_encode($push, JSON_THROW_ON_ERROR));
+    $environment = ['PATH' => $wrapperDirectory.PATH_SEPARATOR.getenv('PATH')];
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        $environment['PATHEXT'] = '.BAT;.CMD;.EXE;.COM';
     }
 
-    expect($fixture->git(['rev-parse', 'main'], $fixture->remote))->toBe($original);
+    $process = new Process([PHP_BINARY, $wrapperDirectory.'/runner.php', $fixture->directory.'/review.json'], $fixture->local, $environment);
+    $process->mustRun();
+    $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect(json_decode(file_get_contents($fixture->directory.'/race.json'), true, flags: JSON_THROW_ON_ERROR))->toBe([
+        'before' => $push->remoteTip,
+        'after' => $original,
+    ])->and($result['exception'])->toBe(RuntimeException::class)
+        ->and($fixture->git(['rev-parse', 'main'], $fixture->remote))->toBe($original);
 });
 
 it('detects divergence from actual remote state even when tracking refs are stale', function () {

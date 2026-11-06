@@ -79,15 +79,34 @@ it('quotes PM2 paths and namespaces as individual shell arguments', function () 
 
 it('rejects executable paths that PM2 would interpret as a numeric deletion target', function () {
     $packageRoot = dirname(__DIR__, 3);
-    $processes = [
-        ['pm_id' => 0, 'name' => 'owned'],
-        ['pm_id' => 1, 'name' => 'foreign', 'pm2_env' => ['namespace' => 'other', 'pm_exec_path' => realpath($this->directory).'/release/0']],
+    $pm2 = installFakePm2Binary($this->directory, $this->files, '[]');
+    $ecosystem = <<<'JS_WRAP'
+    const fs = require('fs');
+    const path = require('path');
+    const cwd = process.cwd();
+    const processes = [
+        {pm_id: 0, name: 'owned'},
+        {pm_id: 1, name: 'foreign', pm2_env: {namespace: 'other', pm_exec_path: cwd + '/0'}},
     ];
-    $pm2 = installFakePm2Binary($this->directory, $this->files, json_encode($processes, JSON_THROW_ON_ERROR));
-    $recipe = installPm2TaskRecipe($this->directory, $this->files, $packageRoot.'/app/Deployer/contrib.php', $pm2);
+    fs.writeFileSync(path.join(__dirname, '..', 'processes.json'), JSON.stringify(processes));
+    fs.writeFileSync(path.join(__dirname, '..', 'node-cwd.json'), JSON.stringify({cwd, processes}));
+    module.exports = {apps: []};
+    JS_WRAP;
+    $recipe = installPm2TaskRecipe($this->directory, $this->files, $packageRoot.'/app/Deployer/contrib.php', $pm2, ecosystem: $ecosystem);
     $process = runPm2TaskRecipe($packageRoot, $this->directory, $recipe);
+    $fixture = $this->files->json($this->directory.'/node-cwd.json');
+    $diagnostics = json_encode([
+        'phpReleasePath' => realpath($this->directory.'/release'),
+        'nodeCwd' => $fixture['cwd'],
+        'output' => $process->getOutput().$process->getErrorOutput(),
+    ], JSON_THROW_ON_ERROR);
 
-    expect($process->isSuccessful())->toBeFalse()
+    expect($fixture['processes'])->toBe([
+        ['pm_id' => 0, 'name' => 'owned'],
+        ['pm_id' => 1, 'name' => 'foreign', 'pm2_env' => ['namespace' => 'other', 'pm_exec_path' => $fixture['cwd'].'/0']],
+    ])
+        ->and($process->isSuccessful())->toBeFalse($diagnostics)
         ->and($process->getOutput())->toContain('an executable path resolves to it')
+        ->and($this->files->json($this->directory.'/processes.json'))->toBe($fixture['processes'])
         ->and(trim($this->files->get($this->directory.'/pm2.log')))->toBe('jlist');
 });
