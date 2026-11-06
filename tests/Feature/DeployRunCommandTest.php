@@ -17,6 +17,17 @@ beforeEach(function () {
     SelectPrompt::fallbackWhen(true);
 });
 
+dataset('supported task search prompts', function (): array {
+    $modes = ['fallback prompts' => false];
+
+    // Laravel Prompts rejects native Windows input even when its terminal is faked.
+    if (! windows_os()) {
+        $modes['native prompts'] = true;
+    }
+
+    return $modes;
+});
+
 function deployerTaskFixture(string $name, string $description = '', bool $hidden = false): array
 {
     $options = [];
@@ -148,64 +159,109 @@ it('reports an unmatched fallback search without executing a task', function () 
     });
 });
 
-it('searches task names and descriptions before running the selected task', function (array $keys, string $task) {
-    withinTemporaryProject(function (string $directory, Filesystem $files) use ($keys, $task) {
+it('searches task names and descriptions before running the selected task', function (array $keys, string $query, array $matches, string $task, bool $native) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($keys, $query, $matches, $task, $native) {
         installTaskDeployerBinary($directory, $files, json_encode(['commands' => [
             deployerTaskFixture('alpha'),
             deployerTaskFixture('deploy'),
             deployerTaskFixture('server:apt:update', 'Refresh package lists'),
             deployerTaskFixture('0', 'Numeric task'),
         ]], JSON_THROW_ON_ERROR));
-        $this->app->resolving(DeployerRunner::class, static function () use ($keys): void {
-            SearchPrompt::flushState();
-            SearchPrompt::fake($keys);
-        });
+        if ($native) {
+            $this->app->resolving(DeployerRunner::class, static function () use ($keys): void {
+                SearchPrompt::flushState();
+                SearchPrompt::fake($keys);
+            });
 
-        $this->artisan('deploy:run')->assertSuccessful()->run();
+            $this->artisan('deploy:run')->assertSuccessful()->run();
+        } else {
+            $this->artisan('deploy:run')
+                ->expectsSearch('Which Deployer task should run?', 'task:'.$task, $query, $matches)
+                ->assertSuccessful();
+        }
 
         expect(taskDeployerInvocations($directory, $files)[1])->toBe([$task]);
     });
 })->with([
-    'case-insensitive task name' => [['APT:UP', Key::DOWN, Key::ENTER], 'server:apt:update'],
-    'case-insensitive description' => [['PACKAGE LISTS', Key::DOWN, Key::ENTER], 'server:apt:update'],
-    'numeric identity' => [['NUMERIC', Key::DOWN, Key::ENTER], '0'],
-    'cleared query restores all tasks' => [['apt', Key::BACKSPACE, Key::BACKSPACE, Key::BACKSPACE, Key::DOWN, Key::DOWN, Key::ENTER], 'alpha'],
-]);
+    'case-insensitive task name' => [['APT:UP', Key::DOWN, Key::ENTER], 'APT:UP', ['task:server:apt:update' => 'server:apt:update - Refresh package lists'], 'server:apt:update'],
+    'case-insensitive description' => [['PACKAGE LISTS', Key::DOWN, Key::ENTER], 'PACKAGE LISTS', ['task:server:apt:update' => 'server:apt:update - Refresh package lists'], 'server:apt:update'],
+    'numeric identity' => [['NUMERIC', Key::DOWN, Key::ENTER], 'NUMERIC', ['task:0' => '0 - Numeric task'], '0'],
+    'unfiltered selection' => [['apt', Key::BACKSPACE, Key::BACKSPACE, Key::BACKSPACE, Key::DOWN, Key::DOWN, Key::ENTER], '', [
+        'task:0' => '0 - Numeric task',
+        'task:alpha' => 'alpha',
+        'task:deploy' => 'deploy',
+        'task:server:apt:update' => 'server:apt:update - Refresh package lists',
+    ], 'alpha'],
+])->with('supported task search prompts');
 
-it('keeps searching after an unmatched query until a task is selected', function () {
-    withinTemporaryProject(function (string $directory, Filesystem $files) {
+it('allows recovery after an unmatched query without executing an unintended task', function (bool $native) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($native) {
         installTaskDeployerBinary($directory, $files);
-        $this->app->resolving(DeployerRunner::class, static function (): void {
-            SearchPrompt::flushState();
-            SearchPrompt::fake(['missing', Key::DOWN, Key::ENTER, ...array_fill(0, 7, Key::BACKSPACE), 'apt', Key::DOWN, Key::ENTER]);
-        });
 
-        $this->artisan('deploy:run')->assertSuccessful()->run();
+        if ($native) {
+            $this->app->resolving(DeployerRunner::class, static function (): void {
+                SearchPrompt::flushState();
+                SearchPrompt::fake(['missing', Key::DOWN, Key::ENTER, ...array_fill(0, 7, Key::BACKSPACE), 'apt', Key::DOWN, Key::ENTER]);
+            });
 
-        SearchPrompt::assertStrippedOutputContains('No results.');
-        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['server:apt:update']);
-    });
-});
+            $this->artisan('deploy:run')->assertSuccessful()->run();
 
-it('shows ten available tasks before scrolling', function () {
-    withinTemporaryProject(function (string $directory, Filesystem $files) {
-        $tasks = array_map(fn (int $number): array => deployerTaskFixture(sprintf('task:%02d', $number)), range(1, 12));
-        installTaskDeployerBinary($directory, $files, json_encode(['commands' => $tasks], JSON_THROW_ON_ERROR));
-        $this->app->resolving(DeployerRunner::class, static function (): void {
-            SearchPrompt::flushState();
-            SearchPrompt::fake([Key::DOWN, Key::ENTER]);
-        });
+            SearchPrompt::assertStrippedOutputContains('No results.');
+            expect(taskDeployerInvocations($directory, $files))->toHaveCount(2);
+        } else {
+            $this->artisan('deploy:run')
+                ->expectsQuestion('Which Deployer task should run?', 'missing')
+                ->expectsOutputToContain('No Deployer tasks match the search. Run the command again with a broader search or leave it empty.')
+                ->assertFailed();
 
-        $this->artisan('deploy:run')->assertSuccessful()->run();
+            expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
 
-        foreach (range(1, 10) as $number) {
-            SearchPrompt::assertStrippedOutputContains(sprintf('task:%02d', $number));
+            $this->artisan('deploy:run')
+                ->expectsSearch('Which Deployer task should run?', 'task:server:apt:update', 'apt', [
+                    'task:server:apt:update' => 'server:apt:update - Refresh package lists',
+                ])
+                ->assertSuccessful();
+
+            expect(taskDeployerInvocations($directory, $files))->toHaveCount(3);
         }
 
-        SearchPrompt::assertStrippedOutputDoesntContain('task:11');
-        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['task:01']);
+        expect(array_last(taskDeployerInvocations($directory, $files)))->toBe(['server:apt:update']);
     });
-});
+})->with('supported task search prompts');
+
+it('keeps large task catalogs accessible with the supported prompt layout', function (bool $native) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($native) {
+        $tasks = array_map(fn (int $number): array => deployerTaskFixture(sprintf('task:%02d', $number)), range(1, 12));
+        installTaskDeployerBinary($directory, $files, json_encode(['commands' => $tasks], JSON_THROW_ON_ERROR));
+        if ($native) {
+            $this->app->resolving(DeployerRunner::class, static function (): void {
+                SearchPrompt::flushState();
+                SearchPrompt::fake([Key::DOWN, Key::ENTER]);
+            });
+
+            $this->artisan('deploy:run')->assertSuccessful()->run();
+
+            foreach (range(1, 10) as $number) {
+                SearchPrompt::assertStrippedOutputContains(sprintf('task:%02d', $number));
+            }
+
+            SearchPrompt::assertStrippedOutputDoesntContain('task:11');
+            expect(taskDeployerInvocations($directory, $files)[1])->toBe(['task:01']);
+        } else {
+            $choices = [];
+
+            foreach (range(1, 12) as $number) {
+                $choices[sprintf('task:task:%02d', $number)] = sprintf('task:%02d', $number);
+            }
+
+            $this->artisan('deploy:run')
+                ->expectsSearch('Which Deployer task should run?', 'task:task:12', '', $choices)
+                ->assertSuccessful();
+
+            expect(taskDeployerInvocations($directory, $files)[1])->toBe(['task:12']);
+        }
+    });
+})->with('supported task search prompts');
 
 it('runs an explicit task noninteractively with options and selectors as separate arguments', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {

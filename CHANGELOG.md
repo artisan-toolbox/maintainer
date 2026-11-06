@@ -6,6 +6,10 @@
 
 - Search the interactive `deploy:run` task selector by name or description without matching letter case. Display up to ten tasks at once, with automatic height adjustment for smaller terminals.
 
+### Testing
+
+- Exercise task search through Laravel's fallback on every platform and through native prompts on macOS and Linux. Keep Windows CI coverage for matching, task identity, unmatched queries, and large catalogs without invoking the unsupported native renderer.
+
 ## [1.11.0] - 2026-11-06
 
 ### Features
