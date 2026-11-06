@@ -6,6 +6,7 @@ use Closure;
 use JsonException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 final readonly class DeployerRunner
 {
@@ -20,7 +21,7 @@ final readonly class DeployerRunner
      * @param  Closure(string): void  $output
      * @param  (Closure(string): void)|null  $errorOutput
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function run(
         array $arguments,
@@ -157,16 +158,38 @@ final readonly class DeployerRunner
             return $process->run();
         }
 
+        $stdinBlocked = null;
+
         if ($interactive && defined('STDIN')) {
+            $stdinBlocked = stream_get_meta_data(STDIN)['blocked'];
             $process->setInput(STDIN);
         }
 
-        return $process->run(static function (string $type, string $buffer) use ($output, $errorOutput): void {
-            if ($type === Process::ERR && $errorOutput !== null) {
-                $errorOutput($buffer);
-            } else {
-                $output($buffer);
+        try {
+            return $process->run(static function (string $type, string $buffer) use ($output, $errorOutput): void {
+                static $outputFailed = false;
+
+                if ($outputFailed) {
+                    return;
+                }
+
+                try {
+                    if ($type === Process::ERR && $errorOutput !== null) {
+                        $errorOutput($buffer);
+                    } else {
+                        $output($buffer);
+                    }
+                } catch (Throwable $exception) {
+                    $outputFailed = true;
+
+                    throw $exception;
+                }
+            });
+        } finally {
+            if ($stdinBlocked !== null) {
+                $process->stop(0);
+                stream_set_blocking(STDIN, $stdinBlocked);
             }
-        });
+        }
     }
 }

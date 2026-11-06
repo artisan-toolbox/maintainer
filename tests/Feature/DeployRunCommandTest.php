@@ -7,6 +7,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Crypt;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\SelectPrompt;
+use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 
 beforeEach(function () {
@@ -138,6 +139,140 @@ it('runs an explicit task noninteractively with options and selectors as separat
         ])->and($files->exists($directory.'/injected'))->toBeFalse();
     });
 });
+
+it('preserves the standard input blocking mode after interactive deployments', function (bool $blocked, int $exitCode) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($blocked, $exitCode) {
+        installTaskDeployerBinary($directory, $files, taskExit: $exitCode);
+        $files->put($directory.'/runner.php', <<<'PHP'
+<?php
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$GLOBALS['_composer_autoload_path'] = getcwd().'/vendor/autoload.php';
+stream_set_blocking(STDIN, $argv[2] === '1');
+$output = '';
+$exitCode = $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deploy'], static function (string $buffer) use (&$output): void {
+    $output .= $buffer;
+}, true);
+echo json_encode([
+    'exitCode' => $exitCode,
+    'output' => $output,
+    'blocked' => stream_get_meta_data(STDIN)['blocked'],
+], JSON_THROW_ON_ERROR);
+PHP);
+        $process = new Process([PHP_BINARY, $directory.'/runner.php', dirname(__DIR__, 2), $blocked ? '1' : '0'], $directory, timeout: 5);
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0, $process->getOutput().$process->getErrorOutput());
+        $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($result['exitCode'])->toBe($exitCode)
+            ->and($result['output'])->toContain('Deployer output')
+            ->and($result['blocked'])->toBe($blocked);
+    });
+})->with([true, false])->with([0, 42]);
+
+it('preserves the standard input blocking mode when deployment output handling throws', function (bool $blocked) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($blocked) {
+        installTaskDeployerBinary($directory, $files);
+        $files->put($directory.'/runner.php', <<<'PHP'
+<?php
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$GLOBALS['_composer_autoload_path'] = getcwd().'/vendor/autoload.php';
+stream_set_blocking(STDIN, $argv[2] === '1');
+$exception = null;
+try {
+    $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deploy'], static function (): void {
+        throw new \RuntimeException('Deployment output handling failed.');
+    }, true);
+} catch (\RuntimeException $caught) {
+    $exception = ['class' => $caught::class, 'message' => $caught->getMessage()];
+}
+echo json_encode([
+    'exception' => $exception,
+    'blocked' => stream_get_meta_data(STDIN)['blocked'],
+], JSON_THROW_ON_ERROR);
+PHP);
+        $process = new Process([PHP_BINARY, $directory.'/runner.php', dirname(__DIR__, 2), $blocked ? '1' : '0'], $directory, timeout: 5);
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0, $process->getOutput().$process->getErrorOutput());
+        $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($result['exception'])->toBe([
+            'class' => RuntimeException::class,
+            'message' => 'Deployment output handling failed.',
+        ])->and($result['blocked'])->toBe($blocked);
+    });
+})->with([true, false]);
+
+it('finishes process cleanup after output handling throws with standard input still open', function (bool $pendingOutput) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($pendingOutput) {
+        installTaskDeployerBinary($directory, $files);
+
+        if ($pendingOutput) {
+            $files->put($directory.'/vendor/bin/dep.php', <<<'PHP'
+<?php
+echo "Deployer output\n";
+while (!file_exists(__DIR__.'/../../callback-started')) {
+    usleep(1000);
+}
+echo str_repeat('x', 1024);
+file_put_contents(__DIR__.'/../../output-staged', 'ready');
+echo str_repeat('x', 131072);
+PHP);
+        }
+
+        $script = <<<'PHP'
+<?php
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$GLOBALS['_composer_autoload_path'] = getcwd().'/vendor/autoload.php';
+stream_set_blocking(STDIN, true);
+$callbackCalls = 0;
+try {
+    $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deploy'], static function () use (&$callbackCalls, $argv): void {
+        $callbackCalls++;
+        gc_collect_cycles();
+        if ($argv[2] === 'pending-output') {
+            file_put_contents(getcwd().'/callback-started', 'ready');
+            while (!file_exists(getcwd().'/output-staged')) {
+                usleep(1000);
+            }
+        }
+        throw new \RuntimeException('Deployment output handling failed.');
+    }, true);
+    exit(1);
+} catch (\RuntimeException $exception) {
+    if ($exception->getMessage() !== 'Deployment output handling failed.') {
+        throw $exception;
+    }
+}
+unset($exception);
+gc_collect_cycles();
+if ($callbackCalls !== 1 || !stream_get_meta_data(STDIN)['blocked']) {
+    fwrite(STDERR, 'Output callbacks must stop after failure and standard input must remain blocking.');
+    exit(2);
+}
+echo "Process cleanup completed.\n";
+PHP;
+        $files->put($directory.'/runner.php', $script);
+        $input = new InputStream;
+        $process = new Process([PHP_BINARY, $directory.'/runner.php', dirname(__DIR__, 2), $pendingOutput ? 'pending-output' : 'single-output'], $directory, input: $input, timeout: 5);
+
+        try {
+            $process->run();
+
+            expect($process->getExitCode())->toBe(0, $process->getOutput().$process->getErrorOutput())
+                ->and($process->getOutput())->toContain('Process cleanup completed.');
+        } finally {
+            $input->close();
+        }
+    });
+})->with(['single output' => false, 'pending output' => true]);
 
 it('requires an explicit task without interaction before starting discovery', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {

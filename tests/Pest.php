@@ -9,6 +9,7 @@ use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusCheck;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusCheckFix;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusTest;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVueTscCheck;
+use Deployer\Deployer;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Env;
@@ -16,6 +17,8 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 use function Illuminate\Filesystem\join_paths;
+
+require_once __DIR__.'/Support/DeployerTasks.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -29,6 +32,23 @@ use function Illuminate\Filesystem\join_paths;
 */
 
 uses(TestCase::class)->in('Feature');
+
+uses()->beforeEach(function () {
+    $this->files = new Filesystem;
+    $this->directory = temporaryTestDirectory('maintainer-deployer-');
+    $this->originalIdentityFile = getenv('MAINTAINER_SSH_IDENTITY_FILE');
+    $this->files->makeDirectory($this->directory, recursive: true);
+    putenv('MAINTAINER_SSH_IDENTITY_FILE');
+})->afterEach(function () {
+    Deployer::resetInstance();
+    deleteTemporaryDirectory($this->directory);
+
+    if ($this->originalIdentityFile === false) {
+        putenv('MAINTAINER_SSH_IDENTITY_FILE');
+    } else {
+        putenv('MAINTAINER_SSH_IDENTITY_FILE='.$this->originalIdentityFile);
+    }
+})->in('Unit/Deployer');
 
 /*
 |--------------------------------------------------------------------------

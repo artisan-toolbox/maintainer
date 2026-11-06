@@ -35,7 +35,7 @@ jobs:
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run tests
-        run: composer exec pest
+        run: composer exec pest -- --parallel --processes=4
 
       - name: Compare Windows startup with released PHARs
         if: ${{ always() && runner.os == 'Windows' }}

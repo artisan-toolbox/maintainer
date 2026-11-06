@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Tests
+
+- Isolate the APT frontend environment in Deployer test subprocesses so inherited runner settings do not affect reboot assertions.
+- Group Deployer integration tests by behavior and run the CI suite with four Pest workers, preserving the complete recipe and subprocess coverage.
+
 ### Added
 
 - Add a pending-push workflow that lists local branches and their outgoing commits before an explicitly confirmed push to origin.
@@ -11,11 +16,14 @@
 
 ### Fixed
 
+- Restore the original standard input blocking mode after interactive Deployer subprocesses, including failures and output exceptions, so surrounding console runners can continue reading input.
 - Isolate PM2 ecosystem replacement by application namespace and persist successful process changes before proceeding.
 - Keep other named PM2 namespaces intact and make cleanup of legacy processes in the default namespace configurable.
 - Update Symfony Filesystem, HttpFoundation, HttpKernel, and YAML to 8.1.11 to address seven dependency security advisories.
 
 ### Documentation
+
+- Update documentation links and managed README badges to `https://atb.dev.br`, and use `contact@atb.dev.br` for public package contact metadata.
 
 - Standardize README badges for release status, compatibility, CI, and documentation.
 
