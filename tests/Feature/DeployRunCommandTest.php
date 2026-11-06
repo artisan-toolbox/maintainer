@@ -64,6 +64,7 @@ SCRIPT;
 
     if (PHP_OS_FAMILY === 'Windows') {
         $files->put($path.'.php', $script);
+        $files->put($path, "<?php require __DIR__.'/dep.php';\n");
         $files->put($path.'.bat', '@"'.PHP_BINARY.'" "'.$path.'.php" %*'."\r\n");
     } else {
         $files->put($path.'.php', $script);
@@ -149,7 +150,8 @@ require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 $GLOBALS['_composer_autoload_path'] = getcwd().'/vendor/autoload.php';
-stream_set_blocking(STDIN, $argv[2] === '1');
+$modeSupported = stream_set_blocking(STDIN, $argv[2] === '1');
+$initialBlocked = stream_get_meta_data(STDIN)['blocked'];
 $output = '';
 $exitCode = $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deploy'], static function (string $buffer) use (&$output): void {
     $output .= $buffer;
@@ -157,6 +159,8 @@ $exitCode = $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deplo
 echo json_encode([
     'exitCode' => $exitCode,
     'output' => $output,
+    'modeSupported' => $modeSupported,
+    'initialBlocked' => $initialBlocked,
     'blocked' => stream_get_meta_data(STDIN)['blocked'],
 ], JSON_THROW_ON_ERROR);
 PHP);
@@ -168,7 +172,14 @@ PHP);
 
         expect($result['exitCode'])->toBe($exitCode)
             ->and($result['output'])->toContain('Deployer output')
-            ->and($result['blocked'])->toBe($blocked);
+            ->and($result['blocked'])->toBe($result['initialBlocked'])
+            ->and($result['modeSupported'])->toBeBool();
+
+        if ($result['modeSupported']) {
+            expect($result['initialBlocked'])->toBe($blocked);
+        } else {
+            expect($result['initialBlocked'])->toBeTrue();
+        }
     });
 })->with([true, false])->with([0, 42]);
 
@@ -181,7 +192,8 @@ require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 $GLOBALS['_composer_autoload_path'] = getcwd().'/vendor/autoload.php';
-stream_set_blocking(STDIN, $argv[2] === '1');
+$modeSupported = stream_set_blocking(STDIN, $argv[2] === '1');
+$initialBlocked = stream_get_meta_data(STDIN)['blocked'];
 $exception = null;
 try {
     $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deploy'], static function (): void {
@@ -192,6 +204,8 @@ try {
 }
 echo json_encode([
     'exception' => $exception,
+    'modeSupported' => $modeSupported,
+    'initialBlocked' => $initialBlocked,
     'blocked' => stream_get_meta_data(STDIN)['blocked'],
 ], JSON_THROW_ON_ERROR);
 PHP);
@@ -204,9 +218,124 @@ PHP);
         expect($result['exception'])->toBe([
             'class' => RuntimeException::class,
             'message' => 'Deployment output handling failed.',
-        ])->and($result['blocked'])->toBe($blocked);
+        ])->and($result['blocked'])->toBe($result['initialBlocked'])
+            ->and($result['modeSupported'])->toBeBool();
+
+        if ($result['modeSupported']) {
+            expect($result['initialBlocked'])->toBe($blocked);
+        } else {
+            expect($result['initialBlocked'])->toBeTrue();
+        }
     });
 })->with([true, false]);
+
+it('completes an interactive deployment while standard input remains open', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $files->put($directory.'/runner.php', <<<'PHP'
+<?php
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$GLOBALS['_composer_autoload_path'] = getcwd().'/vendor/autoload.php';
+$exitCode = $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deploy'], static function (string $buffer): void {
+    echo $buffer;
+}, true);
+echo "Deployment completed.\n";
+exit($exitCode);
+PHP);
+        $input = new InputStream;
+        $process = new Process([PHP_BINARY, $directory.'/runner.php', dirname(__DIR__, 2)], $directory, input: $input, timeout: 5);
+
+        try {
+            $process->run();
+
+            expect($process->getExitCode())->toBe(0, $process->getOutput().$process->getErrorOutput())
+                ->and($process->getOutput())->toContain("Deployer output\n", "Deployment completed.\n")
+                ->and($input->isClosed())->toBeFalse();
+        } finally {
+            $input->close();
+        }
+    });
+});
+
+it('forwards delayed interactive input and preserves deployment arguments', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $files->put($directory.'/vendor/bin/dep.php', <<<'PHP'
+<?php
+echo "Waiting for deployment input.\n";
+echo json_encode([
+    'arguments' => array_slice($argv, 1),
+    'input' => fgets(STDIN),
+], JSON_THROW_ON_ERROR)."\n";
+PHP);
+        $files->put($directory.'/runner.php', <<<'PHP'
+<?php
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$GLOBALS['_composer_autoload_path'] = getcwd().'/vendor/autoload.php';
+$exitCode = $app->make(\App\Support\Deployer\DeployerRunner::class)->run(['deploy', $argv[2]], static function (string $buffer): void {
+    echo $buffer;
+}, true);
+echo "Deployment completed.\n";
+exit($exitCode);
+PHP);
+        $argument = '--message=deploy with spaces; "quoted" \\path';
+        $answer = "approve with spaces; \"quoted\" \\path\n";
+        $input = new InputStream;
+        $process = new Process([PHP_BINARY, $directory.'/runner.php', dirname(__DIR__, 2), $argument], $directory, input: $input, timeout: 5);
+        $output = '';
+        $answerSent = false;
+
+        try {
+            $process->run(static function (string $type, string $buffer) use ($input, $answer, &$output, &$answerSent): void {
+                if ($type !== Process::OUT) {
+                    return;
+                }
+
+                $output .= $buffer;
+
+                if (! $answerSent && str_contains($output, "Waiting for deployment input.\n")) {
+                    $input->write($answer);
+                    $answerSent = true;
+                }
+            });
+
+            expect($process->getExitCode())->toBe(0, $process->getOutput().$process->getErrorOutput())
+                ->and($answerSent)->toBeTrue()
+                ->and($process->getOutput())->toContain(
+                    json_encode(['arguments' => ['deploy', $argument], 'input' => $answer], JSON_THROW_ON_ERROR)."\n",
+                    "Deployment completed.\n",
+                )
+                ->and($input->isClosed())->toBeFalse();
+        } finally {
+            $input->close();
+        }
+    });
+});
+
+it('finishes an interactive CLI deployment while its input pipe remains open', function (string $entrypoint) {
+    $maintainer = dirname(__DIR__, 2).'/'.$entrypoint;
+
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($maintainer) {
+        installTaskDeployerBinary($directory, $files);
+        $input = new InputStream;
+        $process = new Process([PHP_BINARY, $maintainer, 'deploy:run', 'deploy'], $directory, input: $input, timeout: 5);
+
+        try {
+            $process->mustRun();
+
+            expect($process->getOutput())->toContain('Deployer output', 'Deployer task completed successfully.')
+                ->and(taskDeployerInvocations($directory, $files)[1])->toBe(['deploy'])
+                ->and($input->isClosed())->toBeFalse();
+        } finally {
+            $input->close();
+            $process->stop(0);
+        }
+    });
+})->with(['source' => 'maintainer', 'distributed PHAR' => 'builds/maintainer']);
 
 it('finishes process cleanup after output handling throws with standard input still open', function (bool $pendingOutput) {
     withinTemporaryProject(function (string $directory, Filesystem $files) use ($pendingOutput) {
@@ -216,7 +345,12 @@ it('finishes process cleanup after output handling throws with standard input st
             $files->put($directory.'/vendor/bin/dep.php', <<<'PHP'
 <?php
 echo "Deployer output\n";
+$deadline = hrtime(true) + 2_000_000_000;
 while (!file_exists(__DIR__.'/../../callback-started')) {
+    if (hrtime(true) >= $deadline) {
+        fwrite(STDERR, 'Timed out waiting for the deployment output callback to start.');
+        exit(3);
+    }
     usleep(1000);
 }
 echo str_repeat('x', 1024);
@@ -239,7 +373,11 @@ try {
         gc_collect_cycles();
         if ($argv[2] === 'pending-output') {
             file_put_contents(getcwd().'/callback-started', 'ready');
+            $deadline = hrtime(true) + 2_000_000_000;
             while (!file_exists(getcwd().'/output-staged')) {
+                if (hrtime(true) >= $deadline) {
+                    throw new \RuntimeException('Timed out waiting for pending deployment output.');
+                }
                 usleep(1000);
             }
         }

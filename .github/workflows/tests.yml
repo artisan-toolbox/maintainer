@@ -11,6 +11,7 @@ jobs:
   tests:
     name: Pest (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
 
     strategy:
       fail-fast: false
@@ -35,9 +36,11 @@ jobs:
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run tests
+        timeout-minutes: 15
         run: composer exec pest -- --parallel --processes=4
 
       - name: Compare Windows startup with released PHARs
+        timeout-minutes: 3
         if: ${{ always() && runner.os == 'Windows' }}
         shell: bash
         run: |

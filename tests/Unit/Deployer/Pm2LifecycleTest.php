@@ -15,7 +15,9 @@ it('replaces existing PM2 processes with the configured ecosystem file', functio
             'save --force',
             'start '.$this->directory.'/release/ecosystem.config.cjs --namespace=/var/www/current-app --update-env',
             'save --force',
-        ]);
+        ])
+        ->and(array_column(json_decode($this->files->get($this->directory.'/dump.json'), true), 'pm2_env'))
+        ->toBe([['namespace' => '/var/www/current-app']]);
 });
 
 it('does not delete PM2 processes when the current process list is empty', function () {
@@ -31,7 +33,9 @@ it('does not delete PM2 processes when the current process list is empty', funct
             'jlist',
             'start '.$this->directory.'/release/ecosystem.config.cjs --namespace=/var/www/current-app --update-env',
             'save --force',
-        ]);
+        ])
+        ->and(array_column(json_decode($this->files->get($this->directory.'/dump.json'), true), 'pm2_env'))
+        ->toBe([['namespace' => '/var/www/current-app']]);
 });
 
 it('preserves other namespaces while replacing its own and legacy processes', function () {

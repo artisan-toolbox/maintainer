@@ -56,7 +56,7 @@ if ($command === 'save' && ($processes !== [] || in_array('--force', $arguments,
 }
 PHP;
     $files->put($binary.'.php', $script);
-    $files->put($binary, "#!/bin/sh\nexec ".quotePosixShellArgument(PHP_BINARY).' '.quotePosixShellArgument($binary.'.php')." \"\$@\"\n");
+    $files->put($binary, "#!/bin/sh\nMSYS2_ARG_CONV_EXCL='--namespace=' exec ".quotePosixShellArgument(PHP_BINARY).' '.quotePosixShellArgument($binary.'.php')." \"\$@\"\n");
     $files->put($directory.'/lib/Common.js', <<<'JS'
 const fs = require('fs');
 const path = require('path');
