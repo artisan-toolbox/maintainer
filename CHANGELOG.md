@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.11.0] - 2026-11-06
+
+### Features
+
+- **Add deploy:run task selector with unlock retry support** (`5a3241c`)
+  Introduces deployment functionality by adding a `deploy:run` task selector and unlock retry behavior. In practice (per the provided fragments), this includes a new `deploy:run` CLI command that discovers available Deployer tasks and allows selection in interactive mode (or requires a task in non-interactive mode), then executes the selected task with proper argument construction. It also adds/uses logic to rerun deployment after a successful interactive unlock when confirmed by the user. User impact: users gain a new command for choosing and running Deployer tasks via the Maintainer/Laravel Zero interface, and can streamline the unlock→retry flow on interactive sessions. Compatibility/migration: this is an additive feature; existing `deploy` behavior should remain, but unlock behavior can now optionally re-run deployment in interactive mode after confirmation. Consumers should update usage docs/scripts to leverage the new `deploy:run` command if desired.
+
+### Fixes
+
+- **Preserve Windows interactive stdin using native IO** (`de0b7c7`)
+  Fixes Windows interactive Deployer stdin handling by preserving interactive stdin using native IO rather than relying on Symfony Process behavior that can poll or mishandle input on Windows. This matters because interactive deployments/tests can otherwise block, fail to read input, or deadlock when stdin is not handled correctly. User impact is primarily for Windows users running interactive deployer flows (including Deployer task execution and fixture-driven tests). Compatibility: no public API changes are indicated, but runtime behavior on Windows for interactive stdin is corrected. No migration steps are expected for consumers.
+
+- **Inherit interactive Deployer input directly on Windows** (`7856a3f`)
+  Fixes interactive Deployer behavior on Windows by inheriting interactive Deployer input directly when running interactive operations. This prevents output/test blocking and interactive deadlocks caused by stdin not being correctly forwarded to the Deployer subprocess. User impact: Windows interactive deployments and any interactive Deployer-related commands/tests should behave reliably. Compatibility: no public API changes indicated; this is a runtime behavior correction for Windows interactive mode.
+
+### Documentation
+
+- **Standardize README badges with release-linked values** (`17779fc`)
+  Updates documentation branding by standardizing README badges and keeping release-linked values consistent (e.g., version/status badges). User impact is limited to documentation/UX; no runtime behavior changes are implied. Compatibility: none; this affects how information is displayed on GitHub.
+
+### Code Style
+
+- **Merge 1.x branch into 1.x** (`1d28e0e`)
+  Merges the remote-tracking branch 'origin/1.x' into the 1.x line. This is an integration-only change; it does not introduce a specific functional feature by itself but brings in whatever commits were included from the merged branch. User impact depends entirely on the merged content; no explicit API changes are described in the provided fragments for this merge commit.
+
+- **Merge pull request for Windows deployer stdin fix** (`d3e00e0`)
+  Merges PR #1 from artisan-toolbox/codex/windows-deployer-stdin into the 1.x branch. This is an integration commit for the Windows deployer stdin fix and related changes described in other fragments. User impact comes from the included functional fix; the merge itself is not a behavior change beyond incorporating the PR content.
+
+- **Format Node collision fixture using configured Rector rules** (`cbdab42`)
+  Formats the Node collision fixture according to the configured Rector formatting rules. This is a non-functional change intended to keep fixtures consistent with project code style/autoformatting conventions. User impact is none; it may reduce noisy diffs and improve maintainability.
+
+### Tests
+
+- **Derive PM2 numeric collisions from executing Node process** (`4a28351`)
+  Adjusts tests to derive PM2 numeric collision behavior from the executing Node process, improving determinism and alignment with how PM2/Node are actually used. This matters for reliability: collision-related tests can be flaky if they rely on assumptions that differ between environments. User impact is indirect—test stability improves, reducing false failures and making CI more trustworthy.
+
+- **Preserve Windows fixture arguments and verify rebuilt CLI** (`3cf3a84`)
+  Updates Windows fixture/test coverage to preserve Windows fixture arguments and ensure the rebuilt CLI is verified correctly. This matters because Windows paths/arguments frequently differ from non-Windows behavior, and rebuild/CLI regeneration can break argument handling. User impact is indirect via more accurate regression coverage, improving confidence for Windows users.
+
+- **Reproduce Windows Deployer stdin failures with live test events** (`0f7eab3`)
+  Adds/adjusts tests to reproduce Windows Deployer stdin failures using live test events. This increases regression confidence by ensuring the previously problematic behavior is exercised in a realistic way. User impact is indirect: more reliable detection of stdin-handling issues and reduced chance of untested regressions in Windows interactive flows.
+
+- **Run Deployer tests in parallel with isolated subprocess environment** (`3c2636c`)
+  Updates the test execution approach to run Deployer tests in parallel while isolating subprocess environments, mitigating cross-test interference and race conditions. This matters because parallel test execution can introduce flakiness when subprocesses share state (e.g., environment variables, temp dirs, ports, or fixture files). User impact is indirect: improved CI throughput and reliability, though it may expose latent ordering/race issues.
+
 ## [Unreleased]
 
 ### Tests
