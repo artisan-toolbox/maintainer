@@ -11,11 +11,13 @@ jobs:
   tests:
     name: Pest (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
 
     strategy:
       fail-fast: false
       matrix:
         os:
+          - ubuntu-latest
           - windows-latest
 
     steps:
@@ -33,7 +35,26 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Reproduce Windows stdin failures
-        timeout-minutes: 3
-        run: php vendor/bin/pest tests/Feature/DeployRunCommandTest.php --debug
+      - name: Run tests
+        timeout-minutes: 15
+        run: composer exec pest -- --parallel --processes=4
 
+      - name: Compare Windows startup with released PHARs
+        timeout-minutes: 3
+        if: ${{ always() && runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          git fetch --no-tags origin tag 1.5.2 tag 1.6.0
+          for version in 1.5.2 1.6.0; do
+            directory=$(mktemp -d)
+            git archive "$version" builds/maintainer | tar -x -C "$directory"
+            echo "::group::Maintainer $version"
+            if MAINTAINER_TEST_PHAR="$(cygpath -w "$directory/builds/maintainer")" composer exec pest -- tests/Feature/DistributedPharTest.php --filter="loads the bundled defaults"; then
+              echo "Maintainer $version loaded its bundled defaults."
+            else
+              echo "::warning::Maintainer $version failed the bundled defaults smoke test."
+            fi
+            echo "::endgroup::"
+            rm -f "$directory/builds/maintainer"
+            rmdir "$directory/builds" "$directory"
+          done

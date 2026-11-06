@@ -4,6 +4,9 @@
 
 ### Tests
 
+- Check the actual standard-input mode on Windows and cover held-open input, delayed interactive input, and bounded output-cleanup handshakes.
+- Limit CI test execution to 15 minutes per platform and each job to 25 minutes.
+
 - Isolate the APT frontend environment in Deployer test subprocesses so inherited runner settings do not affect reboot assertions.
 - Group Deployer integration tests by behavior and run the CI suite with four Pest workers, preserving the complete recipe and subprocess coverage.
 
@@ -15,6 +18,8 @@
 - Add opt-in APT update, upgrade, and server reboot tasks to the shared Deployer recipe.
 
 ### Fixed
+
+- Inherit interactive Deployer input directly on Windows to avoid blocking process output and parallel test workers while standard input remains open.
 
 - Restore the original standard input blocking mode after interactive Deployer subprocesses, including failures and output exceptions, so surrounding console runners can continue reading input.
 - Isolate PM2 ecosystem replacement by application namespace and persist successful process changes before proceeding.

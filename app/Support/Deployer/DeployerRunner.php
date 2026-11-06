@@ -31,8 +31,9 @@ final readonly class DeployerRunner
     ): int {
         $projectRoot = project_path();
         $binary = project_path('vendor/bin/dep');
+        $nativeInput = PHP_OS_FAMILY === 'Windows' && $interactive && defined('STDIN');
 
-        if (PHP_OS_FAMILY === 'Windows' && is_file($binary.'.bat')) {
+        if (! $nativeInput && PHP_OS_FAMILY === 'Windows' && is_file($binary.'.bat')) {
             $binary .= '.bat';
         }
 
@@ -145,6 +146,22 @@ final readonly class DeployerRunner
         bool $interactive,
         ?Closure $errorOutput,
     ): int {
+        if (PHP_OS_FAMILY === 'Windows' && $interactive && defined('STDIN')) {
+            return (new NativeInputProcess)->run(
+                [PHP_BINARY, $binary, ...$arguments],
+                $projectRoot,
+                $environment,
+                STDIN,
+                static function (string $type, string $buffer) use ($output, $errorOutput): void {
+                    if ($type === Process::ERR && $errorOutput !== null) {
+                        $errorOutput($buffer);
+                    } else {
+                        $output($buffer);
+                    }
+                },
+            );
+        }
+
         $process = new Process(
             [$binary, ...$arguments],
             $projectRoot,
