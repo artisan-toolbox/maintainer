@@ -316,6 +316,27 @@ PHP);
     });
 });
 
+it('finishes an interactive CLI deployment while its input pipe remains open', function (string $entrypoint) {
+    $maintainer = dirname(__DIR__, 2).'/'.$entrypoint;
+
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($maintainer) {
+        installTaskDeployerBinary($directory, $files);
+        $input = new InputStream;
+        $process = new Process([PHP_BINARY, $maintainer, 'deploy:run', 'deploy'], $directory, input: $input, timeout: 5);
+
+        try {
+            $process->mustRun();
+
+            expect($process->getOutput())->toContain('Deployer output', 'Deployer task completed successfully.')
+                ->and(taskDeployerInvocations($directory, $files)[1])->toBe(['deploy'])
+                ->and($input->isClosed())->toBeFalse();
+        } finally {
+            $input->close();
+            $process->stop(0);
+        }
+    });
+})->with(['source' => 'maintainer', 'distributed PHAR' => 'builds/maintainer']);
+
 it('finishes process cleanup after output handling throws with standard input still open', function (bool $pendingOutput) {
     withinTemporaryProject(function (string $directory, Filesystem $files) use ($pendingOutput) {
         installTaskDeployerBinary($directory, $files);

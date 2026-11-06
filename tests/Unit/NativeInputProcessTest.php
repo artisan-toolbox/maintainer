@@ -16,20 +16,20 @@ function nativeInputProcessFixture(string $directory, Filesystem $files, string 
     return [new Process([PHP_BINARY, $directory.'/runner.php'], $directory, input: $input, timeout: 5), $input];
 }
 
-it('collects both output streams and the exit code while inherited input remains open', function (int $exitCode) {
-    withinTemporaryProject(function (string $directory, Filesystem $files) use ($exitCode) {
-        $files->put($directory.'/child.php', '<?php fwrite(STDOUT, "ready"); fwrite(STDERR, "diagnostic"); exit('.$exitCode.');');
-        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP'
-$output = [];
-$blocked = stream_get_meta_data(STDIN)['blocked'];
-$exitCode = (new \App\Support\Deployer\NativeInputProcess)->run(
-    [PHP_BINARY, getcwd().'/child.php'], getcwd(), [], STDIN,
-    static function (string $type, string $buffer) use (&$output): void {
-        $output[$type] = ($output[$type] ?? '').$buffer;
-    },
-);
-echo json_encode(['exitCode' => $exitCode, 'output' => $output, 'blocked' => stream_get_meta_data(STDIN)['blocked'] === $blocked]);
-PHP);
+it('collects both output streams and the exit code while inherited input remains open', function (int $exitCode, int $repetitions) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($exitCode, $repetitions) {
+        $files->put($directory.'/child.php', '<?php fwrite(STDOUT, str_repeat("ready", '.$repetitions.')); fwrite(STDERR, str_repeat("diagnostic", '.$repetitions.')); exit('.$exitCode.');');
+        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP_WRAP'
+        $output = [];
+        $blocked = stream_get_meta_data(STDIN)['blocked'];
+        $exitCode = (new \App\Support\Deployer\NativeInputProcess)->run(
+            [PHP_BINARY, getcwd().'/child.php'], getcwd(), [], STDIN,
+            static function (string $type, string $buffer) use (&$output): void {
+                $output[$type] = ($output[$type] ?? '').$buffer;
+            },
+        );
+        echo json_encode(['exitCode' => $exitCode, 'output' => array_map(static fn (string $buffer): string => hash('sha256', $buffer), $output), 'blocked' => stream_get_meta_data(STDIN)['blocked'] === $blocked]);
+        PHP_WRAP);
 
         try {
             $process->mustRun();
@@ -37,7 +37,7 @@ PHP);
 
             expect($result)->toBe([
                 'exitCode' => $exitCode,
-                'output' => ['out' => 'ready', 'err' => 'diagnostic'],
+                'output' => ['out' => hash('sha256', str_repeat('ready', $repetitions)), 'err' => hash('sha256', str_repeat('diagnostic', $repetitions))],
                 'blocked' => true,
             ]);
         } finally {
@@ -45,7 +45,7 @@ PHP);
             $process->stop(0);
         }
     });
-})->with([0, 42]);
+})->with([0, 42])->with(['small output' => 1, 'large output' => 32768]);
 
 it('delivers input written after the child has started without delaying its output', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
@@ -54,13 +54,13 @@ it('delivers input written after the child has started without delaying its outp
 echo "Ready for input.\n";
 echo fgets(STDIN);
 PHP);
-        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP'
-$exitCode = (new \App\Support\Deployer\NativeInputProcess)->run(
-    [PHP_BINARY, getcwd().'/child.php'], getcwd(), [], STDIN,
-    static function (string $type, string $buffer): void { echo $buffer; },
-);
-exit($exitCode);
-PHP);
+        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP_WRAP'
+        $exitCode = (new \App\Support\Deployer\NativeInputProcess)->run(
+            [PHP_BINARY, getcwd().'/child.php'], getcwd(), [], STDIN,
+            static function (string $type, string $buffer): void { echo $buffer; },
+        );
+        exit($exitCode);
+        PHP_WRAP);
 
         try {
             $process->start();
@@ -84,20 +84,20 @@ file_put_contents(__DIR__.'/child.pid', (string) getmypid());
 echo 'Ready.';
 sleep(30);
 PHP);
-        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP'
-$callbackCalls = 0;
-try {
-    (new \App\Support\Deployer\NativeInputProcess)->run(
-        [PHP_BINARY, getcwd().'/child.php'], getcwd(), [], STDIN,
-        static function (string $type, string $buffer) use (&$callbackCalls): void {
-            $callbackCalls++;
-            throw new \RuntimeException('Output handling failed.');
-        },
-    );
-} catch (\RuntimeException $exception) {
-    echo json_encode(['message' => $exception->getMessage(), 'callbackCalls' => $callbackCalls]);
-}
-PHP);
+        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP_WRAP'
+        $callbackCalls = 0;
+        try {
+            (new \App\Support\Deployer\NativeInputProcess)->run(
+                [PHP_BINARY, getcwd().'/child.php'], getcwd(), [], STDIN,
+                static function (string $type, string $buffer) use (&$callbackCalls): void {
+                    $callbackCalls++;
+                    throw new \RuntimeException('Output handling failed.');
+                },
+            );
+        } catch (\RuntimeException $exception) {
+            echo json_encode(['message' => $exception->getMessage(), 'callbackCalls' => $callbackCalls]);
+        }
+        PHP_WRAP);
 
         try {
             $process->mustRun();
@@ -114,9 +114,13 @@ PHP);
             $status->run();
 
             if (PHP_OS_FAMILY === 'Windows') {
-                expect($status->getOutput())->not->toContain('","'.$pid.'","');
+                expect($status->getExitCode())->toBe(0)
+                    ->and($status->getErrorOutput())->toBe('')
+                    ->and($status->getOutput())->not->toContain('","'.$pid.'","');
             } else {
-                expect(trim($status->getOutput()))->toBe('');
+                expect($status->getExitCode())->toBe(1)
+                    ->and($status->getErrorOutput())->toBe('')
+                    ->and(trim($status->getOutput()))->toBe('');
             }
         } finally {
             $input->close();
@@ -127,34 +131,36 @@ PHP);
 
 it('inherits the process environment and applies additions and removals', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
-        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP'
-putenv('MAINTAINER_NATIVE_PROCESS_REMOVED=original');
-putenv('MAINTAINER_NATIVE_PROCESS_INHERITED=inherited');
-putenv('MAINTAINER_NATIVE_PROCESS_ENV=original');
-$_ENV['MAINTAINER_NATIVE_PROCESS_ENV'] = 'from-env';
-$_ENV['MAINTAINER_NATIVE_PROCESS_CASE'] = 'original';
-$output = '';
-$overrideName = PHP_OS_FAMILY === 'Windows' ? 'maintainer_native_process_case' : 'MAINTAINER_NATIVE_PROCESS_CASE';
-$script = <<<'CHILD'
-echo json_encode([
-    getenv('MAINTAINER_NATIVE_PROCESS_REMOVED'),
-    getenv('MAINTAINER_NATIVE_PROCESS_ADDED'),
-    getenv('MAINTAINER_NATIVE_PROCESS_INHERITED'),
-    getenv('MAINTAINER_NATIVE_PROCESS_ENV'),
-    getenv('MAINTAINER_NATIVE_PROCESS_CASE'),
-]);
-CHILD;
-$exitCode = (new \App\Support\Deployer\NativeInputProcess)->run(
-    [PHP_BINARY, '-r', $script], getcwd(), [
-        'MAINTAINER_NATIVE_PROCESS_REMOVED' => false,
-        'MAINTAINER_NATIVE_PROCESS_ADDED' => 'added',
-        $overrideName => 'case-override',
-    ], STDIN,
-    static function (string $type, string $buffer) use (&$output): void { $output .= $buffer; },
-);
-echo $output;
-exit($exitCode);
-PHP);
+        [$process, $input] = nativeInputProcessFixture($directory, $files, <<<'PHP_WRAP'
+        putenv('MAINTAINER_NATIVE_PROCESS_REMOVED=original');
+        putenv('MAINTAINER_NATIVE_PROCESS_INHERITED=inherited');
+        putenv('MAINTAINER_NATIVE_PROCESS_ENV=original');
+        $_SERVER['MAINTAINER_NATIVE_PROCESS_REMOVED'] = 'original';
+        $_SERVER['MAINTAINER_NATIVE_PROCESS_INHERITED'] = 'inherited';
+        $_ENV['MAINTAINER_NATIVE_PROCESS_ENV'] = 'from-env';
+        $_ENV['MAINTAINER_NATIVE_PROCESS_CASE'] = 'original';
+        $output = '';
+        $overrideName = PHP_OS_FAMILY === 'Windows' ? 'maintainer_native_process_case' : 'MAINTAINER_NATIVE_PROCESS_CASE';
+        $script = <<<'CHILD'
+        echo json_encode([
+            getenv('MAINTAINER_NATIVE_PROCESS_REMOVED'),
+            getenv('MAINTAINER_NATIVE_PROCESS_ADDED'),
+            getenv('MAINTAINER_NATIVE_PROCESS_INHERITED'),
+            getenv('MAINTAINER_NATIVE_PROCESS_ENV'),
+            getenv('MAINTAINER_NATIVE_PROCESS_CASE'),
+        ]);
+        CHILD;
+        $exitCode = (new \App\Support\Deployer\NativeInputProcess)->run(
+            [PHP_BINARY, '-r', $script], getcwd(), [
+                'MAINTAINER_NATIVE_PROCESS_REMOVED' => false,
+                'MAINTAINER_NATIVE_PROCESS_ADDED' => 'added',
+                $overrideName => 'case-override',
+            ], STDIN,
+            static function (string $type, string $buffer) use (&$output): void { $output .= $buffer; },
+        );
+        echo $output;
+        exit($exitCode);
+        PHP_WRAP);
 
         try {
             $process->mustRun();

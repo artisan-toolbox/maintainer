@@ -4,6 +4,8 @@
 
 ### Tests
 
+- Preserve literal PM2 namespaces in Git Bash fixtures, normalize numeric-path collision fixtures, and isolate the Git push race wrapper from executable caches.
+
 - Check the actual standard-input mode on Windows and cover held-open input, delayed interactive input, and bounded output-cleanup handshakes.
 - Limit CI test execution to 15 minutes per platform and each job to 25 minutes.
 

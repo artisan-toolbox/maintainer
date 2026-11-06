@@ -79,9 +79,10 @@ it('quotes PM2 paths and namespaces as individual shell arguments', function () 
 
 it('rejects executable paths that PM2 would interpret as a numeric deletion target', function () {
     $packageRoot = dirname(__DIR__, 3);
+    $this->files->ensureDirectoryExists($this->directory.'/release');
     $processes = [
         ['pm_id' => 0, 'name' => 'owned'],
-        ['pm_id' => 1, 'name' => 'foreign', 'pm2_env' => ['namespace' => 'other', 'pm_exec_path' => realpath($this->directory).'/release/0']],
+        ['pm_id' => 1, 'name' => 'foreign', 'pm2_env' => ['namespace' => 'other', 'pm_exec_path' => realpath($this->directory.'/release').'/0']],
     ];
     $pm2 = installFakePm2Binary($this->directory, $this->files, json_encode($processes, JSON_THROW_ON_ERROR));
     $recipe = installPm2TaskRecipe($this->directory, $this->files, $packageRoot.'/app/Deployer/contrib.php', $pm2);
