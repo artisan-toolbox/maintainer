@@ -2,6 +2,7 @@
 
 namespace App\Commands\Deployment;
 
+use App\Support\Deployer\DeployerArguments;
 use App\Support\Deployer\DeployerRunner;
 use App\Support\ProjectPath;
 use Illuminate\Console\Attributes\Description;
@@ -57,47 +58,6 @@ final class DeployCommand extends Command
      */
     private function deployerArguments(): array
     {
-        $arguments = [];
-        $file = $this->option('file');
-
-        if (is_string($file) && $file !== '') {
-            $arguments[] = "--file={$file}";
-        }
-
-        $arguments[] = 'deploy';
-
-        foreach (['tag', 'revision', 'branch', 'limit', 'start-from', 'log', 'profile'] as $name) {
-            $value = $this->option($name);
-
-            if (is_string($value) && $value !== '') {
-                $arguments[] = "--{$name}={$value}";
-            }
-        }
-
-        $overrides = $this->option('option');
-
-        foreach ($overrides as $override) {
-            throw_if($override === null || $override === '', RuntimeException::class, 'A Deployer configuration override is invalid.');
-
-            $arguments[] = "--option={$override}";
-        }
-
-        foreach (['no-hooks', 'plan'] as $name) {
-            if ($this->option($name) === true) {
-                $arguments[] = "--{$name}";
-            }
-        }
-
-        if (! $this->input->isInteractive()) {
-            $arguments[] = '--no-interaction';
-        }
-
-        $selectors = $this->argument('selector');
-
-        foreach ($selectors as $selector) {
-            $arguments[] = $selector;
-        }
-
-        return $arguments;
+        return DeployerArguments::build('deploy', $this->options(), array_values($this->argument('selector')), $this->input->isInteractive());
     }
 }

@@ -17,7 +17,7 @@ it('registers the public Maintainer commands in the distributed executable', fun
         $names = array_map(fn (string $line): string => explode(' ', $line, 2)[0], $commands);
 
         expect($names)->toContain(
-            'maintainer', 'commit', 'config:publish', 'deploy', 'deploy:unlock', 'diff:html',
+            'maintainer', 'commit', 'push', 'config:publish', 'deploy', 'deploy:unlock', 'deploy:run', 'diff:html',
             'quality:check', 'quality:fix', 'release:create', 'ssh:key', 'ssh:public',
         );
     });

@@ -2,12 +2,15 @@
 
 namespace App\Commands\Deployment;
 
+use App\Support\Deployer\DeployerArguments;
 use App\Support\Deployer\DeployerRunner;
 use App\Support\ProjectPath;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
+
+use function Laravel\Prompts\confirm;
 
 #[Signature('deploy:unlock {selector?* : Host selectors passed to Deployer} {--file= : Alternative Deployer recipe path} {--option=* : Override a Deployer configuration option} {--limit= : Maximum number of hosts running tasks in parallel} {--no-hooks : Run without Deployer hooks} {--plan : Display the unlock plan without executing it} {--log= : Write the Deployer log to a file} {--profile= : Write the Deployer profile to a file}')]
 #[Description('Unlock a failed Deployer deployment')]
@@ -49,7 +52,17 @@ final class DeployUnlockCommand extends Command
 
         $this->components->success('Deployer deployment unlocked successfully.');
 
-        return self::SUCCESS;
+        if (! $this->input->isInteractive() || $this->option('plan') === true || ! confirm('Run deployment again with the same options and selectors?', default: false)) {
+            return self::SUCCESS;
+        }
+
+        $options = ['selector' => $this->argument('selector')];
+
+        foreach (['file', 'option', 'limit', 'no-hooks', 'log', 'profile'] as $name) {
+            $options["--{$name}"] = $this->option($name);
+        }
+
+        return $this->call('deploy', $options);
     }
 
     /**
@@ -57,47 +70,6 @@ final class DeployUnlockCommand extends Command
      */
     private function deployerArguments(): array
     {
-        $arguments = [];
-        $file = $this->option('file');
-
-        if (is_string($file) && $file !== '') {
-            $arguments[] = "--file={$file}";
-        }
-
-        $arguments[] = 'deploy:unlock';
-
-        foreach (['limit', 'log', 'profile'] as $name) {
-            $value = $this->option($name);
-
-            if (is_string($value) && $value !== '') {
-                $arguments[] = "--{$name}={$value}";
-            }
-        }
-
-        $overrides = $this->option('option');
-
-        foreach ($overrides as $override) {
-            throw_if($override === null || $override === '', RuntimeException::class, 'A Deployer configuration override is invalid.');
-
-            $arguments[] = "--option={$override}";
-        }
-
-        foreach (['no-hooks', 'plan'] as $name) {
-            if ($this->option($name) === true) {
-                $arguments[] = "--{$name}";
-            }
-        }
-
-        if (! $this->input->isInteractive()) {
-            $arguments[] = '--no-interaction';
-        }
-
-        $selectors = $this->argument('selector');
-
-        foreach ($selectors as $selector) {
-            $arguments[] = $selector;
-        }
-
-        return $arguments;
+        return DeployerArguments::build('deploy:unlock', $this->options(), array_values($this->argument('selector')), $this->input->isInteractive());
     }
 }

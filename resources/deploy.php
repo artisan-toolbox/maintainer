@@ -16,6 +16,8 @@ import(getenv('MAINTAINER_CONTRIB'));
 // set('keep_releases', 4);
 // set('repository_tag_limit', 10);
 // set('pm2_config_file', 'pm2.config.cjs');
+// set('pm2_namespace', '/var/www/foo_bar');
+// set('pm2_cleanup_legacy', true);
 
 // add('shared_files', []);
 // add('shared_dirs', []);

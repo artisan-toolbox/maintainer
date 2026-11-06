@@ -80,6 +80,7 @@ it('groups the available maintenance workflows into sections', function () {
         'diff:html',
         'release:create',
         'readme:update',
+        'push',
     ])->and(array_keys(maintainerMenuOptions('CONFIGURATION_WORKFLOWS')))->toBe([
         'config:publish',
         'ssh:key',
@@ -90,6 +91,7 @@ it('groups the available maintenance workflows into sections', function () {
     ])->and(array_keys(maintainerMenuOptions('DEPLOYMENT_WORKFLOWS')))->toBe([
         'deploy',
         'deploy:unlock',
+        'deploy:run',
     ]);
 });
 

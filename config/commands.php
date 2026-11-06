@@ -6,11 +6,13 @@ use App\Commands\Configuration\PublishConfigurationCommand;
 use App\Commands\Configuration\SshPrivateKeyCommand;
 use App\Commands\Configuration\SshPublicKeyCommand;
 use App\Commands\Deployment\DeployCommand;
+use App\Commands\Deployment\DeployRunCommand;
 use App\Commands\Deployment\DeployUnlockCommand;
 use App\Commands\MaintainerCommand;
 use App\Commands\Versioning\CreateCommitCommand;
 use App\Commands\Versioning\CreateHtmlDiffCommand;
 use App\Commands\Versioning\CreateReleaseCommand;
+use App\Commands\Versioning\PushCommitsCommand;
 use App\Commands\Versioning\UpdateReadmeCommand;
 use Illuminate\Console\Scheduling\ScheduleFinishCommand;
 use Illuminate\Console\Scheduling\ScheduleListCommand;
@@ -67,8 +69,10 @@ return [
         SshPrivateKeyCommand::class,
         SshPublicKeyCommand::class,
         DeployCommand::class,
+        DeployRunCommand::class,
         DeployUnlockCommand::class,
         CreateCommitCommand::class,
+        PushCommitsCommand::class,
         CreateHtmlDiffCommand::class,
         CreateReleaseCommand::class,
         UpdateReadmeCommand::class,

@@ -1,0 +1,329 @@
+<?php
+
+use App\Support\Deployer\DeployerRunner;
+use App\Support\Ssh\Ed25519KeyGenerator;
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Crypt;
+use Laravel\Prompts\ConfirmPrompt;
+use Laravel\Prompts\SelectPrompt;
+use Symfony\Component\Process\Process;
+
+beforeEach(function () {
+    ConfirmPrompt::fallbackWhen(true);
+    SelectPrompt::fallbackWhen(true);
+});
+
+function deployerTaskFixture(string $name, string $description = '', bool $hidden = false): array
+{
+    $options = [];
+
+    foreach (['option', 'limit', 'no-hooks', 'plan', 'start-from', 'log', 'profile', 'message', 'force', 'item'] as $option) {
+        $options[$option] = [
+            'accept_value' => ! in_array($option, ['no-hooks', 'plan', 'force'], true),
+            'is_value_required' => ! in_array($option, ['no-hooks', 'plan', 'force'], true),
+            'is_multiple' => in_array($option, ['option', 'item'], true),
+        ];
+    }
+
+    return [
+        'name' => $name,
+        'description' => $description,
+        'hidden' => $hidden,
+        'definition' => ['arguments' => ['selector' => ['is_array' => true]], 'options' => $options],
+    ];
+}
+
+function installTaskDeployerBinary(string $directory, Filesystem $files, ?string $catalog = null, int $discoveryExit = 0, int $taskExit = 0, ?int $retryExit = null, string $discoveryError = ''): void
+{
+    $catalog ??= json_encode(['commands' => [
+        deployerTaskFixture('server:apt:update', 'Refresh package lists'),
+        deployerTaskFixture('deploy'),
+        deployerTaskFixture('secret', hidden: true),
+        deployerTaskFixture('worker', hidden: true),
+        ['name' => 'run', 'description' => 'Run a shell command', 'hidden' => false, 'definition' => ['arguments' => ['selector' => []], 'options' => []]],
+    ]], JSON_THROW_ON_ERROR);
+
+    $script = <<<'SCRIPT'
+<?php
+$arguments = array_slice($argv, 1);
+file_put_contents(__DIR__.'/../../invocations.jsonl', json_encode($arguments)."\n", FILE_APPEND);
+$identity = getenv('MAINTAINER_SSH_IDENTITY_FILE');
+file_put_contents(__DIR__.'/../../identity-paths.jsonl', json_encode($identity)."\n", FILE_APPEND);
+if (in_array('list', $arguments, true)) {
+    fwrite(STDERR, DISCOVERY_ERROR);
+    echo CATALOG;
+    exit(DISCOVERY_EXIT);
+}
+echo "Deployer output\n";
+exit(in_array('deploy', $arguments, true) ? RETRY_EXIT : TASK_EXIT);
+SCRIPT;
+    $script = str_replace(['CATALOG', 'DISCOVERY_EXIT', 'TASK_EXIT', 'RETRY_EXIT', 'DISCOVERY_ERROR'], [var_export($catalog, true), (string) $discoveryExit, (string) $taskExit, (string) ($retryExit ?? $taskExit), var_export($discoveryError, true)], $script);
+    $path = $directory.'/vendor/bin/dep';
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        $files->put($path.'.php', $script);
+        $files->put($path.'.bat', '@"'.PHP_BINARY.'" "'.$path.'.php" %*'."\r\n");
+    } else {
+        $files->put($path.'.php', $script);
+        $files->put($path, "#!/bin/sh\nexec ".escapeshellarg(PHP_BINARY).' '.escapeshellarg($path.'.php').' "$@"'."\n");
+        chmod($path, 0755);
+    }
+}
+
+function taskDeployerInvocations(string $directory, Filesystem $files): array
+{
+    return array_map(fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), $files->lines($directory.'/invocations.jsonl')->filter(fn (string $line): bool => $line !== '')->values()->all());
+}
+
+it('registers the declared task runner', function () {
+    expect($this->app->make(Kernel::class)->all())->toHaveKey('deploy:run');
+});
+
+it('parses the task catalog independently of recipe stderr diagnostics', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files, discoveryError: "Recipe loaded successfully\n");
+        $this->artisan('deploy:run', ['task' => 'deploy', '--no-interaction' => true])
+            ->assertSuccessful();
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(2);
+    });
+});
+
+it('includes recipe stderr when task discovery fails', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files, discoveryExit: 42, discoveryError: "Recipe configuration is invalid\n");
+        $this->artisan('deploy:run', ['task' => 'deploy', '--no-interaction' => true])
+            ->expectsOutputToContain('Recipe configuration is invalid')
+            ->assertFailed();
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
+    });
+});
+
+it('discovers visible recipe tasks and excludes hidden and built-in commands', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+
+        $this->artisan('deploy:run', ['--file' => 'ops/deploy.php', '--plan' => true])
+            ->expectsChoice('Which Deployer task should run?', 'task:server:apt:update', [
+                'task:deploy' => 'deploy',
+                'task:server:apt:update' => 'server:apt:update - Refresh package lists',
+            ])
+            ->expectsOutputToContain('Deployer task completed successfully.')
+            ->assertSuccessful();
+
+        expect(taskDeployerInvocations($directory, $files))->toBe([
+            ['--file=ops/deploy.php', 'list', '--format=json', '--no-ansi', '--no-interaction'],
+            ['--file=ops/deploy.php', 'server:apt:update', '--plan'],
+        ]);
+    });
+});
+
+it('runs an explicit task noninteractively with options and selectors as separate arguments', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $message = 'hello; touch '.$directory.'/injected';
+
+        $this->artisan('deploy:run', [
+            'task' => 'server:apt:update',
+            'selector' => ['production', '--message='.$message, '--force', '--item=first', '--item=second'],
+            '--file' => 'recipe with spaces.php',
+            '--option' => ['keep_releases=3'],
+            '--limit' => '2',
+            '--no-interaction' => true,
+        ])->assertSuccessful();
+
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe([
+            '--file=recipe with spaces.php', 'server:apt:update', '--limit=2', '--option=keep_releases=3', '--no-interaction',
+            '--message='.$message, '--force', '--item=first', '--item=second', '--', 'production',
+        ])->and($files->exists($directory.'/injected'))->toBeFalse();
+    });
+});
+
+it('requires an explicit task without interaction before starting discovery', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:run', ['--no-interaction' => true])
+            ->expectsOutputToContain('Specify a Deployer task')
+            ->assertFailed();
+        expect($files->exists($directory.'/invocations.jsonl'))->toBeFalse();
+    });
+});
+
+it('refuses undeclared built-in and option-shaped task names', function (string $task) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($task) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:run', ['task' => $task, '--no-interaction' => true])->assertFailed();
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
+    });
+})->with(['missing', 'worker', 'run', '--file=evil.php', 'deploy; touch injected']);
+
+it('rejects custom option smuggling and invalid custom values before executing tasks', function (array $tokens) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($tokens) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:run', ['task' => 'deploy', 'selector' => $tokens, '--no-interaction' => true])->assertFailed();
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
+    });
+})->with([
+    [['--file=evil.php']], [['--file', 'evil.php']], [['--option=repository=evil']], [['--plan']], [['--no-interaction']], [['--help']], [['-f', 'evil.php']],
+    [['--message', 'value']], [['--force=yes']], [['--unknown=x']], [['--message=a', '--message=b']],
+]);
+
+it('rejects invalid task catalogs and discovery failures without executing a task', function (string $catalog, int $exit) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($catalog, $exit) {
+        installTaskDeployerBinary($directory, $files, $catalog, $exit);
+        $this->artisan('deploy:run', ['task' => 'deploy', '--no-interaction' => true])->assertFailed();
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
+    });
+})->with([
+    ['not json', 0], ['{}', 0], ['{"commands":{}}', 0], ['{"commands":[]}', 0], ['{"commands":[{}]}', 0], ['{"commands":[]}', 42],
+    [json_encode(['commands' => [deployerTaskFixture('--file=evil.php')]], JSON_THROW_ON_ERROR), 0],
+]);
+
+it('returns the task execution exit code', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files, taskExit: 42);
+        $this->artisan('deploy:run', ['task' => 'deploy', '--no-interaction' => true])
+            ->expectsOutputToContain('Deployer task failed with exit code 42.')
+            ->assertExitCode(42);
+    });
+});
+
+it('offers deployment again after a successful unlock with all the same options', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:unlock', [
+            'selector' => ['production', 'role=web'], '--file' => 'ops.php', '--option' => ['keep_releases=5'],
+            '--limit' => '1', '--no-hooks' => true, '--log' => 'unlock.log', '--profile' => 'unlock.csv',
+        ])->expectsConfirmation('Run deployment again with the same options and selectors?', 'yes')->assertSuccessful();
+
+        expect(taskDeployerInvocations($directory, $files))->toBe([
+            ['--file=ops.php', 'deploy:unlock', '--limit=1', '--log=unlock.log', '--profile=unlock.csv', '--option=keep_releases=5', '--no-hooks', '--', 'production', 'role=web'],
+            ['--file=ops.php', 'deploy', '--limit=1', '--log=unlock.log', '--profile=unlock.csv', '--option=keep_releases=5', '--no-hooks', '--', 'production', 'role=web'],
+        ]);
+    });
+});
+
+it('does not deploy again when the unlock follow-up is declined', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:unlock')->expectsConfirmation('Run deployment again with the same options and selectors?', 'no')->assertSuccessful();
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
+    });
+});
+
+it('never offers to retry an unlock plan a failed unlock or a noninteractive unlock', function (array $options, int $exit) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($options, $exit) {
+        installTaskDeployerBinary($directory, $files, taskExit: $exit);
+        $this->artisan('deploy:unlock', $options)->assertExitCode($exit);
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(1);
+    });
+})->with([[['--plan' => true], 0], [[], 42], [['--no-interaction' => true], 0]]);
+
+it('rejects option-shaped host selectors in existing deployment commands', function (string $command) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($command) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan($command, ['selector' => ['--file=evil.php'], '--no-interaction' => true])->assertFailed();
+        expect($files->exists($directory.'/invocations.jsonl'))->toBeFalse();
+    });
+})->with(['deploy', 'deploy:unlock']);
+
+it('cleans temporary SSH identities after discovery errors and task failures', function (bool $discoveryFailure) {
+    forgetTestEnvironmentVariable('APP_KEY');
+
+    try {
+        withinTemporaryProject(function (string $directory, Filesystem $files) use ($discoveryFailure) {
+            $files->put($directory.'/.env', 'APP_KEY=base64:'.base64_encode(random_bytes(32))."\n");
+            $key = resolve(Ed25519KeyGenerator::class)->generatePrivateKey('owner@example.com');
+            putPhpConfiguration($files, $directory.'/config/dev_maintainer_secrets.php', ['ssh_key' => Crypt::encryptString($key)]);
+            installTaskDeployerBinary($directory, $files, $discoveryFailure ? 'bad json' : null, taskExit: 42);
+            $this->artisan('deploy:run', ['task' => 'deploy', '--no-interaction' => true])->assertExitCode($discoveryFailure ? 1 : 42);
+
+            foreach ($files->lines($directory.'/identity-paths.jsonl')->filter(fn (string $line): bool => $line !== '') as $line) {
+                $path = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                expect($path)->toBeString()->not->toBe('')->and($files->exists($path))->toBeFalse();
+            }
+        });
+    } finally {
+        forgetTestEnvironmentVariable('APP_KEY');
+    }
+})->with([true, false]);
+
+it('discovers real recipe tasks without running their bodies or connecting to hosts', function () {
+    $deployer = dirname(__DIR__, 2).'/vendor/deployer/deployer/bin/dep';
+
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($deployer) {
+        $path = $directory.'/vendor/bin/dep';
+        $source = '<?php require '.var_export($deployer, true).';';
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $files->put($path.'.php', $source);
+            $files->put($path.'.bat', '@"'.PHP_BINARY.'" "'.$path.'.php" %*'."\r\n");
+        } else {
+            $files->put($path.'.php', $source);
+            $files->put($path, "#!/bin/sh\nexec ".escapeshellarg(PHP_BINARY).' '.escapeshellarg($path.'.php').' "$@"'."\n");
+            chmod($path, 0755);
+        }
+
+        $files->put($directory.'/custom.php', <<<'RECIPE'
+<?php
+namespace Deployer;
+localhost('local');
+desc('Visible local task');
+task('sample:visible', function () { throw new \RuntimeException('Task body must not run during discovery.'); });
+task('sample:hidden', function () {})->hidden();
+RECIPE);
+        $tasks = resolve(DeployerRunner::class)->tasks('custom.php');
+        expect(array_keys($tasks))->toBe(['sample:visible'])->and($tasks['sample:visible']->description)->toBe('Visible local task');
+    });
+});
+
+it('accepts passthrough task options through the actual command line', function () {
+    $maintainer = dirname(__DIR__, 2).'/maintainer';
+
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($maintainer) {
+        installTaskDeployerBinary($directory, $files);
+        $process = new Process([PHP_BINARY, $maintainer, 'deploy:run', 'deploy', 'production', '-n', '--', '--message=hello world', '--force'], $directory);
+        $process->run();
+        expect($process->getExitCode())->toBe(0, $process->getOutput().$process->getErrorOutput());
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['deploy', '--no-interaction', '--message=hello world', '--force', '--', 'production']);
+    });
+});
+
+it('runs explicitly named hidden recipe tasks without exposing internal commands', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files);
+        $this->artisan('deploy:run', ['task' => 'secret', '--no-interaction' => true])->assertSuccessful();
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['secret', '--no-interaction']);
+    });
+});
+
+it('returns a failed deployment status after the unlock follow-up', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files, retryExit: 42);
+        $this->artisan('deploy:unlock')
+            ->expectsConfirmation('Run deployment again with the same options and selectors?', 'yes')
+            ->expectsOutputToContain('Deployer failed with exit code 42.')
+            ->assertExitCode(42);
+        expect(taskDeployerInvocations($directory, $files))->toHaveCount(2);
+    });
+});
+
+it('keeps shell punctuation in declared task names as a single process argument', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        $name = 'custom;touch '.$directory.'/injected';
+        installTaskDeployerBinary($directory, $files, json_encode(['commands' => [deployerTaskFixture($name)]], JSON_THROW_ON_ERROR));
+        $this->artisan('deploy:run', ['task' => $name, '--no-interaction' => true])->assertSuccessful();
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe([$name, '--no-interaction'])
+            ->and($files->exists($directory.'/injected'))->toBeFalse();
+    });
+});
+
+it('selects numeric task names without confusing option keys with labels', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installTaskDeployerBinary($directory, $files, json_encode(['commands' => [deployerTaskFixture('0', 'Numeric task')]], JSON_THROW_ON_ERROR));
+        $this->artisan('deploy:run')
+            ->expectsChoice('Which Deployer task should run?', 'task:0', ['task:0' => '0 - Numeric task'])
+            ->assertSuccessful();
+        expect(taskDeployerInvocations($directory, $files)[1])->toBe(['0']);
+    });
+});

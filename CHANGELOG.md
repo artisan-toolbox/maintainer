@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add a pending-push workflow that lists local branches and their outgoing commits before an explicitly confirmed push to origin.
+- Add `deploy:run` to select or directly execute declared Deployer tasks with Maintainer's temporary SSH identity.
+- Offer to run deployment again after a successful interactive unlock, preserving the selected hosts and deployment options.
+- Add opt-in APT update, upgrade, and server reboot tasks to the shared Deployer recipe.
+
+### Fixed
+
+- Isolate PM2 ecosystem replacement by application namespace and persist successful process changes before proceeding.
+- Keep other named PM2 namespaces intact and make cleanup of legacy processes in the default namespace configurable.
+- Update Symfony Filesystem, HttpFoundation, HttpKernel, and YAML to 8.1.11 to address seven dependency security advisories.
+
 ### Documentation
 
 - Standardize README badges for release status, compatibility, CI, and documentation.

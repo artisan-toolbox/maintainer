@@ -42,6 +42,7 @@ final class MaintainerCommand extends Command
         'diff:html' => '2 - View Git diff',
         'release:create' => '3 - New GitHub release',
         'readme:update' => '4 - Update README header',
+        'push' => '5 - Push pending Git commits',
     ];
 
     /**
@@ -67,6 +68,7 @@ final class MaintainerCommand extends Command
     private const array DEPLOYMENT_WORKFLOWS = [
         'deploy' => '1 - Deploy the project with Deployer',
         'deploy:unlock' => '2 - Unlock a failed deployment',
+        'deploy:run' => '3 - Choose a Deployer task',
     ];
 
     /**

@@ -86,6 +86,7 @@ it('runs the project Deployer binary with deployment options', function () {
                 '--no-hooks',
                 '--plan',
                 '--no-interaction',
+                '--',
                 'production',
                 'role=web',
             ]))
@@ -165,6 +166,7 @@ it('unlocks a failed deployment through the project Deployer binary', function (
             '--no-hooks',
             '--plan',
             '--no-interaction',
+            '--',
             'production',
         ]));
     });
