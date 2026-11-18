@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.0] - 2026-11-18
+
+### Features
+
+- **Add maintainer development skill documentation** (`8bd1e4c`)
+  Introduces new documentation for using the Maintainer CLI as a “project workflow skill” in existing Composer projects. The added file `resources/boost/skills/maintainer-development/SKILL.md` explains installation as a development dependency, key CLI commands (`list`, `config:publish`, `quality:check`), targeting quality tools (e.g., `--tool=pest`), and notes on how Maintainer contracts (such as `Versionable`) should be integrated (e.g., when considered for production dependencies). This is documentation-only and has no runtime/API or behavioral changes, but it improves discoverability and adoption of the Maintainer workflow via the Boost/skill catalog.
+
+- **Add case-insensitive task search to deploy:run selector** (`843c08a`)
+  Enhances the `deploy:run` interactive task selector to support case-insensitive searching by task name/description using the search prompt mechanism. When the `{task?}` argument is omitted, the command switches from a non-search `select` prompt to a `search` prompt backed by `SearchPrompt`, with a UI that includes a search placeholder (e.g., “Search tasks by name or description”), scroll limited to up to 10 results, and arrow-key guidance. Results are filtered using a case-insensitive substring match against the task label (name/description). If the search yields no matches and `SearchPrompt::shouldFallback()` indicates fallback behavior, the command throws a `RuntimeException` instructing the user to broaden the search or leave the task argument empty, preventing accidental execution of unintended tasks. Public command signature/arguments remain unchanged; this is a UX and selection-filter behavior change with a new failure mode when no results are found under fallback conditions.
+
+### Tests
+
+- **Cover deploy:run task search prompts across platforms** (`9eb334f`)
+  Expands automated coverage for the interactive `deploy:run` task selector to validate search behavior across prompt modes and platforms. Tests are updated to run with both “native prompts” and “fallback prompts” (with native prompts disabled on Windows), ensuring consistent behavior for matching, identity handling, and large-catalog scenarios. The change focuses on verifying the prompt interaction contract using search-based assertions rather than choice-only assertions, preventing regressions where platform-specific prompt rendering or fallback behavior could otherwise break task discovery or selection.
+
 ## [Unreleased]
 
 - Ship the Maintainer CLI and project workflow skill for discovery by Laravel Boost in consuming Laravel applications.
