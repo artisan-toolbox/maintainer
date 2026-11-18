@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Ship the Maintainer CLI and project workflow skill for discovery by Laravel Boost in consuming Laravel applications.
+
 ### Features
 
 - Search the interactive `deploy:run` task selector by name or description without matching letter case. Display up to ten tasks at once, with automatic height adjustment for smaller terminals.
