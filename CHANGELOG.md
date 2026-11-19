@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.13.0] - 2026-11-19
+
+### Features
+
+- **Gate release publishing on GitHub workflow and add resume support** (`31b42d8`)
+  Adds GitHub Actions workflow gating for release publishing and introduces resumability for prepared releases.
+
+Key changes:
+- Adds a new CLI option: `release:create {--resume : Retry publication for the prepared release commit}` to retry/pick up publication after an interrupted prepared release.
+- Introduces configuration-driven workflow support via a new `release.workflow` config value. It must be a nonempty workflow name/filename or `null` (default). This config is published as `release.workflow` in published configuration; consumers may now see/expect this key.
+- When `release.workflow` is set:
+  - The release process records a “PreparedRelease” (including repository, workflow, branch `{$major}.x`, commit, version data, title, and notes) into a `PreparedReleaseStore`.
+  - Rollback/disarming is coordinated so that once the prepared commit/tag workflow succeeds, the process disarms rollback.
+  - The command waits for a specific push workflow run to reach success via a new `GitHubReleaseGate::waitForSuccess(...)` implementation.
+  - Publishing the GitHub release occurs only after the workflow passes, ensuring release artifacts reflect the validated push/workflow.
+- Resumption logic: if `--resume` is provided (or a prepared release record exists at HEAD), the command validates that the prepared release matches the current config before continuing.
+
+User impact & migration:
+- Release creation/publishing behavior changes when `release.workflow` is configured: release publishing is no longer immediate and will now block until the configured GitHub Actions workflow succeeds.
+- Users can recover interrupted releases using `--resume`.
+- Any integrators relying on the previous interface/behavior should ensure they can accommodate the added workflow gating and the new configuration key (`release.workflow`).
+
+- **Update README release and Packagist badges** (`9e65003`)
+  Updates README documentation badges related to releases.
+
+Changes:
+- Replaces the generic GitHub “latest release” badge with a fixed version badge for v1.12.0.
+- Adds a Packagist badge.
+- Removes the README note that the Maintainer is “currently in beta” (which may change how users interpret readiness/expectations).
+- Removes the standalone Packagist link from the Resources list; Packagist is now represented only by the badge.
+
+Compatibility & impact:
+- No code/API behavior changes are implied—this is documentation/badging only.
+
 ## [1.12.0] - 2026-11-18
 
 ### Features
