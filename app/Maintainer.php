@@ -29,10 +29,11 @@ final class Maintainer implements BeforeVersioning, Versionable, WithReadmeHead
             ->withLogo(src: 'logo/maintainer-icon.svg', alt: '', width: 88)
             ->withTitle('Maintainer')
             ->withDescription('Automated validation, quality assurance, versioning, and release workflows for Laravel packages and applications.')
+            ->addBadge(Badge::releaseVersion('https://github.com/artisan-toolbox/maintainer/releases'))
             ->addBadge(Badge::make(
-                link: 'https://github.com/artisan-toolbox/maintainer/releases',
-                imgSrc: 'https://img.shields.io/github/v/release/artisan-toolbox/maintainer?label=Release&style=flat-square',
-                imgAlt: 'Release',
+                link: 'https://packagist.org/packages/artisan-toolbox/maintainer',
+                imgSrc: 'https://img.shields.io/badge/Packagist-F28D1A?style=flat-square&logo=packagist&logoColor=white',
+                imgAlt: 'Packagist',
             ))
             ->addBadge(Badge::make(
                 link: 'https://atb.dev.br/packages/maintainer/#requirements',

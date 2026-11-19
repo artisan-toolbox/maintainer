@@ -21,7 +21,7 @@ it('builds the Maintainer executable before versioning itself', function () {
     ] && $process->path === $projectRoot && $process->timeout === null);
 });
 
-it('keeps its README badges tied to the published release', function () {
+it('updates its README version badge when preparing a release', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files): void {
         $readme = $directory.'/README.md';
         $contents = $files->get(dirname(__DIR__, 2).'/README.md');
@@ -30,15 +30,22 @@ it('keeps its README badges tied to the published release', function () {
         $head = (new Maintainer)->readmeHead();
 
         expect($writer->update($directory, $head, Maintainer::VERSION))->toBeFalse()
-            ->and($writer->update($directory, $head, '2.0.0-beta.1'))->toBeFalse()
             ->and($files->get($readme))->toBe($contents)
             ->and(array_map(static fn (Badge $badge): array => [
-                $badge->imgAlt(), $badge->link(), $badge->imgSrc(),
+                $badge->imgAlt(), $badge->link(), $badge->imgSrc('1.2.3-beta.4'),
             ], $head->badges()))->toBe([
-                ['Release', 'https://github.com/artisan-toolbox/maintainer/releases', 'https://img.shields.io/github/v/release/artisan-toolbox/maintainer?label=Release&style=flat-square'],
+                ['version', 'https://github.com/artisan-toolbox/maintainer/releases', 'https://img.shields.io/badge/version-1.2.3--beta.4-blue?style=flat-square'],
+                ['Packagist', 'https://packagist.org/packages/artisan-toolbox/maintainer', 'https://img.shields.io/badge/Packagist-F28D1A?style=flat-square&logo=packagist&logoColor=white'],
                 ['PHP', 'https://atb.dev.br/packages/maintainer/#requirements', 'https://img.shields.io/badge/PHP-%5E8.5-777BB4?style=flat-square'],
                 ['Tests', 'https://github.com/artisan-toolbox/maintainer/actions/workflows/tests.yml?query=branch%3A1.x', 'https://img.shields.io/github/actions/workflow/status/artisan-toolbox/maintainer/tests.yml?branch=1.x&label=Tests&style=flat-square'],
                 ['Docs', 'https://atb.dev.br/packages/maintainer/', 'https://img.shields.io/badge/Docs-Read-blue?style=flat-square'],
             ]);
+
+        expect($writer->update($directory, $head, '2.0.0-beta.1'))->toBeTrue()
+            ->and($files->get($readme))->toBe(str_replace(
+                $head->badges()[0]->imgSrc(Maintainer::VERSION),
+                'https://img.shields.io/badge/version-2.0.0--beta.1-blue?style=flat-square',
+                $contents,
+            ));
     });
 });
