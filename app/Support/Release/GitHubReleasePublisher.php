@@ -11,5 +11,6 @@ interface GitHubReleasePublisher
         string $title,
         string $body,
         bool $prerelease,
+        ?string $verifiedTagRepository = null,
     ): string;
 }

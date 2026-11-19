@@ -7,7 +7,7 @@ use App\Support\Release\SemanticVersion;
 it('finds the highest valid GitHub release for the branch major', function () {
     $source = new class implements GitHubReleaseSource
     {
-        public function versions(string $projectRoot): array
+        public function versions(string $projectRoot, ?string $repository = null): array
         {
             return [
                 'invalid',
@@ -28,7 +28,7 @@ it('finds the highest valid GitHub release for the branch major', function () {
 it('returns no release when GitHub has none for the branch major', function () {
     $source = new class implements GitHubReleaseSource
     {
-        public function versions(string $projectRoot): array
+        public function versions(string $projectRoot, ?string $repository = null): array
         {
             return ['1.9.0', 'invalid'];
         }

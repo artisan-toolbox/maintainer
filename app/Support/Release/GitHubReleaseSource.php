@@ -7,5 +7,5 @@ interface GitHubReleaseSource
     /**
      * @return list<string>
      */
-    public function versions(string $projectRoot): array;
+    public function versions(string $projectRoot, ?string $repository = null): array;
 }

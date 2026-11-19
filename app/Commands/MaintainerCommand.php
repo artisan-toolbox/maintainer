@@ -40,7 +40,7 @@ final class MaintainerCommand extends Command
     private const array VERSIONING_WORKFLOWS = [
         'commit' => '1 - New Git commit',
         'diff:html' => '2 - View Git diff',
-        'release:create' => '3 - New GitHub release',
+        'release:create' => '3 - GitHub releases',
         'readme:update' => '4 - Update README header',
         'push' => '5 - Push pending Git commits',
     ];

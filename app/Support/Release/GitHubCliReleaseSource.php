@@ -17,15 +17,19 @@ final readonly class GitHubCliReleaseSource implements GitHubReleaseSource
     /**
      * @return list<string>
      */
-    public function versions(string $projectRoot): array
+    public function versions(string $projectRoot, ?string $repository = null): array
     {
+        [$host, $name] = $repository === null ? [null, '{owner}/{repo}'] : explode('/', $repository, 2);
         $command = [
             'gh',
             'api',
-            'repos/{owner}/{repo}/releases?per_page=100',
+            "repos/{$name}/releases?per_page=100",
             '--paginate',
             '--slurp',
         ];
+        if ($host !== null) {
+            array_push($command, '--hostname', $host);
+        }
         $process = $this->processFactory === null
             ? new Process($command, $projectRoot)
             : ($this->processFactory)($command, $projectRoot);

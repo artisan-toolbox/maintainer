@@ -9,14 +9,18 @@ use App\Support\Ai\ReleaseChangelogGenerator;
 use App\Support\Ai\ReleaseIncrement;
 use App\Support\Ai\ReleaseNotesGenerator;
 use App\Support\Ai\ReleaseVersionRecommender;
+use App\Support\Configuration\MaintainerConfiguration;
 use App\Support\Git\GitWorkingTree;
 use App\Support\Git\ReleaseBranch;
 use App\Support\ProjectPath;
 use App\Support\Quality\QualityCheckPrompt;
 use App\Support\Release\ChangelogWriter;
+use App\Support\Release\GitHubReleaseGate;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\LatestGitHubRelease;
 use App\Support\Release\PackageJsonVersionWriter;
+use App\Support\Release\PreparedRelease;
+use App\Support\Release\PreparedReleaseStore;
 use App\Support\Release\ReadmeHeadWriter;
 use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
@@ -26,6 +30,7 @@ use App\Support\Release\ReleaseVersionOptions;
 use App\Support\Release\ReleaseVersionSelector;
 use App\Support\Release\ReleaseWorktreeRollback;
 use App\Support\Release\SemanticVersion;
+use App\Support\Release\VersionableClass;
 use App\Support\Release\VersionableImplementation;
 use App\Support\Release\VersionableVersionWriter;
 use App\Support\Release\VersioningLifecycle;
@@ -42,7 +47,7 @@ use Throwable;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
 
-#[Signature('release:create')]
+#[Signature('release:create {--resume : Retry publication for the prepared release commit}')]
 #[Description('Create a new GitHub release for the project')]
 final class CreateReleaseCommand extends Command implements SignalableCommandInterface
 {
@@ -78,6 +83,9 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         ReleaseTitleReviewer $titleReviewer,
         ReleaseWorktreeRollback $releaseRollback,
         QualityCheckPrompt $qualityCheckPrompt,
+        MaintainerConfiguration $configuration,
+        GitHubReleaseGate $releaseGate,
+        PreparedReleaseStore $preparedReleases,
     ): int {
         $this->releaseRollback = $releaseRollback;
         $projectRoot = $projectPath->root();
@@ -99,10 +107,64 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $versionableClass = $versionableImplementation->findValidated($projectRoot, $semanticVersion);
             $this->components->twoColumnDetail('Versionable class', $versionableClass->name);
             $this->components->twoColumnDetail('Current version', $versionableClass->version ?? 'Not declared');
+
+            $workflow = $configuration->get('release.workflow');
+            throw_unless(
+                $workflow === null || (is_string($workflow) && trim($workflow) !== ''),
+                RuntimeException::class,
+                'The release.workflow option must be a nonempty GitHub Actions workflow name or filename, or null.',
+            );
+            $branch = "{$major}.x";
+            $repository = $workflow === null ? null : $git->githubOrigin($projectRoot);
+            $prepared = $workflow === null ? null : $preparedReleases->read($projectRoot);
+
+            if ($prepared !== null && $prepared->commit !== $git->head($projectRoot)) {
+                $prepared = null;
+            }
+
+            if ($this->option('resume') || $prepared !== null) {
+                throw_unless(
+                    $prepared !== null
+                        && $prepared->repository === $repository
+                        && $prepared->workflow === $workflow
+                        && $prepared->branch === $branch
+                        && $prepared->version === $versionableClass->version,
+                    RuntimeException::class,
+                    'No prepared release matches HEAD and the current release configuration.',
+                );
+            }
         } catch (RuntimeException $exception) {
             $this->components->error('Unable to complete the initial release validation: '.$exception->getMessage());
 
             return self::FAILURE;
+        }
+
+        if ($prepared !== null) {
+            if (! $this->option('resume')) {
+                if (! $this->input->isInteractive()) {
+                    $this->components->error('A release is already prepared at HEAD. Run release:create --resume to continue.');
+
+                    return self::FAILURE;
+                }
+
+                if (! confirm("Resume the prepared GitHub release {$prepared->version}?", default: false)) {
+                    $this->components->info('The prepared release remains available.');
+
+                    return self::SUCCESS;
+                }
+            }
+
+            try {
+                $this->publishPrepared($projectRoot, $prepared, $git, $releaseGate, $publisher);
+                $preparedReleases->delete($projectRoot);
+                $this->finishRelease($lifecycle, $versionableClass, $prepared->currentVersion, $prepared->version);
+
+                return self::SUCCESS;
+            } catch (Throwable $exception) {
+                $this->components->error('Unable to resume the release: '.$exception->getMessage());
+
+                return self::FAILURE;
+            }
         }
 
         if (! $this->input->isInteractive()) {
@@ -125,7 +187,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         try {
             $operation = 'fetch GitHub releases';
             $latestVersion = spin(
-                fn () => $latestGitHubRelease->forMajor($projectRoot, $major),
+                fn () => $latestGitHubRelease->forMajor($projectRoot, $major, $repository),
                 'Fetching GitHub releases...',
             );
 
@@ -258,6 +320,37 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             );
             $this->components->twoColumnDetail('Commit', $commit);
 
+            if ($workflow !== null && $repository !== null) {
+                $operation = 'record the prepared release';
+                $prepared = new PreparedRelease(
+                    $repository,
+                    $workflow,
+                    $branch,
+                    $git->head($projectRoot),
+                    $currentVersion,
+                    $selectedVersion,
+                    $releaseTitle,
+                    $releaseNotes->body,
+                );
+                $preparedReleases->write($projectRoot, $prepared);
+                $releaseRollback->disarm();
+
+                $operation = 'publish the prepared GitHub release';
+                try {
+                    $this->publishPrepared($projectRoot, $prepared, $git, $releaseGate, $publisher);
+                } catch (Throwable $exception) {
+                    $this->components->warn('The prepared release commit was kept. Resume from Versioning › GitHub releases or run release:create --resume after the required workflow passes.');
+
+                    throw $exception;
+                }
+
+                $preparedReleases->delete($projectRoot);
+                $operation = 'run the after-versioning callback';
+                $this->finishRelease($lifecycle, $versionableClass, $currentVersion, $selectedVersion);
+
+                return self::SUCCESS;
+            }
+
             $operation = 'push the release commit';
             spin(
                 function () use ($git, $projectRoot, $releaseRollback): void {
@@ -274,7 +367,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
                 fn (): string => $publisher->publish(
                     $projectRoot,
                     $selectedVersion,
-                    "{$major}.x",
+                    $branch,
                     $releaseTitle,
                     $releaseNotes->body,
                     $selected?->prerelease !== null,
@@ -283,17 +376,9 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             );
             $this->components->twoColumnDetail('GitHub release', $releaseUrl);
 
-            if ($versionableClass->implements(AfterVersioning::class)) {
-                $operation = 'run the after-versioning callback';
-                spin(
-                    fn (): bool => $lifecycle->after($versionableClass, $currentVersion, $selectedVersion),
-                    "Running the after-versioning callback for {$selectedVersion}...",
-                );
-                $this->components->twoColumnDetail('After versioning', "{$currentVersion} → {$selectedVersion}");
-            }
-
+            $operation = 'run the after-versioning callback';
+            $this->finishRelease($lifecycle, $versionableClass, $currentVersion, $selectedVersion);
             $releaseRollback->disarm();
-            $this->components->success("Published GitHub release {$selectedVersion}.");
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
@@ -311,6 +396,58 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
 
             return self::FAILURE;
         }
+    }
+
+    private function publishPrepared(
+        string $projectRoot,
+        PreparedRelease $release,
+        ReleaseGitRepository $git,
+        GitHubReleaseGate $gate,
+        GitHubReleasePublisher $publisher,
+    ): void {
+        spin(
+            fn () => $git->pushReleaseCommit($projectRoot, $release),
+            'Pushing the prepared release commit to origin...',
+        );
+        $this->components->twoColumnDetail('Release commit', $release->commit);
+
+        spin(
+            fn () => $gate->waitForSuccess($projectRoot, $release),
+            "Waiting for the {$release->workflow} push workflow...",
+        );
+        $this->components->success("The {$release->workflow} workflow passed for the release commit.");
+
+        $releaseUrl = spin(function () use ($projectRoot, $release, $git, $publisher): string {
+            $git->pushReleaseTag($projectRoot, $release);
+
+            return $publisher->publish(
+                $projectRoot,
+                $release->version,
+                $release->commit,
+                $release->title,
+                $release->body,
+                str_contains($release->version, '-'),
+                $release->repository,
+            );
+        }, 'Publishing the verified GitHub release...');
+        $this->components->twoColumnDetail('GitHub release', $releaseUrl);
+    }
+
+    private function finishRelease(
+        VersioningLifecycle $lifecycle,
+        VersionableClass $versionable,
+        string $currentVersion,
+        string $selectedVersion,
+    ): void {
+        if ($versionable->implements(AfterVersioning::class)) {
+            spin(
+                fn (): bool => $lifecycle->after($versionable, $currentVersion, $selectedVersion),
+                "Running the after-versioning callback for {$selectedVersion}...",
+            );
+            $this->components->twoColumnDetail('After versioning', "{$currentVersion} → {$selectedVersion}");
+        }
+
+        $this->components->success("Published GitHub release {$selectedVersion}.");
     }
 
     /** @return list<int> */
@@ -340,7 +477,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         }
 
         if ($this->releaseRollback === null || ! $this->releaseRollback->isArmed()) {
-            $this->components->warn('SIGTERM received before release changes were prepared. No rollback was required.');
+            $this->components->warn('SIGTERM received with no active release rollback. No rollback was required.');
 
             return 128 + self::SIGTERM;
         }

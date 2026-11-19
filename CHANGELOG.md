@@ -17,6 +17,10 @@
 
 ## [Unreleased]
 
+- Allow projects to require a GitHub Actions push workflow before publishing a release. Publish the exact checked commit and resume an interrupted release with `release:create --resume`.
+- Offer to resume a prepared release from the Versioning menu.
+- Include `release.workflow` in published configuration with a `null` default.
+
 - Ship the Maintainer CLI and project workflow skill for discovery by Laravel Boost in consuming Laravel applications.
 
 ### Features

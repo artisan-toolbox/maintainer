@@ -16,5 +16,11 @@ interface ReleaseGitRepository
 
     public function push(string $projectRoot): void;
 
+    public function githubOrigin(string $projectRoot): string;
+
+    public function pushReleaseCommit(string $projectRoot, PreparedRelease $release): void;
+
+    public function pushReleaseTag(string $projectRoot, PreparedRelease $release): void;
+
     public function rollback(string $projectRoot, string $reference): void;
 }

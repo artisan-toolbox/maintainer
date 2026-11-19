@@ -13,8 +13,10 @@ use App\Support\Quality\QualityCommand;
 use App\Support\Quality\QualityCommandAvailability;
 use App\Support\Quality\QualityTool;
 use App\Support\Release\GitCliReleaseRepository;
+use App\Support\Release\GitHubReleaseGate;
 use App\Support\Release\GitHubReleasePublisher;
 use App\Support\Release\GitHubReleaseSource;
+use App\Support\Release\PreparedReleaseStore;
 use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseDiffReviewer;
 use App\Support\Release\ReleaseGitRepository;
@@ -24,6 +26,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Prompts\ConfirmPrompt;
+use Laravel\Prompts\SelectPrompt;
 use Laravel\Prompts\TextareaPrompt;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Process\Process;
@@ -249,6 +252,95 @@ it('continues when the Git working tree is clean', function () {
         ReleaseNotesAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '[feat] abc1234 Improve the release workflow'));
     });
 });
+
+it('keeps a failed prepared release and publishes the exact same commit after CI succeeds', function (string $entryPoint) {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files) use ($entryPoint): void {
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'release' => ['workflow' => 'tests.yml'],
+        ]);
+        new Process(['git', 'add', 'config/dev_maintainer.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Require release CI'], $directory)->mustRun();
+
+        $git = resolve(FakeReleaseGitRepository::class);
+        $runs = ['failure', 'success'];
+        app()->instance(GitHubReleaseGate::class, new GitHubReleaseGate(
+            function (array $command) use ($git, &$runs): Process {
+                $release = $git->pushedRelease;
+                expect($release)->not->toBeNull();
+                expect($git->taggedRelease)->toBeNull();
+                expect($command)->toContain('--commit', $release->commit);
+
+                $workflow = json_encode([[
+                    'headSha' => $release->commit,
+                    'headBranch' => $release->branch,
+                    'event' => 'push',
+                    'status' => 'completed',
+                    'conclusion' => array_shift($runs),
+                    'url' => 'https://github.com/example/project/actions/runs/1',
+                ]], flags: JSON_THROW_ON_ERROR);
+
+                return new Process([PHP_BINARY, '-r', 'echo $argv[1];', $workflow]);
+            },
+        ));
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('concluded failure')
+            ->expectsOutputToContain('release:create --resume')
+            ->assertFailed();
+
+        $store = resolve(PreparedReleaseStore::class);
+        $pending = $store->read($directory);
+        $publisher = resolve(FakeGitHubReleasePublisher::class);
+        expect($pending)->toEqual($git->pushedRelease)
+            ->and($git->taggedRelease)->toBeNull()
+            ->and($git->rolledBack)->toBeFalse()
+            ->and($publisher->published)->toBeNull();
+
+        new Process(['git', 'add', '--all'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Record prepared files for retry'], $directory)->mustRun();
+        $this->artisan('release:create', ['--no-interaction' => true])
+            ->expectsOutputToContain('A release is already prepared at HEAD.')
+            ->assertFailed();
+
+        if ($entryPoint === 'menu') {
+            ConfirmPrompt::fallbackWhen(true);
+            SelectPrompt::fallbackWhen(true);
+            $selectRelease = fn () => $this->artisan('maintainer')
+                ->expectsQuestion('What would you like to manage?', 'versioning')
+                ->expectsQuestion('Choose a versioning workflow', 'release:create');
+            $question = "Resume the prepared GitHub release {$pending->version}?";
+
+            $selectRelease()
+                ->expectsConfirmation($question, 'no')
+                ->expectsOutputToContain('The prepared release remains available.')
+                ->assertSuccessful();
+
+            expect($runs)->toBe(['success'])
+                ->and($publisher->published)->toBeNull()
+                ->and($store->read($directory))->toEqual($pending);
+
+            $command = $selectRelease()->expectsConfirmation($question, 'yes');
+        } else {
+            $command = $this->artisan('release:create', ['--resume' => true, '--no-interaction' => true]);
+        }
+
+        $command
+            ->expectsOutputToContain('workflow passed for the release commit')
+            ->assertSuccessful()
+            ->run();
+
+        expect($git->taggedRelease)->toEqual($pending)
+            ->and($publisher->verifiedTagRepository)->toBe($pending->repository)
+            ->and($publisher->published)->toMatchArray([
+                'version' => $pending->version,
+                'target' => $pending->commit,
+                'title' => $pending->title,
+                'body' => $pending->body,
+            ])
+            ->and($store->read($directory))->toBeNull()
+            ->and($runs)->toBe([]);
+    });
+})->with(['direct command' => 'cli', 'versioning menu' => 'menu']);
 
 it('runs configured fixes after writing the changelog and before staging the release', function () {
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {

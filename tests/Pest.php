@@ -105,6 +105,9 @@ function defaultMaintainerConfigurationFixture(): array
                 'output_format' => 'line_by_line',
             ],
         ],
+        'release' => [
+            'workflow' => null,
+        ],
         'quality' => [
             'fix' => [
                 RunsRectorFix::class,

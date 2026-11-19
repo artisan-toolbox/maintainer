@@ -59,10 +59,53 @@ final class GitCliReleaseRepository implements ReleaseGitRepository
         $this->run(['git', 'push', 'origin', 'HEAD'], $projectRoot);
     }
 
+    public function githubOrigin(string $projectRoot): string
+    {
+        $fetch = trim($this->run(['git', 'remote', 'get-url', '--all', 'origin'], $projectRoot));
+        $push = trim($this->run(['git', 'remote', 'get-url', '--push', '--all', 'origin'], $projectRoot));
+        throw_unless(
+            $fetch === $push
+                && preg_match(
+                    '~^(?:https?://|ssh://(?:git@)?|git@)([a-zA-Z0-9.-]+)[/:]([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)\z~',
+                    $fetch,
+                    $matches,
+                ) === 1,
+            RuntimeException::class,
+            'A release protected by GitHub Actions requires one matching GitHub fetch and push URL for origin.',
+        );
+
+        return strtolower($matches[1].'/'.$matches[2].'/'.preg_replace('/\.git\z/', '', $matches[3]));
+    }
+
+    public function pushReleaseCommit(string $projectRoot, PreparedRelease $release): void
+    {
+        $this->pushReleaseReference($projectRoot, $release, "refs/heads/{$release->branch}");
+    }
+
+    public function pushReleaseTag(string $projectRoot, PreparedRelease $release): void
+    {
+        $this->pushReleaseReference($projectRoot, $release, "refs/tags/{$release->version}");
+    }
+
     public function rollback(string $projectRoot, string $reference): void
     {
         $this->run(['git', 'reset', '--hard', $reference], $projectRoot);
         $this->run(['git', 'clean', '-fd'], $projectRoot);
+    }
+
+    private function pushReleaseReference(string $projectRoot, PreparedRelease $release, string $reference): void
+    {
+        throw_unless(
+            $this->githubOrigin($projectRoot) === $release->repository,
+            RuntimeException::class,
+            'Origin changed after the release commit was prepared.',
+        );
+
+        $this->run([
+            'git', '-c', 'push.followTags=false', '-c', 'remote.origin.mirror=false',
+            'push', '--no-force', '--no-follow-tags', '--recurse-submodules=no',
+            '--', 'origin', "{$release->commit}:{$reference}",
+        ], $projectRoot);
     }
 
     private function emptyTree(string $projectRoot): string

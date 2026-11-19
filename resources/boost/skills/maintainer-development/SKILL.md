@@ -33,6 +33,10 @@ php vendor/bin/maintainer quality:check --no-interaction
 
 Read the result for each configured tool. An unavailable tool can be reported as skipped, so verify that the expected checks ran. Use `--tool=pest` to select only Pest when the project has installed it. Review `quality:fix` separately when edits are requested.
 
+## Require CI before publishing
+
+The published `config/maintainer.php` sets `release.workflow` to `null`. To require CI before publication, replace `null` with a workflow filename such as `tests.yml`. The workflow must run on pushes to the release branch. Maintainer waits for a successful run for the pushed commit and publishes that commit. If waiting or publishing fails, stay on the prepared commit and reopen **Versioning › GitHub releases**. Confirm the prompt to resume the displayed version. For direct invocation, use `php vendor/bin/maintainer release:create --resume`.
+
 ## Choose a workflow
 
 - [Install and verify the CLI](https://atb.dev.br/docs/maintainer/installation)

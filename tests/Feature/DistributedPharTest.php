@@ -59,6 +59,10 @@ it('publishes configuration from the distributed executable in a consuming packa
         $process->mustRun();
 
         expect($process->getOutput())->toContain('Configuration publishing completed.');
+        $configuration = require $directory.'/config/maintainer.php';
+        expect($configuration)->toHaveKey('release.workflow')
+            ->and($configuration['release']['workflow'])->toBeNull();
+
         $packageRoot = dirname(__DIR__, 2);
 
         foreach ([

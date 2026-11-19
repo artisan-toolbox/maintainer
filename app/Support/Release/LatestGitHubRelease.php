@@ -9,11 +9,11 @@ final readonly class LatestGitHubRelease
         private SemanticVersion $semanticVersion,
     ) {}
 
-    public function forMajor(string $projectRoot, int $major): ?SemanticVersionNumber
+    public function forMajor(string $projectRoot, int $major, ?string $repository = null): ?SemanticVersionNumber
     {
         $latest = null;
 
-        foreach ($this->source->versions($projectRoot) as $version) {
+        foreach ($this->source->versions($projectRoot, $repository) as $version) {
             $candidate = $this->semanticVersion->parse($version);
 
             if ($candidate === null || $candidate->major !== $major) {

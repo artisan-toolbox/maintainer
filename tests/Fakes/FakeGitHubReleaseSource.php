@@ -9,7 +9,7 @@ final class FakeGitHubReleaseSource implements GitHubReleaseSource
     /** @var list<string> */
     public array $releases = ['1.0.0'];
 
-    public function versions(string $projectRoot): array
+    public function versions(string $projectRoot, ?string $repository = null): array
     {
         return $this->releases;
     }

@@ -2,6 +2,7 @@
 
 namespace Tests\Fakes;
 
+use App\Support\Release\PreparedRelease;
 use App\Support\Release\ReleaseChangeSet;
 use App\Support\Release\ReleaseGitRepository;
 
@@ -13,6 +14,10 @@ final class FakeReleaseGitRepository implements ReleaseGitRepository
 
     public bool $pushed = false;
 
+    public ?PreparedRelease $pushedRelease = null;
+
+    public ?PreparedRelease $taggedRelease = null;
+
     public bool $rolledBack = false;
 
     public ?string $changelogWhenStaged = null;
@@ -22,7 +27,7 @@ final class FakeReleaseGitRepository implements ReleaseGitRepository
 
     public function head(string $projectRoot): string
     {
-        return 'baseline-head';
+        return $this->committed ? str_repeat('a', 40) : 'baseline-head';
     }
 
     public function ensureLocalReference(string $projectRoot, string $reference): void
@@ -56,6 +61,21 @@ final class FakeReleaseGitRepository implements ReleaseGitRepository
     public function push(string $projectRoot): void
     {
         $this->pushed = true;
+    }
+
+    public function githubOrigin(string $projectRoot): string
+    {
+        return 'github.com/example/project';
+    }
+
+    public function pushReleaseCommit(string $projectRoot, PreparedRelease $release): void
+    {
+        $this->pushedRelease = $release;
+    }
+
+    public function pushReleaseTag(string $projectRoot, PreparedRelease $release): void
+    {
+        $this->taggedRelease = $release;
     }
 
     public function rollback(string $projectRoot, string $reference): void

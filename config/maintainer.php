@@ -24,6 +24,9 @@ return [
             'output_format' => env('MAINTAINER_GIT_DIFF_OUTPUT_FORMAT', 'line_by_line'),
         ],
     ],
+    'release' => [
+        'workflow' => null,
+    ],
     'quality' => [
         'fix' => [
             RunsRectorFix::class,
