@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.3] - 2026-11-20
+
+### Features
+
+- **Refresh the interactive menu banner and SVG branding** (`6ae120c`)
+  Replace the ASCII menu banner with a five-line Unicode MAINTAINER wordmark that displays the CLI version at the end of the middle line. The menu renders the banner as a Laravel Prompts note, using the terminal width minus one column and leaving the breadcrumb unchanged. If the middle line does not fit, the banner falls back to `MAINTAINER  v<version>` on one line. Decorated output adds Symfony Console colors and a bold version; undecorated output contains no ANSI escapes. Refresh the standalone SVG icon and both light and dark wordmarks with clipped-corner badges, slanted lettering, and warm gradients, while preserving their existing viewBoxes and accessible titles. The changelog documents the new layout and branding, and unit tests cover version placement, exact-width rendering, the one-column-short fallback, and color that leaves the banner text unchanged. Existing no-argument calls to `MaintainerBanner::render()` remain valid, but consumers that match the old ASCII text or version placement must update their expectations.
+
 ## [1.14.2] - 2026-11-20
 
 ### Fixes

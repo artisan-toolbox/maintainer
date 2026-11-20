@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Process;
 
 final class Maintainer implements BeforeVersioning, Versionable, WithReadmeHead
 {
-    public const string VERSION = '1.14.2';
+    public const string VERSION = '1.14.3';
 
     public static function beforeVersioning(string $current, string $next): void
     {
