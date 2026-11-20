@@ -23,6 +23,7 @@
 
 ### Features
 
+- Refresh the interactive menu with a color wordmark and the CLI version alongside it. The header fits narrow terminals with a single-line layout. Update the standalone SVG icon and both wordmarks to match.
 - Move the CI setup action to the repository root so GitHub's source archive includes it. Replace `artisan-toolbox/maintainer/.github/actions/setup-ci` with `artisan-toolbox/maintainer` and pin the call to a full commit SHA containing the root `action.yml`. The action keeps its existing inputs. The reusable CI workflow also uses the root action at the workflow's revision.
 
 ### Fixes

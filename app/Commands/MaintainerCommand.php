@@ -11,7 +11,6 @@ use LogicException;
 use Throwable;
 
 use function Laravel\Prompts\clear;
-use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\select;
 
@@ -144,7 +143,7 @@ final class MaintainerCommand extends Command
     {
         $this->clearTerminalWhenSupported();
 
-        info($banner->render());
+        note($banner->render(Prompt::terminal()->cols() - 1, $this->output->isDecorated()));
         note($breadcrumb, 'info');
     }
 
