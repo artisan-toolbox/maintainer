@@ -24,11 +24,16 @@ use App\Support\Release\ReleaseTitleReviewer;
 use App\Support\Release\ReleaseVersionSelector;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Str;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\SelectPrompt;
 use Laravel\Prompts\TextareaPrompt;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Process\Process;
 use Tests\Fakes\FakeBrowserLauncher;
 use Tests\Fakes\FakeGitHubReleasePublisher;
@@ -174,15 +179,21 @@ PHP
     app()->instance(BrowserLauncher::class, $browser);
     app()->instance(FakeBrowserLauncher::class, $browser);
     ReleaseVersionAgent::fake([[
-        'release_increment' => 'patch',
-        'justification' => 'The diff contains backwards-compatible fixes and maintenance.',
+        'recommended_version' => '1.0.1',
+        'reasons' => [
+            '1.0.1' => 'The diff contains maintenance.',
+            '1.1.0' => 'The diff adds no public capability.',
+            '1.1.0-alpha.1' => 'The change needs no experimental preview.',
+            '1.1.0-beta.1' => 'The change needs no stabilization release.',
+        ],
+        'public_change_evidence' => '',
     ]]);
     ReleaseDiffSummaryAgent::fake([[
         'summary' => 'The release workflow changes project versioning behavior.',
     ]]);
     ReleaseNotesAgent::fake([[
         'title' => 'Improve the release workflow',
-        'body' => "## Changed\n\nImproved the release workflow.",
+        'sections' => [['type' => 'changed', 'heading' => 'Changed', 'items' => ['Improved the release workflow.']]],
     ]]);
     ReleaseChangelogAgent::fake([[
         'entries' => [[
@@ -231,6 +242,9 @@ it('continues when the Git working tree is clean', function () {
             ->expectsOutputToContain('Release branch')
             ->expectsOutputToContain('Latest GitHub version')
             ->expectsOutputToContain('Selected version')
+            ->expectsOutputToContain('Summarizing release changes')
+            ->expectsOutputToContain('Building the changelog')
+            ->expectsOutputToContain('Writing GitHub release notes')
             ->doesntExpectOutputToContain('CI checks completed successfully')
             ->assertSuccessful();
 
@@ -253,37 +267,94 @@ it('continues when the Git working tree is clean', function () {
     });
 });
 
-it('keeps a failed prepared release and publishes the exact same commit after CI succeeds', function (string $entryPoint) {
-    withinTemporaryReleaseProject(function (string $directory, Filesystem $files) use ($entryPoint): void {
+it('offers to deploy the published tag when a local recipe exists', function (string $recipe, string $answer, int $deployExitCode) {
+    ConfirmPrompt::fallbackWhen(true);
+
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files) use ($recipe, $answer, $deployExitCode): void {
+        $files->put($directory.'/'.$recipe, "Fixture recipe\n");
+        new Process(['git', 'add', $recipe], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add deployment recipe'], $directory)->mustRun();
+        $deployStarted = false;
+
+        Artisan::registerCommand(new Command('deploy')
+            ->addOption('file', null, InputOption::VALUE_REQUIRED)
+            ->addOption('tag', null, InputOption::VALUE_REQUIRED)
+            ->setCode(function (InputInterface $input) use ($recipe, &$deployStarted, $deployExitCode): int {
+                $deployStarted = true;
+                expect($input->getOption('file'))->toBe($recipe)
+                    ->and($input->getOption('tag'))->toBe('1.0.1')
+                    ->and(resolve(FakeGitHubReleasePublisher::class)->published['version'])->toBe('1.0.1');
+
+                return $deployExitCode;
+            }));
+
+        $release = $this->artisan('release:create')
+            ->expectsOutputToContain('Published GitHub release 1.0.1.')
+            ->expectsConfirmation('Deploy release 1.0.1 now?', $answer)
+            ->assertExitCode($deployExitCode);
+
+        if ($deployExitCode !== 0) {
+            $release->expectsOutputToContain('GitHub release 1.0.1 is published. The deployment failed.');
+        }
+
+        $release->run();
+
+        expect($deployStarted)->toBe($answer === 'yes')
+            ->and(resolve(FakeReleaseGitRepository::class)->rolledBack)->toBeFalse();
+    });
+})->with([
+    'declined' => ['deploy.php', 'no', 0],
+    'PHP recipe' => ['deploy.php', 'yes', 0],
+    'YAML deployment failed' => ['deploy.yaml', 'yes', 7],
+]);
+
+it('keeps a failed prepared release and publishes the exact same commit after all required CI passes', function (string $entryPoint, string|array $workflow) {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files) use ($entryPoint, $workflow): void {
         putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
-            'release' => ['workflow' => 'tests.yml'],
+            'release' => ['workflow' => $workflow],
         ]);
-        new Process(['git', 'add', 'config/dev_maintainer.php'], $directory)->mustRun();
+        $files->put($directory.'/deploy.php', "<?php\n");
+        new Process(['git', 'add', 'config/dev_maintainer.php', 'deploy.php'], $directory)->mustRun();
         new Process(['git', 'commit', '-m', 'Require release CI'], $directory)->mustRun();
 
         $git = resolve(FakeReleaseGitRepository::class);
-        $runs = ['failure', 'success'];
+        $runs = is_array($workflow)
+            ? [42 => ['success', 'success'], 43 => ['failure', 'success']]
+            : [42 => ['failure', 'success']];
         app()->instance(GitHubReleaseGate::class, new GitHubReleaseGate(
             function (array $command) use ($git, &$runs): Process {
+                if ($command[1] === 'api') {
+                    $catalog = json_encode([['workflows' => [
+                        ['id' => 42, 'name' => 'Tests', 'path' => '.github/workflows/tests.yml', 'state' => 'active'],
+                        ['id' => 43, 'name' => 'Coverage', 'path' => '.github/workflows/coverage.yml', 'state' => 'active'],
+                    ]]], flags: JSON_THROW_ON_ERROR);
+
+                    return new Process([PHP_BINARY, '-r', 'echo $argv[1];', $catalog]);
+                }
+
                 $release = $git->pushedRelease;
                 expect($release)->not->toBeNull();
                 expect($git->taggedRelease)->toBeNull();
                 expect($command)->toContain('--commit', $release->commit);
+                $workflowId = (int) $command[array_search('--workflow', $command, true) + 1];
 
-                $workflow = json_encode([[
+                $run = json_encode([[
                     'headSha' => $release->commit,
                     'headBranch' => $release->branch,
                     'event' => 'push',
                     'status' => 'completed',
-                    'conclusion' => array_shift($runs),
-                    'url' => 'https://github.com/example/project/actions/runs/1',
+                    'conclusion' => array_shift($runs[$workflowId]),
+                    'url' => "https://github.com/example/project/actions/runs/{$workflowId}",
+                    'workflowDatabaseId' => $workflowId,
                 ]], flags: JSON_THROW_ON_ERROR);
 
-                return new Process([PHP_BINARY, '-r', 'echo $argv[1];', $workflow]);
+                return new Process([PHP_BINARY, '-r', 'echo $argv[1];', $run]);
             },
         ));
 
         $this->artisan('release:create')
+            ->expectsOutputToContain('Waiting for GitHub Actions on 1.x.')
+            ->expectsOutputToContain('Completed (failure)')
             ->expectsOutputToContain('concluded failure')
             ->expectsOutputToContain('release:create --resume')
             ->assertFailed();
@@ -315,17 +386,21 @@ it('keeps a failed prepared release and publishes the exact same commit after CI
                 ->expectsOutputToContain('The prepared release remains available.')
                 ->assertSuccessful();
 
-            expect($runs)->toBe(['success'])
+            expect($runs)->toBe(array_fill_keys(array_keys($runs), ['success']))
                 ->and($publisher->published)->toBeNull()
                 ->and($store->read($directory))->toEqual($pending);
 
-            $command = $selectRelease()->expectsConfirmation($question, 'yes');
+            $command = $selectRelease()
+                ->expectsConfirmation($question, 'yes')
+                ->expectsConfirmation("Deploy release {$pending->version} now?", 'no');
         } else {
             $command = $this->artisan('release:create', ['--resume' => true, '--no-interaction' => true]);
         }
 
         $command
-            ->expectsOutputToContain('workflow passed for the release commit')
+            ->expectsOutputToContain('Completed (success)')
+            ->expectsOutputToContain('https://github.com/example/project/actions/runs/42')
+            ->expectsOutputToContain(is_array($workflow) ? 'All required workflows passed for the release commit.' : 'The tests.yml workflow passed for the release commit.')
             ->assertSuccessful()
             ->run();
 
@@ -338,9 +413,30 @@ it('keeps a failed prepared release and publishes the exact same commit after CI
                 'body' => $pending->body,
             ])
             ->and($store->read($directory))->toBeNull()
-            ->and($runs)->toBe([]);
+            ->and($runs)->toBe(array_fill_keys(array_keys($runs), []));
     });
-})->with(['direct command' => 'cli', 'versioning menu' => 'menu']);
+})->with([
+    'direct command with one workflow' => ['cli', 'tests.yml'],
+    'versioning menu with one workflow' => ['menu', 'tests.yml'],
+    'direct command with tests and coverage' => ['cli', ['tests.yml', 'coverage.yml']],
+]);
+
+it('requires interactive input for a new gated release before contacting GitHub', function (): void {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'release' => ['workflow' => ['tests.yml', 'coverage.yml']],
+        ]);
+        new Process(['git', 'add', 'config/dev_maintainer.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Require release CI'], $directory)->mustRun();
+        app()->instance(GitHubReleaseGate::class, new GitHubReleaseGate(
+            static fn (): never => throw new LogicException('A new non-interactive release should exit before calling GitHub.'),
+        ));
+
+        $this->artisan('release:create', ['--no-interaction' => true])
+            ->expectsOutputToContain('The release:create command requires interactive input')
+            ->assertFailed();
+    });
+});
 
 it('runs configured fixes after writing the changelog and before staging the release', function () {
     withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
@@ -533,18 +629,93 @@ it('uses the structured AI recommendation as the default for a stable release', 
                 ],
             ],
         ]);
+        $files->put($directory.'/src/Export.php', "<?php\nfunction exportCsv(): string { return 'CSV'; }\n");
+        new Process(['git', 'add', 'src/Export.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add CSV exports'], $directory)->mustRun();
         ReleaseVersionAgent::fake([[
-            'release_increment' => 'minor',
-            'justification' => 'The diff adds a backward-compatible public command option.',
+            'recommended_version' => '1.1.0',
+            'reasons' => [
+                '1.0.1' => 'A patch would omit the new API from the version signal.',
+                '1.1.0' => 'The diff adds a backward-compatible CSV export. Consumers can now export records through the public exportCsv function while existing callers can continue using their current exports.',
+                '1.1.0-alpha.1' => 'The export has no experimental designation.',
+                '1.1.0-beta.1' => 'The export does not introduce a beta cycle.',
+            ],
+            'public_change_evidence' => "+function exportCsv(): string { return 'CSV'; }",
         ]]);
-        $this->artisan('release:create')
-            ->expectsOutputToContain('AI recommendation')
-            ->expectsOutputToContain('1.1.0')
-            ->expectsOutputToContain('The diff adds a backward-compatible public command option.')
-            ->assertSuccessful();
+        $this->withoutMockingConsoleOutput();
+        $originalWidth = getenv('COLUMNS');
+        putenv('COLUMNS=54');
+        try {
+            $result = Artisan::call('release:create');
+            $output = Artisan::output();
+        } finally {
+            putenv($originalWidth === false ? 'COLUMNS' : 'COLUMNS='.$originalWidth);
+        }
+        $rationales = Str::between($output, 'Minor — 1.1.0', 'Selected version');
+        foreach (explode("\n", $rationales) as $line) {
+            expect(mb_strwidth(rtrim($line)))->toBeLessThanOrEqual(54);
+        }
+        expect($result)->toBe(Command::SUCCESS);
+        expect(preg_replace('/\s+/', ' ', $output))
+            ->toContain('AI recommendation', 'The diff adds a backward-compatible CSV export', 'Other release options',
+                'A patch would omit the new API', 'The export has no experimental designation', 'The export does not introduce a beta cycle');
+        expect($output)->toMatch('~Analyzing the release diff[^\n]*openai / gpt-6\.2-sol~');
+        foreach (['Summarizing release changes', 'Building the changelog', 'Writing GitHub release notes'] as $activity) {
+            expect($output)->toMatch('~'.preg_quote($activity, '~').'[^\n]*openai / gpt-6\.2-sol~');
+        }
 
         expect($files->get($directory.'/src/ProjectVersion.php'))
             ->toContain("public const string VERSION = '1.1.0';");
+    });
+});
+
+it('warns when none of the offered versions fits a demonstrated breaking change', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        $files->put($directory.'/src/Exports.php', "<?php\nfunction export(): string {}\n");
+        new Process(['git', 'add', 'src/Exports.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add the original export API'], $directory)->mustRun();
+        new Process(['git', 'tag', '1.0.1'], $directory)->mustRun();
+        resolve(FakeGitHubReleaseSource::class)->releases = ['1.0.1'];
+
+        $files->put($directory.'/src/Exports.php', "<?php\nfunction export(string \$requiredFormat): string {}\n");
+        new Process(['git', 'add', 'src/Exports.php'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Require an export format'], $directory)->mustRun();
+        ReleaseVersionAgent::fake([[
+            'recommended_version' => null,
+            'reasons' => [
+                '1.0.2' => 'Callers must supply the export format.',
+                '1.1.0' => 'A minor release promises compatibility.',
+                '1.1.0-alpha.1' => 'The alpha belongs to the current major.',
+                '1.1.0-beta.1' => 'The beta belongs to the current major.',
+            ],
+            'public_change_evidence' => '+function export(string $requiredFormat): string {}',
+        ]]);
+
+        $this->withoutMockingConsoleOutput();
+        expect(Artisan::call('release:create'))->toBe(Command::SUCCESS);
+        expect(preg_replace('/\s+/', ' ', Artisan::output()))
+            ->toContain('A breaking change requires a new major version', 'Available release options',
+                'Callers must supply the export format', 'The beta belongs to the current major')
+            ->not->toContain('AI recommendation');
+    });
+});
+
+it('keeps the manual version selection available when the AI omits alternatives', function () {
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files): void {
+        $files->append($directory.'/README.md', "Updated contributor notes.\n");
+        new Process(['git', 'commit', '-am', 'Update contributor notes'], $directory)->mustRun();
+        ReleaseVersionAgent::fake([[
+            'recommended_version' => '1.0.1',
+            'reasons' => ['1.0.1' => 'Updated guidance.'],
+            'public_change_evidence' => '',
+        ]]);
+        resolve(FakeReleaseVersionSelector::class)->selected = '1.1.0-alpha.1';
+
+        $this->artisan('release:create')
+            ->expectsOutputToContain('Patch remains the default')
+            ->assertSuccessful();
+
+        expect($files->get($directory.'/src/ProjectVersion.php'))->toContain("VERSION = '1.1.0-alpha.1'");
     });
 });
 
@@ -566,11 +737,11 @@ it('offers to set the root package.json version to the selected release version'
         $manifest = <<<'JSON'
 {
   "name": "@fixture/client",
-  "version": "0.1.0",
   "config": {
     "version": "independent"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "version": "0.1.0"
 }
 JSON;
         $path = $directory.'/package.json';
@@ -580,6 +751,7 @@ JSON;
         resolve(FakeReleaseVersionSelector::class)->selected = '1.1.0-beta.1';
 
         $this->artisan('release:create')
+            ->expectsOutputToContain('set maintainer.syncVersion to true in package.json. See https://atb.dev.br/docs/maintainer/versioning/releases#release-workflow')
             ->expectsConfirmation('Update package.json to 1.1.0-beta.1?', $answer)
             ->assertSuccessful();
 
@@ -591,6 +763,46 @@ JSON;
     'accepted' => ['yes', '1.1.0-beta.1'],
     'declined' => ['no', '0.1.0'],
 ]);
+
+it('adds the first package.json version at the top of the manifest', function (bool|string|null $syncSetting) {
+    ConfirmPrompt::fallbackWhen(true);
+
+    withinTemporaryReleaseProject(function (string $directory, Filesystem $files) use ($syncSetting): void {
+        $properties = ["\t\"name\": \"@fixture/client\","];
+
+        if ($syncSetting !== null) {
+            $properties[] = "\t\"maintainer\": {";
+            $properties[] = "\t\t\"syncVersion\": ".json_encode($syncSetting, JSON_THROW_ON_ERROR);
+            $properties[] = "\t},";
+        }
+
+        $properties[] = "\t\"private\": true";
+        $path = $directory.'/package.json';
+        $files->put($path, implode("\r\n", ['{', ...$properties, '}', '']));
+        new Process(['git', 'add', 'package.json'], $directory)->mustRun();
+        new Process(['git', 'commit', '-m', 'Add frontend manifest'], $directory)->mustRun();
+
+        $release = $this->artisan('release:create');
+
+        if ($syncSetting === true) {
+            $release->doesntExpectOutputToContain('To sync automatically');
+        } else {
+            $release->expectsConfirmation('Update package.json to 1.0.1?', 'yes');
+        }
+
+        $release->assertSuccessful()->run();
+
+        $expected = implode("\r\n", [
+            '{',
+            "\t\"version\": \"1.0.1\",",
+            ...$properties,
+            '}',
+            '',
+        ]);
+
+        expect($files->get($path))->toBe($expected);
+    });
+})->with(['after confirmation' => [null], 'string needs confirmation' => ['true'], 'automatic sync' => [true]]);
 
 it('does not ask AI for a release recommendation during a prerelease flow', function () {
     withinTemporaryReleaseProject(function (): void {

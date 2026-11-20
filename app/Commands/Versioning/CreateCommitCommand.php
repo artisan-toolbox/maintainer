@@ -2,6 +2,7 @@
 
 namespace App\Commands\Versioning;
 
+use App\Support\Ai\AiConsoleProgress;
 use App\Support\Ai\CommitMessageGenerator;
 use App\Support\Ai\ConfiguredAiProvider;
 use App\Support\Git\CommitMessageMode;
@@ -20,7 +21,7 @@ use function Laravel\Prompts\pause;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\textarea;
 
-#[Signature('commit')]
+#[Signature('commit {--release : Start the release workflow after creating the commit}')]
 #[Description('Create a Git commit from selected project changes')]
 final class CreateCommitCommand extends Command
 {
@@ -35,6 +36,7 @@ final class CreateCommitCommand extends Command
         CommitWorkflowPrompts $workflowPrompts,
         ConfiguredAiProvider $configuredAiProvider,
         CommitMessageGenerator $messageGenerator,
+        AiConsoleProgress $aiProgress,
     ): int {
         if (! $this->input->isInteractive()) {
             $this->components->error('The commit command requires interactive input to review changes, select files, and create a commit message.');
@@ -49,6 +51,8 @@ final class CreateCommitCommand extends Command
 
             return self::FAILURE;
         }
+
+        $withRelease = $this->option('release') === true;
 
         try {
             $changes = $repository->changes($projectRoot);
@@ -94,6 +98,7 @@ final class CreateCommitCommand extends Command
                 $messageReviewer,
                 $configuredAiProvider,
                 $messageGenerator,
+                $aiProgress,
             );
 
             note("Commit message:\n\n{$message}");
@@ -106,7 +111,7 @@ final class CreateCommitCommand extends Command
             $this->components->twoColumnDetail('Commit', $this->commitSummary($commitOutput));
             $this->components->success('Created the Git commit.');
 
-            if ($workflowPrompts->shouldPushCommit()) {
+            if (! $withRelease && $workflowPrompts->shouldPushCommit()) {
                 spin(
                     fn (): string => $repository->pushToOrigin($projectRoot),
                     'Pushing the commit to origin...',
@@ -120,7 +125,7 @@ final class CreateCommitCommand extends Command
             return self::FAILURE;
         }
 
-        return self::SUCCESS;
+        return $withRelease ? $this->call('release:create') : self::SUCCESS;
     }
 
     private function commitMessage(
@@ -130,6 +135,7 @@ final class CreateCommitCommand extends Command
         CommitMessageReviewer $messageReviewer,
         ConfiguredAiProvider $configuredAiProvider,
         CommitMessageGenerator $messageGenerator,
+        AiConsoleProgress $aiProgress,
     ): string {
         $generatedMessage = '';
 
@@ -147,9 +153,10 @@ final class CreateCommitCommand extends Command
                 )
                 : null;
             $provider = $configuredAiProvider->for('commit_message');
-            $generatedMessage = spin(
+            $generatedMessage = $aiProgress->run(
+                $this->components,
+                'Generating the commit message',
                 fn (): string => $messageGenerator->generate($provider, $status, $diff, $context),
-                "Generating the commit message with {$provider}...",
             );
         }
 

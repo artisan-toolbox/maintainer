@@ -5,6 +5,7 @@ namespace App\Support\Quality;
 use Closure;
 
 use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\select;
 
 final readonly class QualityCommitPrompt
 {
@@ -19,5 +20,18 @@ final readonly class QualityCommitPrompt
                 true,
             )
             : ($this->prompt)();
+    }
+
+    public function shouldRelease(): bool
+    {
+        return select(
+            label: 'What would you like to do after creating the commit?',
+            options: [
+                'commit' => 'Commit',
+                'release' => 'Commit and release',
+            ],
+            default: 'commit',
+            hint: 'Commit and release starts the regular release workflow.',
+        ) === 'release';
     }
 }

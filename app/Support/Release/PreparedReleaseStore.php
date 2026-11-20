@@ -28,7 +28,6 @@ final readonly class PreparedReleaseStore
         throw_unless(
             is_array($release)
                 && is_string($release['repository'] ?? null)
-                && is_string($release['workflow'] ?? null)
                 && is_string($release['branch'] ?? null)
                 && is_string($release['commit'] ?? null)
                 && is_string($release['currentVersion'] ?? null)
@@ -41,7 +40,7 @@ final readonly class PreparedReleaseStore
 
         return new PreparedRelease(
             $release['repository'],
-            $release['workflow'],
+            $this->readWorkflows($release),
             $release['branch'],
             $release['commit'],
             $release['currentVersion'],
@@ -63,6 +62,51 @@ final readonly class PreparedReleaseStore
             RuntimeException::class,
             'The local prepared release record could not be removed.',
         );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $release
+     * @return non-empty-list<GitHubReleaseWorkflow>
+     */
+    private function readWorkflows(array $release): array
+    {
+        if (! array_key_exists('workflows', $release)) {
+            $legacy = $release['workflow'] ?? null;
+            throw_unless(
+                is_string($legacy) && trim($legacy) !== '',
+                RuntimeException::class,
+                'The local prepared release record has an invalid workflow.',
+            );
+
+            return [new GitHubReleaseWorkflow(trim($legacy))];
+        }
+
+        $entries = $release['workflows'];
+        throw_unless(
+            is_array($entries) && array_is_list($entries) && $entries !== [],
+            RuntimeException::class,
+            'The local prepared release record has invalid workflows.',
+        );
+
+        $workflows = [];
+        $ids = [];
+
+        foreach ($entries as $entry) {
+            throw_unless(
+                is_array($entry)
+                    && is_string($entry['selector'] ?? null)
+                    && trim($entry['selector']) !== ''
+                    && is_int($entry['id'] ?? null)
+                    && $entry['id'] > 0
+                    && ! isset($ids[$entry['id']]),
+                RuntimeException::class,
+                'The local prepared release record has invalid workflows.',
+            );
+            $ids[$entry['id']] = true;
+            $workflows[] = new GitHubReleaseWorkflow($entry['selector'], $entry['id']);
+        }
+
+        return $workflows;
     }
 
     private function path(string $projectRoot): string

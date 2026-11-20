@@ -2,6 +2,8 @@
 
 These instructions supplement the workspace-level guidelines for work inside the Maintainer project.
 
+Use the [Maintainer AI maintenance skill](.ai/skills/maintainer-ai-maintenance/SKILL.md) when reviewing the API model defaults for a release or changing the AI prompts or recommendation output.
+
 ## PHP Attributes
 
 - Prefer native PHP attributes whenever the framework or library provides an equivalent to legacy metadata properties, annotations, or configuration.

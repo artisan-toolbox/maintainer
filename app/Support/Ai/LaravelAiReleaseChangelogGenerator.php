@@ -8,9 +8,14 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 
-final class LaravelAiReleaseChangelogGenerator implements ReleaseChangelogGenerator
+final readonly class LaravelAiReleaseChangelogGenerator implements ReleaseChangelogGenerator
 {
     private const array TYPES = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert'];
+
+    public function __construct(
+        private ConfiguredAiModel $models,
+        private AiReportLocale $locales,
+    ) {}
 
     public function generate(string $provider, string $version, ReleaseChangeSet $changes): array
     {
@@ -18,9 +23,11 @@ final class LaravelAiReleaseChangelogGenerator implements ReleaseChangelogGenera
 
         throw_if($commits === [], RuntimeException::class, 'No Git commits were found for the release changelog.');
 
+        $locale = $this->locales->forProjectArtifacts();
         $response = ReleaseChangelogAgent::make()->prompt(
             <<<PROMPT
             Build the changelog entries for version {$version}.
+            Write entry titles and descriptions in the language of project locale {$locale}. Keep type keys and commit hashes unchanged.
 
             HASH RULES
             Every entry must use exactly one hash from COMMITS. Return one entry for every commit.
@@ -33,6 +40,7 @@ final class LaravelAiReleaseChangelogGenerator implements ReleaseChangelogGenera
             {$changes->diff}
             PROMPT,
             provider: $provider,
+            model: $this->models->for('release_changelog_update', $provider),
         );
 
         throw_unless($response instanceof StructuredAgentResponse, RuntimeException::class, 'The AI provider did not return a structured changelog.');

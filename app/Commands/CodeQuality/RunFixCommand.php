@@ -19,11 +19,6 @@ final class RunFixCommand extends RunCodeQualityWorkflowCommand
         return 'Code quality fixes';
     }
 
-    protected function offersCommit(): bool
-    {
-        return true;
-    }
-
     protected function offersCheck(): bool
     {
         return true;

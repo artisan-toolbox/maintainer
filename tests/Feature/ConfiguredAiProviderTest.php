@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Ai\ConfiguredAiModel;
 use App\Support\Ai\ConfiguredAiProvider;
 use Illuminate\Filesystem\Filesystem;
 
@@ -95,5 +96,27 @@ it('continues reading legacy JSON secrets during migration', function () {
         resolve(ConfiguredAiProvider::class)->for('commit_message');
 
         expect(config('ai.providers.openai.key'))->toBe('legacy-secret');
+    });
+});
+
+it('defaults each OpenAI workflow to Sol and keeps other provider defaults', function (string $purpose) {
+    withinTemporaryProject(function () use ($purpose) {
+        $models = resolve(ConfiguredAiModel::class);
+
+        expect($models->for($purpose, 'openai'))->toBe('gpt-6.2-sol')
+            ->and($models->for($purpose, 'anthropic'))->toBeNull()
+            ->and($models->for($purpose, 'openai-compatible'))->toBeNull();
+    });
+})->with(['commit_message', 'release_type_suggestion', 'release_notes', 'release_changelog_update']);
+
+it('honors one workflow model override without changing other workflows', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'ai' => ['models' => ['release_notes' => 'configured-notes-model']],
+        ]);
+        $models = resolve(ConfiguredAiModel::class);
+
+        expect($models->for('release_notes', 'openai'))->toBe('configured-notes-model')
+            ->and($models->for('release_changelog_update', 'openai'))->toBe('gpt-6.2-sol');
     });
 });

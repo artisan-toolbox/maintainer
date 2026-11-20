@@ -4,36 +4,59 @@ declare(strict_types=1);
 
 namespace App\Ai\Agents;
 
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
+use Laravel\Ai\Attributes\Strict;
 use Laravel\Ai\Attributes\UseCheapestModel;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Promptable;
 
+#[Strict]
 #[UseCheapestModel]
-final class CommitMessageAgent implements Agent
+final class CommitMessageAgent implements Agent, HasStructuredOutput
 {
     use Promptable;
+
+    public const array TYPES = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert'];
+
+    public const array TRAILER_TOKENS = ['Refs', 'Fixes', 'Closes', 'Resolves', 'Co-authored-by'];
 
     public function instructions(): string
     {
         return <<<'INSTRUCTIONS'
-            You write production-grade Git commit messages from a repository status and diff.
-            Follow the Conventional Commits 1.0 structure exactly:
-            <type>[optional scope][optional !]: <description>
-
-            [optional body]
-
-            [optional footer(s)]
-
-            Use one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.
-            Use an imperative, lowercase description without a trailing period.
-            Keep the entire subject at 72 characters or fewer.
-            Use a concise scope only when the changed component is unambiguous.
-            Add a body when it helps explain what changed and why; wrap body lines at 72 characters.
-            Separate the subject, body, and footers with blank lines.
-            Use BREAKING CHANGE: or a ! marker only for an actual breaking change.
-            Add issue or co-author footers only when supplied by the input; never invent them.
-            Return only the commit message, without Markdown fences, quotes, commentary, or a git command.
+            Describe the selected changes using the fields for a Conventional Commit.
+            Choose the main change type for the subject. Write the title in the imperative without its type prefix or a trailing period.
+            Keep the title short enough that the composed subject fits in 72 characters.
+            Use a concise scope only when the changed component is unambiguous. Use null otherwise.
+            Put distinct changes that add useful detail in the changes list, each with its own type.
+            Write each change description as one line without a bullet or type prefix. Use an empty list when the title suffices.
+            Explain an actual breaking change in breaking_change. Use null for compatible changes.
+            Include issue and co-author trailers only when explicitly supplied as complete trailer lines in USER CONTEXT.
             Never claim that tests passed unless the supplied context explicitly says so.
             INSTRUCTIONS;
+    }
+
+    /** @return array<string, Type> */
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'type' => $schema->string()->enum(self::TYPES)->required(),
+            'scope' => $schema->string()->nullable()->description('Component name using letters, numbers, or . _ / -.')->required(),
+            'title' => $schema->string()->description('The concise subject without Conventional Commit syntax.')->required(),
+            'breaking_change' => $schema->string()->nullable()->description('A one-line description of the breaking change, or null.')->required(),
+            'changes' => $schema->array()->items(
+                $schema->object([
+                    'type' => $schema->string()->enum(self::TYPES)->required(),
+                    'description' => $schema->string()->required(),
+                ])->withoutAdditionalProperties(),
+            )->required(),
+            'trailers' => $schema->array()->items(
+                $schema->object([
+                    'token' => $schema->string()->enum(self::TRAILER_TOKENS)->required(),
+                    'value' => $schema->string()->required(),
+                ])->withoutAdditionalProperties(),
+            )->required(),
+        ];
     }
 }

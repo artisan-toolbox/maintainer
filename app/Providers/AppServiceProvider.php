@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\Ai\AiConsoleProgress;
 use App\Support\Ai\CommitMessageGenerator;
 use App\Support\Ai\LaravelAiCommitMessageGenerator;
 use App\Support\Ai\LaravelAiReleaseChangeAnalyzer;
@@ -44,7 +45,9 @@ use ArtisanToolbox\Maintainer\Ssh\MaintainerSshKeys;
 use Illuminate\Contracts\Encryption\StringEncrypter;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Ai\Events\PromptingAgent;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -53,7 +56,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Event::listen(PromptingAgent::class, AiConsoleProgress::class);
     }
 
     /**
@@ -76,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
                 fn (): string => $application->make(MaintainerSecrets::class)->sshKey(),
             ),
         );
+        $this->app->singleton(AiConsoleProgress::class);
         $this->app->bind(CommitMessageGenerator::class, LaravelAiCommitMessageGenerator::class);
         $this->app->bind(ReleaseChangeAnalyzer::class, LaravelAiReleaseChangeAnalyzer::class);
         $this->app->bind(ReleaseChangelogGenerator::class, LaravelAiReleaseChangelogGenerator::class);

@@ -48,6 +48,11 @@
         "rector/rector": "^2.6.2",
         "symfony/process": "^8.1"
     },
+    "scripts": {
+        "lint:check": "@php vendor/bin/pint --test",
+        "analyse": "@php vendor/bin/phpstan analyse --memory-limit=512M --no-progress",
+        "test": "@php vendor/bin/pest --parallel --processes=4"
+    },
     "autoload": {
         "files": [
             "app/Support/client_helpers.php"

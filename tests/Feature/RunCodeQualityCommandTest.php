@@ -1,5 +1,9 @@
 <?php
 
+use App\Support\Git\CommitMessageMode;
+use App\Support\Git\CommitMessageReviewer;
+use App\Support\Git\CommitWorkflowPrompts;
+use App\Support\Git\GitFileSelector;
 use App\Support\Quality\QualityCheckPrompt;
 use App\Support\Quality\QualityCommitPrompt;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsPestCheck;
@@ -9,6 +13,11 @@ use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusCheck;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVitePlusTest;
 use ArtisanToolbox\Maintainer\Quality\Contracts\RunsVueTscCheck;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Artisan;
+use Laravel\Prompts\ConfirmPrompt;
+use Laravel\Prompts\MultiSearchPrompt;
+use Laravel\Prompts\SelectPrompt;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Process\Process;
 
 function installFakeComposerQualityBinary(string $directory, Filesystem $files, string $binary, int $exitCode = 0): void
@@ -175,6 +184,77 @@ it('offers to run configured checks after an interactive fix', function () {
     });
 });
 
+it('runs the selected commit action after interactive checks pass', function (string $choice, int $releaseExitCode, bool $runFixFirst = false) {
+    ConfirmPrompt::fallbackWhen(true);
+    SelectPrompt::fallbackWhen(true);
+
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($choice, $releaseExitCode, $runFixFirst): void {
+        installFakeComposerQualityBinary($directory, $files, 'pest');
+        $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
+        $files->put($directory.'/.gitignore', "/vendor/\n/quality.log\n");
+        $files->put($directory.'/example.txt', "original\n");
+
+        if ($runFixFirst) {
+            installFakeComposerQualityBinary($directory, $files, 'pint');
+            $files->put($directory.'/pint.json', "{}\n");
+        }
+
+        foreach ([
+            ['init', '--initial-branch=1.x'],
+            ['config', 'user.name', 'Maintainer Tests'],
+            ['config', 'user.email', 'maintainer@example.com'],
+            ['add', '.'],
+            ['commit', '-m', 'Create quality fixture'],
+        ] as $arguments) {
+            new Process(['git', ...$arguments], $directory)->mustRun();
+        }
+
+        $files->put($directory.'/example.txt', "updated\n");
+        $pushOffered = false;
+        $releaseStarted = false;
+        app()->instance(CommitWorkflowPrompts::class, new CommitWorkflowPrompts(
+            reviewDiff: static fn (): bool => false,
+            messageMode: static fn (): CommitMessageMode => CommitMessageMode::Manual,
+            pushCommit: static function () use (&$pushOffered): bool {
+                $pushOffered = true;
+
+                return false;
+            },
+        ));
+        app()->instance(CommitMessageReviewer::class, new CommitMessageReviewer(static fn (): string => 'fix: update fixture'));
+        app()->instance(GitFileSelector::class, new GitFileSelector(static fn (MultiSearchPrompt $prompt): array => array_keys($prompt->values)));
+        Artisan::registerCommand(new Command('release:create')->setCode(function () use ($directory, &$releaseStarted, $releaseExitCode): int {
+            $releaseStarted = true;
+            expect(new Process(['git', 'show', 'HEAD:example.txt'], $directory)->mustRun()->getOutput())->toBe("updated\n");
+
+            return $releaseExitCode;
+        }));
+
+        $quality = $runFixFirst
+            ? $this->artisan('quality:fix', ['--tool' => ['pint']])
+                ->expectsConfirmation('Would you like to run the configured code-quality checks now?', 'yes')
+            : $this->artisan('quality:check', ['--tool' => ['pest']]);
+
+        $quality
+            ->expectsConfirmation('The project has changes. Would you like to create a commit now?', 'yes')
+            ->expectsChoice('What would you like to do after creating the commit?', $choice, [
+                'commit' => 'Commit',
+                'release' => 'Commit and release',
+            ])
+            ->assertExitCode($releaseExitCode)
+            ->run();
+
+        expect($releaseStarted)->toBe($choice === 'release')
+            ->and($pushOffered)->toBe($choice === 'commit')
+            ->and(new Process(['git', 'show', 'HEAD:example.txt'], $directory)->mustRun()->getOutput())->toBe("updated\n");
+    });
+})->with([
+    'commit' => ['commit', 0],
+    'commit and release' => ['release', 0],
+    'commit and release after a fix and check' => ['release', 0, true],
+    'release failure keeps the commit' => ['release', 8],
+]);
+
 it('returns a failed accepted check before offering a commit after an interactive fix', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         app()->instance(QualityCheckPrompt::class, new QualityCheckPrompt(
@@ -258,6 +338,75 @@ it('runs only a selected configured tool', function () {
     });
 });
 
+it('runs the selected PHPStan check once in strict mode', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeComposerQualityBinary($directory, $files, 'phpstan');
+        $files->put($directory.'/phpstan.neon', "parameters:\n");
+
+        $this->artisan('quality:check', [
+            '--strict' => true,
+            '--tool' => ['phpstan'],
+            '--no-interaction' => true,
+        ])
+            ->expectsOutputToContain('CI checks completed successfully: 1 run, 0 skipped.')
+            ->assertSuccessful();
+
+        $executed = explode("\n", trim(normalizedQualityLog($directory, $files)));
+
+        expect($executed)->toHaveCount(1)
+            ->and($executed[0])->toStartWith('phpstan analyse --configuration ');
+    });
+});
+
+it('fails strict CI when an expected tool cannot run', function (bool $installBinary, string $reason) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($installBinary, $reason) {
+        installFakeComposerQualityBinary($directory, $files, 'pest');
+        $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
+
+        if ($installBinary) {
+            installFakeComposerQualityBinary($directory, $files, 'phpstan');
+        }
+
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => ['test' => [RunsPestCheck::class, RunsPhpStanCheck::class]],
+        ]);
+
+        $this->artisan('quality:check', ['--strict' => true, '--no-interaction' => true])
+            ->expectsOutputToContain("Required PHPStan could not run: {$reason}")
+            ->assertFailed();
+    });
+})->with([
+    'binary missing' => [false, 'vendor/bin/phpstan is not installed'],
+    'configuration missing' => [true, 'no supported configuration file was found'],
+]);
+
+it('fails strict CI when no tools are configured', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => ['test' => []],
+        ]);
+
+        $this->artisan('quality:check', ['--strict' => true, '--no-interaction' => true])
+            ->expectsOutputToContain('Strict mode requires at least one configured tool in quality.test.')
+            ->assertFailed();
+    });
+});
+
+it('preserves the exit code of a failed strict check', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeComposerQualityBinary($directory, $files, 'pest', 7);
+        $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
+
+        $this->artisan('quality:check', [
+            '--strict' => true,
+            '--tool' => ['pest'],
+            '--no-interaction' => true,
+        ])
+            ->expectsOutputToContain('Pest failed with exit code 7.')
+            ->assertExitCode(7);
+    });
+});
+
 it('replaces default command lists with project configuration', function () {
     withinTemporaryProject(function (string $directory, Filesystem $files) {
         installFakeComposerQualityBinary($directory, $files, 'pest');
@@ -299,8 +448,8 @@ it('stops the workflow and returns a tool failure exit code', function () {
     });
 });
 
-it('keeps Pest parallel execution and PHPStan memory configuration', function () {
-    withinTemporaryProject(function (string $directory, Filesystem $files) {
+it('applies Pest worker and PHPStan memory configuration', function (bool $parallel, ?int $processes) {
+    withinTemporaryProject(function (string $directory, Filesystem $files) use ($parallel, $processes) {
         installFakeComposerQualityBinary($directory, $files, 'pest');
         installFakeComposerQualityBinary($directory, $files, 'phpstan');
         $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
@@ -311,16 +460,39 @@ it('keeps Pest parallel execution and PHPStan memory configuration', function ()
                     RunsPestCheck::class,
                     RunsPhpStanCheck::class,
                 ],
-                'pest' => ['parallel' => true],
+                'pest' => ['parallel' => $parallel, 'processes' => $processes],
                 'phpstan' => ['memory_limit' => '4G'],
             ],
         ]);
 
         $this->artisan('quality:check', ['--no-interaction' => true])->assertSuccessful();
 
-        expect(normalizedQualityLog($directory, $files))
+        $log = normalizedQualityLog($directory, $files);
+
+        expect($log)
             ->toContain('pest --configuration')
-            ->toContain('--parallel')
-            ->toContain('--memory-limit=4G');
+            ->toContain('--memory-limit=4G')
+            ->and(str_contains($log, '--parallel'))->toBe($parallel)
+            ->and(str_contains($log, '--processes=4'))->toBe($parallel && $processes === 4);
+    });
+})->with([
+    'automatic worker count' => [true, null],
+    'fixed worker count' => [true, 4],
+    'sequential tests' => [false, 4],
+]);
+
+it('rejects an invalid Pest worker count before running tests', function () {
+    withinTemporaryProject(function (string $directory, Filesystem $files) {
+        installFakeComposerQualityBinary($directory, $files, 'pest');
+        $files->put($directory.'/phpunit.xml', "<phpunit/>\n");
+        putPhpConfiguration($files, $directory.'/config/dev_maintainer.php', [
+            'quality' => [
+                'pest' => ['parallel' => true, 'processes' => 0],
+            ],
+        ]);
+
+        $this->artisan('quality:check', ['--no-interaction' => true, '--strict' => true, '--tool' => ['pest']])
+            ->expectsOutputToContain('quality.pest.processes must be a positive integer or null.')
+            ->assertFailed();
     });
 });

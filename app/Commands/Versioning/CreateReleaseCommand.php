@@ -2,12 +2,13 @@
 
 namespace App\Commands\Versioning;
 
+use App\Support\Ai\AiConsoleProgress;
 use App\Support\Ai\ChangelogEntry;
 use App\Support\Ai\ConfiguredAiProvider;
 use App\Support\Ai\ReleaseChangeAnalyzer;
 use App\Support\Ai\ReleaseChangelogGenerator;
-use App\Support\Ai\ReleaseIncrement;
 use App\Support\Ai\ReleaseNotesGenerator;
+use App\Support\Ai\ReleaseVersionRecommendation;
 use App\Support\Ai\ReleaseVersionRecommender;
 use App\Support\Configuration\MaintainerConfiguration;
 use App\Support\Git\GitWorkingTree;
@@ -17,6 +18,8 @@ use App\Support\Quality\QualityCheckPrompt;
 use App\Support\Release\ChangelogWriter;
 use App\Support\Release\GitHubReleaseGate;
 use App\Support\Release\GitHubReleasePublisher;
+use App\Support\Release\GitHubReleaseWorkflow;
+use App\Support\Release\GitHubWorkflowProgress;
 use App\Support\Release\LatestGitHubRelease;
 use App\Support\Release\PackageJsonVersionWriter;
 use App\Support\Release\PreparedRelease;
@@ -44,6 +47,7 @@ use RuntimeException;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Throwable;
 
+use function Illuminate\Filesystem\join_paths;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
 
@@ -69,6 +73,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         VersionableVersionWriter $versionWriter,
         PackageJsonVersionWriter $packageVersionWriter,
         ConfiguredAiProvider $configuredAiProvider,
+        AiConsoleProgress $aiProgress,
         ReleaseVersionRecommender $releaseVersionRecommender,
         VersioningLifecycle $lifecycle,
         ReadmeHeadWriter $readmeHeadWriter,
@@ -108,15 +113,9 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $this->components->twoColumnDetail('Versionable class', $versionableClass->name);
             $this->components->twoColumnDetail('Current version', $versionableClass->version ?? 'Not declared');
 
-            $workflow = $configuration->get('release.workflow');
-            throw_unless(
-                $workflow === null || (is_string($workflow) && trim($workflow) !== ''),
-                RuntimeException::class,
-                'The release.workflow option must be a nonempty GitHub Actions workflow name or filename, or null.',
-            );
+            $workflowSelectors = GitHubReleaseWorkflow::configuredSelectors($configuration->get('release.workflow'));
             $branch = "{$major}.x";
-            $repository = $workflow === null ? null : $git->githubOrigin($projectRoot);
-            $prepared = $workflow === null ? null : $preparedReleases->read($projectRoot);
+            $prepared = $preparedReleases->read($projectRoot);
 
             if ($prepared !== null && $prepared->commit !== $git->head($projectRoot)) {
                 $prepared = null;
@@ -125,14 +124,30 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             if ($this->option('resume') || $prepared !== null) {
                 throw_unless(
                     $prepared !== null
-                        && $prepared->repository === $repository
-                        && $prepared->workflow === $workflow
+                        && $workflowSelectors !== []
                         && $prepared->branch === $branch
                         && $prepared->version === $versionableClass->version,
                     RuntimeException::class,
                     'No prepared release matches HEAD and the current release configuration.',
                 );
             }
+
+            if ($prepared === null && ! $this->input->isInteractive()) {
+                $this->components->error('The release:create command requires interactive input to select the next GitHub release version and review the release.');
+
+                return self::FAILURE;
+            }
+
+            $repository = $workflowSelectors === [] ? null : $git->githubOrigin($projectRoot);
+            $workflows = $workflowSelectors === [] || $repository === null
+                ? []
+                : $releaseGate->resolveWorkflows($projectRoot, $repository, $workflowSelectors);
+
+            throw_if(
+                $prepared !== null && ($prepared->repository !== $repository || ! $prepared->requiresWorkflows($workflows)),
+                RuntimeException::class,
+                'No prepared release matches HEAD and the current release configuration.',
+            );
         } catch (RuntimeException $exception) {
             $this->components->error('Unable to complete the initial release validation: '.$exception->getMessage());
 
@@ -155,22 +170,21 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             }
 
             try {
+                if ($workflows !== [] && $prepared->workflows != $workflows) {
+                    $prepared = $prepared->withWorkflows($workflows);
+                    $preparedReleases->write($projectRoot, $prepared);
+                }
+
                 $this->publishPrepared($projectRoot, $prepared, $git, $releaseGate, $publisher);
                 $preparedReleases->delete($projectRoot);
                 $this->finishRelease($lifecycle, $versionableClass, $prepared->currentVersion, $prepared->version);
-
-                return self::SUCCESS;
             } catch (Throwable $exception) {
                 $this->components->error('Unable to resume the release: '.$exception->getMessage());
 
                 return self::FAILURE;
             }
-        }
 
-        if (! $this->input->isInteractive()) {
-            $this->components->error('The release:create command requires interactive input to select the next GitHub release version and review the release.');
-
-            return self::FAILURE;
+            return $this->offerDeployment($projectRoot, $prepared->version);
         }
 
         try {
@@ -210,16 +224,17 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             if ($latestVersion !== null && $latestVersion->prerelease === null) {
                 try {
                     $provider = $configuredAiProvider->for('release_type_suggestion');
-                    $recommendation = spin(
-                        fn () => $releaseVersionRecommender->recommend($provider, $projectRoot, $latestVersion),
-                        "Analyzing the release diff with {$provider}...",
+                    $recommendation = $aiProgress->run(
+                        $this->components,
+                        'Analyzing the release diff',
+                        fn () => $releaseVersionRecommender->recommend($provider, $projectRoot, $latestVersion, $options),
                     );
-                    $defaultVersion = $recommendation->increment === ReleaseIncrement::Minor
-                        ? "{$major}.".($latestVersion->minor + 1).'.0'
-                        : "{$major}.{$latestVersion->minor}.".($latestVersion->patch + 1);
-
-                    $this->components->twoColumnDetail('AI recommendation', ucfirst($recommendation->increment->value)." — {$defaultVersion}");
-                    $this->components->twoColumnDetail('Reason', $recommendation->justification);
+                    if ($recommendation === null) {
+                        $this->components->info('No reviewable changes in the release diff. Patch remains the default.');
+                    } else {
+                        $this->showVersionRecommendation($recommendation, $options);
+                        $defaultVersion = $recommendation->version ?? $defaultVersion;
+                    }
                 } catch (Throwable $exception) {
                     $this->components->warn('Unable to analyze the release diff with AI. Patch remains the default: '.$exception->getMessage());
                 }
@@ -236,9 +251,18 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $this->components->twoColumnDetail('Version file', $versionableClass->file);
 
             $operation = 'update the package.json version';
-            if ($packageVersionWriter->canUpdate($projectRoot) && confirm("Update package.json to {$selectedVersion}?", default: false)) {
-                $packageVersionWriter->write($projectRoot, $selectedVersion);
-                $this->components->twoColumnDetail('package.json version', $selectedVersion);
+            if ($packageVersionWriter->canUpdate($projectRoot)) {
+                $syncPackageJsonVersion = $packageVersionWriter->shouldSyncAutomatically($projectRoot);
+
+                if (! $syncPackageJsonVersion) {
+                    $this->components->info('To sync automatically, set maintainer.syncVersion to true in package.json. See https://atb.dev.br/docs/maintainer/versioning/releases#release-workflow');
+                    $syncPackageJsonVersion = confirm("Update package.json to {$selectedVersion}?", default: false);
+                }
+
+                if ($syncPackageJsonVersion) {
+                    $packageVersionWriter->write($projectRoot, $selectedVersion);
+                    $this->components->twoColumnDetail('package.json version', $selectedVersion);
+                }
             }
 
             if ($versionableClass->implements(BeforeVersioning::class)) {
@@ -254,24 +278,27 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $changes = $git->changesSince($projectRoot, $latestVersion?->value());
             $changelogProvider = $configuredAiProvider->for('release_changelog_update');
             $operation = 'analyze release changes with AI';
-            $analyzedChanges = spin(
+            $analyzedChanges = $aiProgress->run(
+                $this->components,
+                'Summarizing release changes',
                 fn () => $releaseChangeAnalyzer->analyze($changelogProvider, $changes),
-                "Summarizing bounded release diff fragments with {$changelogProvider}...",
             );
             $operation = 'generate the release changelog';
-            $changelogEntries = spin(
+            $changelogEntries = $aiProgress->run(
+                $this->components,
+                'Building the changelog',
                 fn () => $changelogGenerator->generate($changelogProvider, $selectedVersion, $analyzedChanges),
-                "Building the changelog with {$changelogProvider}...",
             );
             $notesProvider = $configuredAiProvider->for('release_notes');
             $operation = 'generate GitHub release notes';
-            $releaseNotes = spin(
+            $releaseNotes = $aiProgress->run(
+                $this->components,
+                'Writing GitHub release notes',
                 fn () => $releaseNotesGenerator->generate(
                     $notesProvider,
                     $selectedVersion,
                     $this->releaseNotesContext($analyzedChanges, $changelogEntries),
                 ),
-                "Writing GitHub release notes with {$notesProvider}...",
             );
             $operation = 'review the GitHub release title';
             $releaseTitle = $titleReviewer->review($selectedVersion, $releaseNotes->title);
@@ -320,11 +347,11 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             );
             $this->components->twoColumnDetail('Commit', $commit);
 
-            if ($workflow !== null && $repository !== null) {
+            if ($workflows !== []) {
                 $operation = 'record the prepared release';
                 $prepared = new PreparedRelease(
                     $repository,
-                    $workflow,
+                    $workflows,
                     $branch,
                     $git->head($projectRoot),
                     $currentVersion,
@@ -339,7 +366,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
                 try {
                     $this->publishPrepared($projectRoot, $prepared, $git, $releaseGate, $publisher);
                 } catch (Throwable $exception) {
-                    $this->components->warn('The prepared release commit was kept. Resume from Versioning › GitHub releases or run release:create --resume after the required workflow passes.');
+                    $this->components->warn('The prepared release commit was kept. Resume from Versioning › GitHub releases or run release:create --resume after all required workflows pass.');
 
                     throw $exception;
                 }
@@ -348,7 +375,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
                 $operation = 'run the after-versioning callback';
                 $this->finishRelease($lifecycle, $versionableClass, $currentVersion, $selectedVersion);
 
-                return self::SUCCESS;
+                return $this->offerDeployment($projectRoot, $selectedVersion);
             }
 
             $operation = 'push the release commit';
@@ -380,7 +407,7 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $this->finishRelease($lifecycle, $versionableClass, $currentVersion, $selectedVersion);
             $releaseRollback->disarm();
 
-            return self::SUCCESS;
+            return $this->offerDeployment($projectRoot, $selectedVersion);
         } catch (Throwable $exception) {
             if (! $releaseRollback->wasPushed()) {
                 try {
@@ -398,6 +425,29 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         }
     }
 
+    /** @param array<string, string> $options */
+    private function showVersionRecommendation(ReleaseVersionRecommendation $report, array $options): void
+    {
+        if ($report->version === null) {
+            $this->components->warn('A breaking change requires a new major version. Review the change before proceeding on this branch.');
+            $this->components->info('Available release options');
+        } else {
+            $this->components->twoColumnDetail('AI recommendation', $options[$report->version]);
+            $this->output->block($report->reasons[$report->version], prefix: '    ');
+            $this->components->info('Other release options');
+        }
+
+        foreach ($options as $version => $label) {
+            if ($version !== $report->version) {
+                $this->output->block($label."\n".$report->reasons[$version], prefix: '    ');
+            }
+        }
+
+        if ($report->truncated) {
+            $this->components->warn('The diff exceeded the analysis limit. Review the remaining changes before choosing a version.');
+        }
+    }
+
     private function publishPrepared(
         string $projectRoot,
         PreparedRelease $release,
@@ -411,11 +461,38 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         );
         $this->components->twoColumnDetail('Release commit', $release->commit);
 
-        spin(
-            fn () => $gate->waitForSuccess($projectRoot, $release),
-            "Waiting for the {$release->workflow} push workflow...",
+        $this->components->info("Waiting for GitHub Actions on {$release->branch}.");
+        $runUrls = [];
+        $gate->waitForSuccess(
+            $projectRoot,
+            $release,
+            onProgress: function (GitHubWorkflowProgress $progress) use (&$runUrls): void {
+                $status = match ($progress->status) {
+                    null => 'Waiting for GitHub to create the push run',
+                    'queued' => 'Queued',
+                    'in_progress' => 'In progress',
+                    'completed' => 'Completed ('.str_replace('_', ' ', (string) $progress->conclusion).')',
+                    default => ucfirst(str_replace('_', ' ', $progress->status)),
+                };
+                $elapsed = sprintf('%d:%02d', intdiv($progress->elapsedSeconds, 60), $progress->elapsedSeconds % 60);
+                $attempt = $progress->attempt !== null && $progress->attempt > 1 ? " · attempt {$progress->attempt}" : '';
+                $this->components->twoColumnDetail($progress->workflow, "{$status}{$attempt} · {$elapsed} elapsed");
+
+                if ($progress->url !== null && $progress->url !== ($runUrls[$progress->workflow] ?? null)) {
+                    $runUrls[$progress->workflow] = $progress->url;
+                    $this->components->twoColumnDetail('Workflow run', $progress->url);
+                }
+
+                foreach ($progress->activeJobs as $job) {
+                    $label = Str::limit(Str::replaceMatches('/[\p{C}]+/u', ' ', $job), 100);
+                    $this->components->twoColumnDetail('Running job', $label);
+                }
+            },
         );
-        $this->components->success("The {$release->workflow} workflow passed for the release commit.");
+        $summary = count($release->workflows) === 1
+            ? "The {$release->workflows[0]->selector} workflow passed for the release commit."
+            : 'All required workflows passed for the release commit.';
+        $this->components->success($summary);
 
         $releaseUrl = spin(function () use ($projectRoot, $release, $git, $publisher): string {
             $git->pushReleaseTag($projectRoot, $release);
@@ -448,6 +525,41 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
         }
 
         $this->components->success("Published GitHub release {$selectedVersion}.");
+    }
+
+    private function offerDeployment(string $projectRoot, string $version): int
+    {
+        if (! $this->input->isInteractive()) {
+            return self::SUCCESS;
+        }
+
+        foreach (['deploy.php', 'deploy.maml', 'deploy.yaml', 'deploy.yml'] as $recipe) {
+            $path = join_paths($projectRoot, $recipe);
+
+            if (! is_file($path) || ! is_readable($path)) {
+                continue;
+            }
+
+            if (! confirm("Deploy release {$version} now?", default: false)) {
+                return self::SUCCESS;
+            }
+
+            try {
+                $exitCode = $this->call('deploy', ['--file' => $recipe, '--tag' => $version]);
+            } catch (Throwable $exception) {
+                $this->components->error("Unable to deploy release {$version}. The GitHub release is already published. {$exception->getMessage()}");
+
+                return self::FAILURE;
+            }
+
+            if ($exitCode !== self::SUCCESS) {
+                $this->components->warn("GitHub release {$version} is published. The deployment failed.");
+            }
+
+            return $exitCode;
+        }
+
+        return self::SUCCESS;
     }
 
     /** @return list<int> */

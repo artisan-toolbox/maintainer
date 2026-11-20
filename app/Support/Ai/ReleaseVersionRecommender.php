@@ -6,9 +6,11 @@ use App\Support\Release\SemanticVersionNumber;
 
 interface ReleaseVersionRecommender
 {
+    /** @param array<string, string> $options */
     public function recommend(
         string $provider,
         string $projectRoot,
         SemanticVersionNumber $latestVersion,
-    ): ReleaseVersionRecommendation;
+        array $options,
+    ): ?ReleaseVersionRecommendation;
 }

@@ -28,14 +28,26 @@ final class PestCommand extends ComposerQualityCommand implements RunsPestCheck
     public function command(string $projectRoot, ?string $configurationPath, MaintainerConfiguration $configuration): array
     {
         $parallel = $configuration->get('quality.pest.parallel');
+        $processes = $configuration->get('quality.pest.processes');
 
         throw_unless(is_bool($parallel), RuntimeException::class, 'quality.pest.parallel must be true or false.');
+        throw_unless(
+            $processes === null || (is_int($processes) && $processes > 0),
+            RuntimeException::class,
+            'quality.pest.processes must be a positive integer or null.',
+        );
 
-        return $this->binaryCommand($projectRoot, [
-            '--configuration',
-            (string) $configurationPath,
-            ...($parallel ? ['--parallel'] : []),
-        ]);
+        $arguments = ['--configuration', (string) $configurationPath];
+
+        if ($parallel) {
+            $arguments[] = '--parallel';
+
+            if ($processes !== null) {
+                $arguments[] = "--processes={$processes}";
+            }
+        }
+
+        return $this->binaryCommand($projectRoot, $arguments);
     }
 
     protected function binaryFilename(): string

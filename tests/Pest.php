@@ -99,6 +99,14 @@ function defaultMaintainerConfigurationFixture(): array
                 'release_notes' => 'openai',
                 'release_changelog_update' => 'openai',
             ],
+            'models' => [
+                'commit_message' => null,
+                'release_type_suggestion' => null,
+                'release_notes' => null,
+                'release_changelog_update' => null,
+            ],
+            'local_feedback_locale' => null,
+            'project_locale' => 'en',
         ],
         'git' => [
             'diff' => [

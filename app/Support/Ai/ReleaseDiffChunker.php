@@ -18,6 +18,7 @@ final readonly class ReleaseDiffChunker
         $sections = preg_split('/(?=^diff --git )/m', trim($diff), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $chunks = [];
         $omittedFiles = [];
+        $paths = [];
         $truncated = false;
 
         foreach ($sections as $section) {
@@ -37,12 +38,14 @@ final readonly class ReleaseDiffChunker
                 }
 
                 $chunks[] = $part;
+                $paths[] = $path;
             }
         }
 
         $hasAnalyzableChanges = $chunks !== [];
 
         if (! $hasAnalyzableChanges) {
+            $paths[] = null;
             $chunks[] = 'No textual source diff remains after generated files and dependency lock files were omitted.';
         }
 
@@ -51,6 +54,7 @@ final readonly class ReleaseDiffChunker
             array_values(array_unique($omittedFiles)),
             $truncated,
             $hasAnalyzableChanges,
+            $paths,
         );
     }
 

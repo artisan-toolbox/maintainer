@@ -51,9 +51,23 @@ Compatibility & impact:
 
 ## [Unreleased]
 
+- Run the Linux formatting and PHPStan checks and the cross-platform Pest suite through Composer scripts. Run the historical Windows PHAR checks on demand or after a Pest failure.
 - Allow projects to require a GitHub Actions push workflow before publishing a release. Publish the exact checked commit and resume an interrupted release with `release:create --resume`.
 - Offer to resume a prepared release from the Versioning menu.
 - Include `release.workflow` in published configuration with a `null` default.
+- Show GitHub Actions status, elapsed time, and workflow links while waiting to publish a release.
+- Accept one or more required GitHub Actions workflows in `release.workflow`. Every workflow must pass on the exact release commit before publication.
+- Add `quality:check --strict` to fail when a selected check cannot run or the selection is empty.
+- Run the Maintainer repository's Pint, PHPStan, and Pest checks through the source CLI in GitHub Actions. Run the test workflow on branch pushes, pull requests, and manual runs.
+- Support a fixed number of parallel Pest workers through `quality.pest.processes`.
+- Add a missing top-level `version` as the first property of `package.json` when syncing a release version. Update an existing property in place.
+- Allow automatic release version sync with `maintainer.syncVersion` in `package.json`. The confirmation points to the setting and release guide.
+- Offer Commit and Commit and release after successful interactive quality checks. Default to Commit and use the regular release workflow after creating a commit when the release option is selected.
+- Offer to deploy the published tag after an interactive release when the project has a local Deployer recipe.
+- Explain the suggested version and the other available versions. Treat routine repository maintenance as patch-level work when the diff shows no public change.
+- Configure each AI task's model and set separate languages for local feedback and project artifacts. OpenAI defaults to GPT‑6.2 Sol.
+- Show the resolved provider and model for each AI request in the commit and release workflows.
+- Compose Conventional Commit messages and GitHub release notes from structured AI output.
 
 - Ship the Maintainer CLI and project workflow skill for discovery by Laravel Boost in consuming Laravel applications.
 

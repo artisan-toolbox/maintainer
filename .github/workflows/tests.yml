@@ -3,14 +3,20 @@ name: Tests
 on:
   pull_request:
   push:
+    branches: ['**']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'latest' || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     name: Pest (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
 
     strategy:
@@ -19,42 +25,82 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
+        include:
+          - os: ubuntu-latest
+            runner: ubuntu-24.04
+          - os: windows-latest
+            runner: windows-2025
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
           php-version: '8.5'
-          extensions: fileinfo
+          extensions: curl, dom, fileinfo, mbstring, pdo_sqlite, zip
+          ini-values: error_reporting=E_ALL, display_errors=stderr
           coverage: none
           tools: composer:v2
+
+      - name: Validate Composer manifest and lock
+        run: composer validate --no-check-publish
+
+      - name: Locate Composer download cache
+        id: composer
+        shell: bash
+        run: echo "path=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer package downloads
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ steps.composer.outputs.path }}
+          key: composer-${{ runner.os }}-8.5-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-8.5-
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Check formatting
+        if: runner.os == 'Linux'
+        run: php maintainer quality:check --no-interaction --strict --tool=pint
+
+      - name: Analyse PHP
+        if: runner.os == 'Linux'
+        env:
+          MAINTAINER_PHPSTAN_MEMORY_LIMIT: 512M
+        run: php maintainer quality:check --no-interaction --strict --tool=phpstan
+
       - name: Run tests
+        id: pest
         timeout-minutes: 15
-        run: composer exec pest -- --parallel --processes=4
+        run: php maintainer quality:check --no-interaction --strict --tool=pest
 
       - name: Compare Windows startup with released PHARs
         timeout-minutes: 3
-        if: ${{ always() && runner.os == 'Windows' }}
+        if: ${{ !cancelled() && runner.os == 'Windows' && (steps.pest.outcome == 'failure' || (steps.pest.outcome == 'success' && github.event_name == 'workflow_dispatch')) }}
         shell: bash
         run: |
-          git fetch --no-tags origin tag 1.5.2 tag 1.6.0
-          for version in 1.5.2 1.6.0; do
-            directory=$(mktemp -d)
-            git archive "$version" builds/maintainer | tar -x -C "$directory"
+          fixtures=(
+            1.5.2:3db7796d78ae568545b8bf99c485fb686bbe71c6
+            1.6.0:b5272808a1ba2a9fba45bec8ed9e0fe7a5904c1e
+          )
+          git fetch --depth=1 --no-tags origin "${fixtures[@]#*:}"
+          directory=$(mktemp -d)
+          trap 'rm -f -- "$directory/maintainer"; rmdir -- "$directory"' EXIT
+          fixture_path=$(cygpath -w "$directory/maintainer")
+          for fixture in "${fixtures[@]}"; do
+            version=${fixture%%:*}
+            commit=${fixture#*:}
+            git show "$commit:builds/maintainer" > "$directory/maintainer"
             echo "::group::Maintainer $version"
-            if MAINTAINER_TEST_PHAR="$(cygpath -w "$directory/builds/maintainer")" composer exec pest -- tests/Feature/DistributedPharTest.php --filter="loads the bundled defaults"; then
+            if MAINTAINER_TEST_PHAR="$fixture_path" php vendor/bin/pest tests/Feature/DistributedPharTest.php --filter="loads the bundled defaults"; then
               echo "Maintainer $version loaded its bundled defaults."
             else
               echo "::warning::Maintainer $version failed the bundled defaults smoke test."
             fi
             echo "::endgroup::"
-            rm -f "$directory/builds/maintainer"
-            rmdir "$directory/builds" "$directory"
           done

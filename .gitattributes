@@ -1,4 +1,6 @@
 * text=auto eol=lf
 /.github export-ignore
+/.ai export-ignore
+/config/dev_maintainer.php export-ignore
 CONTRIBUTING.md export-ignore
 CHANGELOG.md export-ignore

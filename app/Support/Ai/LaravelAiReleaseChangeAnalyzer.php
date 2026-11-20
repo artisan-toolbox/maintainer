@@ -14,11 +14,17 @@ final readonly class LaravelAiReleaseChangeAnalyzer implements ReleaseChangeAnal
 
     private const int MAX_COMMIT_CHARACTERS = 12_000;
 
-    public function __construct(private ReleaseDiffChunker $chunker) {}
+    public function __construct(
+        private ReleaseDiffChunker $chunker,
+        private ConfiguredAiModel $models,
+        private AiReportLocale $locales,
+    ) {}
 
     public function analyze(string $provider, ReleaseChangeSet $changes): ReleaseChangeSet
     {
         $context = $this->chunker->chunk($changes->diff);
+        $model = $this->models->for('release_changelog_update', $provider);
+        $locale = $this->locales->forProjectArtifacts();
         $summaries = [];
 
         foreach ($context->chunks as $index => $chunk) {
@@ -27,11 +33,13 @@ final readonly class LaravelAiReleaseChangeAnalyzer implements ReleaseChangeAnal
             $response = ReleaseDiffSummaryAgent::make()->prompt(
                 <<<PROMPT
                 Summarize release diff fragment {$number} of {$total}.
+                Write the summary in the language of project locale {$locale}.
 
                 GIT DIFF FRAGMENT
                 {$chunk}
                 PROMPT,
                 provider: $provider,
+                model: $model,
             );
 
             throw_unless($response instanceof StructuredAgentResponse, RuntimeException::class, 'The AI provider did not return a structured diff summary.');

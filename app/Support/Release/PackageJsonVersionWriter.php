@@ -26,6 +26,13 @@ final readonly class PackageJsonVersionWriter
             && $this->workingTree->isTracked($projectRoot, 'package.json');
     }
 
+    public function shouldSyncAutomatically(string $projectRoot): bool
+    {
+        $manifest = json_decode($this->files->get(join_paths($projectRoot, 'package.json')));
+
+        return ($manifest->maintainer->syncVersion ?? null) === true;
+    }
+
     public function write(string $projectRoot, string $version): void
     {
         $path = join_paths($projectRoot, 'package.json');
@@ -43,7 +50,12 @@ final readonly class PackageJsonVersionWriter
             return;
         }
 
-        $manifest->version = $version;
+        if (property_exists($manifest, 'version')) {
+            $manifest->version = $version;
+        } else {
+            $manifest = (object) (['version' => $version] + get_object_vars($manifest));
+        }
+
         $updated = json_encode($manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
 
         preg_match('/\R([ \t]+)"/', $contents, $indentation);

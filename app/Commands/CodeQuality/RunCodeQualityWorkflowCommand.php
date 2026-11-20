@@ -21,7 +21,7 @@ abstract class RunCodeQualityWorkflowCommand extends Command
 
     abstract protected function workflowLabel(): string;
 
-    protected function offersCommit(): bool
+    protected function requiresAllSelectedTools(): bool
     {
         return false;
     }
@@ -53,33 +53,38 @@ abstract class RunCodeQualityWorkflowCommand extends Command
         }
 
         try {
+            $strict = $this->requiresAllSelectedTools();
             $commands = $this->selectedCommands($configuration);
+            throw_if(
+                $strict && $commands === [],
+                RuntimeException::class,
+                "Strict mode requires at least one configured tool in {$this->configurationKey()}.",
+            );
+
             $ran = 0;
             $skipped = 0;
 
             foreach ($commands as $command) {
                 $availability = $command->availability($projectRoot);
-
-                if (! $availability->available) {
-                    $this->components->warn("Skipped {$command->label()}: {$availability->reason}.");
-                    $skipped++;
-
-                    continue;
-                }
-
+                $skipReason = $availability->reason;
                 $configurationPath = null;
-                $tool = $command->configurationTool();
+                $tool = $availability->available ? $command->configurationTool() : null;
 
                 if ($tool !== null) {
                     $configurationPath = $qualityConfigurations->find($tool, $projectRoot);
 
                     if ($configurationPath === null) {
                         $filenames = implode(', ', $tool->configurationFilenames());
-                        $this->components->warn("Skipped {$command->label()}: no supported configuration file was found ({$filenames}).");
-                        $skipped++;
-
-                        continue;
+                        $skipReason = "no supported configuration file was found ({$filenames})";
                     }
+                }
+
+                if ($skipReason !== null) {
+                    throw_if($strict, RuntimeException::class, "Required {$command->label()} could not run: {$skipReason}.");
+                    $this->components->warn("Skipped {$command->label()}: {$skipReason}.");
+                    $skipped++;
+
+                    continue;
                 }
 
                 $this->components->twoColumnDetail("Running {$command->label()}", $command->name());
@@ -107,6 +112,7 @@ abstract class RunCodeQualityWorkflowCommand extends Command
         }
 
         $this->components->success("{$this->workflowLabel()} completed successfully: {$ran} run, {$skipped} skipped.");
+        $checksPassed = ! $this->offersCheck();
 
         if ($this->offersCheck() && $interactive && $qualityCheckPrompt->shouldRun()) {
             $exitCode = $this->callNonInteractively('quality:check', $interactive);
@@ -114,10 +120,14 @@ abstract class RunCodeQualityWorkflowCommand extends Command
             if ($exitCode !== self::SUCCESS) {
                 return $exitCode;
             }
+
+            $checksPassed = true;
         }
 
-        if ($ran > 0 && $this->offersCommit() && $interactive && $this->shouldCreateCommit($projectRoot, $workingTree, $qualityCommitPrompt)) {
-            return $this->call('commit');
+        if ($ran > 0 && $interactive && $this->shouldCreateCommit($projectRoot, $workingTree, $qualityCommitPrompt)) {
+            $withRelease = $checksPassed && $qualityCommitPrompt->shouldRelease();
+
+            return $this->call('commit', $withRelease ? ['--release' => true] : []);
         }
 
         return self::SUCCESS;
