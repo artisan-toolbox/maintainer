@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.14.0] - 2026-11-20
+
+### Features
+
+- **Show progress for each AI release-analysis fragment** (`e0f4be3`)
+  The release command now reports progress one fragment at a time during AI diff summarization and version analysis, making it easier to see what is happening while a large diff is being reviewed. Both release agents register a progress callback through AI middleware. Code that constructs `ReleaseDiffSummaryAgent` directly must now pass a `Closure`; callers of `ReleaseVersionAgent` must also supply the progress callback.
+
+- **Gate releases on GitHub Actions and structure AI-generated output** (`3b0fcaa`)
+  Configure `release.workflow` to require one or more GitHub Actions workflows to pass on the exact commit being published. The setting defaults to `null`, so existing projects do not need to opt in. While waiting, the release command shows each workflow's status, elapsed time, retry attempt, run link, and active jobs. `release:create --resume` verifies that the prepared release still matches HEAD, the branch, version, repository, and resolved workflow set, and refreshes saved workflow details when needed. For eligible `package.json` files, `maintainer.syncVersion: true` enables automatic version syncing; otherwise syncing remains opt-in. Syncing updates an existing top-level `version` in place or inserts it first if missing.
+
+AI commit messages, release notes, and version recommendations now use strict structured output. Direct consumers must migrate from plain-text commit messages to typed fields for the subject, breaking change, individual changes, and trailers; from a Markdown release-notes `body` to localized sections they render themselves; and from `release_increment` and `justification` to `recommended_version`, localized reasons for every offered version, and `public_change_evidence`. The version agent now takes the eligible versions, labeled options, and locale. Release analysis defaults to patch when there are no reviewable changes or analysis fails, calls for minor when the diff demonstrates a backward-compatible public capability or deprecation, and warns when a demonstrated breaking change requires a new major version or when the diff was truncated. Minor and required-major recommendations must cite a verbatim implementation line. Commit generation retains the 72-character subject limit, accepts trailers only when supplied as complete lines in user context, and still requires explicit evidence before claiming tests passed. AI commit-message generation uses shared console progress reporting.
+
+`quality:check --strict` fails when no tools are selected or when a selected tool cannot run, without changing the default warn-and-skip behavior or the `--tool` filter. `quality.pest.processes` can set a fixed Pest worker count. Interactive quality workflows that ran at least one tool can offer to commit; they offer to release only if the quality check passed or no check was offered. Declining an offered check still permits a commit without a release, while a failed check stops the workflow before the commit prompt. `commit --release` skips the push prompt after a successful commit, starts `release:create`, and returns its exit code. Plain `commit` retains its optional push prompt. Quality workflow subclasses must replace any `offersCommit()` override: that hook was removed, and `requiresAllSelectedTools()` controls strict execution, not commit prompting.
+
+CI now uses the source CLI's strict checks for Pint and PHPStan on Linux and Pest on Linux and Windows. It runs on branch pushes, pull requests, and manual dispatches rather than tag pushes, and cancels superseded or duplicate runs. It pins runner versions and action revisions, stops persisting checkout credentials, expands the PHP 8.5 extensions, sends `E_ALL` errors to stderr, validates Composer metadata, and caches Composer downloads by operating system, PHP version, and lockfile. The Windows smoke test uses the 1.5.2 and 1.6.0 PHARs from pinned commits and runs only after a Pest failure or after Pest passes in a manual run, unless canceled.
+
+Maintainer documentation adds a required checklist for AI model and prompt reviews. It covers checking the models actually used by each request, validating Responses API structured output without breaking other-provider overrides, testing version recommendations against repository fixtures, keeping local feedback and project locales independent, and reporting whether validation used fixtures or a live provider. Git no longer ignores `config/dev_maintainer.php` through the project rule, but both that file and `.ai` are excluded from `git archive` exports. The development secrets file remains ignored.
+
 ## [1.13.0] - 2026-11-19
 
 ### Features
