@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.2] - 2026-11-20
+
+### Fixes
+
+- **Move the GitHub Actions CI setup action to the repository root** (`f32dc04`)
+  Moved `.github/actions/setup-ci/action.yml` to the repository root so GitHub’s source archive includes `action.yml`. The action and its inputs are unchanged. This is a breaking path change for custom jobs: replace `artisan-toolbox/maintainer/.github/actions/setup-ci@<commit-sha>` with `artisan-toolbox/maintainer@<commit-sha>` after checkout, and pin it to a full commit SHA that contains the root `action.yml`. Quality-only jobs can keep using `.github/workflows/ci.yml`, which now calls the root action from its own revision. The repository’s test workflow also uses the root action without changing its PHP version or extensions. Updated the migration guidance and actionlint suppression, and added tests that verify the root action is composite and that the reusable workflow’s `quality` job calls it exactly once with only declared inputs.
+
 ## [1.14.1] - 2026-11-20
 
 ### Features
