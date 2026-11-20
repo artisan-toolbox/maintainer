@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.14.1] - 2026-11-20
+
+### Features
+
+- **Add reusable GitHub Actions helpers for Maintainer CI** (`4965ed6`)
+  Adds a reusable workflow that installs dependencies and runs `quality:check --no-interaction --strict`, with an option to run only one configured tool. The workflow defaults to Ubuntu 24.04, PHP 8.5, a 25-minute timeout, and `vendor/bin/maintainer`, and uses read-only repository permissions without persisting checkout credentials. Projects that need to keep existing job names, matrices, services, or custom steps can use the new `setup-ci` composite action after checkout instead. The action defaults to PHP 8.5 and Composer v2 and supports configurable PHP settings, Composer install or update modes, optional manifest validation, and optional Node.js setup with `npm ci`. Composer and npm scripts can be disabled. Composer download caching is on by default and keyed to the active manifest and lockfile; disable it for private dependencies. npm caching is opt-in and intended only for public dependencies. The test workflow now uses the composite action and adds a manually triggered job that exercises the reusable workflow with Pint. A workflow-specific actionlint exception suppresses the outdated missing-ref warning for GitHub’s workflow-relative action syntax. The adoption guide explains how to pin either helper to a full commit SHA, verify that the installed CLI supports the check flags, and confirm that restoring a cache does not skip dependency installation.
+
+### Fixes
+
+- **Use the preferred macOS language for AI release feedback** (`46b1042`)
+  When the terminal provides no usable locale, including `C.UTF-8`, Maintainer now uses the first preferred macOS language for AI release recommendation explanations. An explicit feedback locale still takes precedence, followed by a valid terminal locale. The macOS lookup has a one-second timeout and preserves the existing fallbacks if the preference cannot be read or is invalid. Locale normalization now preserves script subtags, for example converting `zh-Hant-TW` to `zh_Hant_TW`. The development configuration exposes optional environment-backed model overrides for commit messages, release type suggestions, release notes, and changelog updates without changing provider settings. It also exposes separate feedback and project locale settings, so generated project text continues to use the project locale, which defaults to English. Tests pin the existing cases to Linux and cover macOS preference detection, normalization, precedence, and fallback.
+
 ## [Unreleased]
 
 ### Features
