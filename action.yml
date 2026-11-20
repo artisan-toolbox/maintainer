@@ -78,7 +78,7 @@ runs:
 
     - name: Set up PHP and Composer
       id: php
-      uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+      uses: shivammathur/setup-php@2001cd3148dcbaf467b7fa06cd7155ebb6d4cacf # PHP 8.6 stable support
       with:
         php-version: ${{ inputs.php-version }}
         extensions: ${{ inputs.php-extensions }}

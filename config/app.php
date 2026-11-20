@@ -2,6 +2,7 @@
 
 use App\Providers\AppServiceProvider;
 use App\Providers\EncryptionServiceProvider;
+use ArtisanToolbox\Maintainer\Maintainer;
 use Laravel\Ai\AiServiceProvider;
 
 return [
@@ -30,7 +31,7 @@ return [
     |
     */
 
-    'version' => resolve('git.version'),
+    'version' => Maintainer::VERSION,
 
     /*
     |--------------------------------------------------------------------------

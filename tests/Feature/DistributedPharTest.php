@@ -1,5 +1,6 @@
 <?php
 
+use ArtisanToolbox\Maintainer\Maintainer;
 use Illuminate\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
@@ -7,6 +8,15 @@ function distributedMaintainerExecutable(): string
 {
     return getenv('MAINTAINER_TEST_PHAR') ?: dirname(__DIR__, 2).'/builds/maintainer';
 }
+
+it('reports the release version from the distributed executable', function () {
+    withinTemporaryProject(function (string $directory): void {
+        $process = new Process([PHP_BINARY, distributedMaintainerExecutable(), '--version', '--no-ansi'], $directory);
+        $process->mustRun();
+
+        expect(trim($process->getOutput()))->toBe('Maintainer '.Maintainer::VERSION);
+    });
+});
 
 it('registers the public Maintainer commands in the distributed executable', function () {
     withinTemporaryProject(function (string $directory): void {

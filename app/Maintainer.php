@@ -19,7 +19,7 @@ final class Maintainer implements BeforeVersioning, Versionable, WithReadmeHead
     {
         Process::path(base_path())
             ->forever()
-            ->run([PHP_BINARY, base_path('maintainer'), 'app:build'])
+            ->run([PHP_BINARY, base_path('maintainer'), 'app:build', '--build-version='.$next, '--no-interaction'])
             ->throw();
     }
 

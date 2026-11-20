@@ -18,6 +18,8 @@ it('builds the Maintainer executable before versioning itself', function () {
         PHP_BINARY,
         base_path('maintainer'),
         'app:build',
+        '--build-version=1.0.1',
+        '--no-interaction',
     ] && $process->path === $projectRoot && $process->timeout === null);
 });
 

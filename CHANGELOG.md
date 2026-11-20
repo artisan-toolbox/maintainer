@@ -28,6 +28,10 @@
 
 ## [Unreleased]
 
+- Build the release executable with the selected version so the CLI reports the same version as its package.
+- Identify the published CI action, strict quality checks, parallel Pest settings, and release options in the Boost usage skill.
+- Run the Maintainer test suite and check the same distributed PHAR on PHP 8.5 and 8.6 across Ubuntu and Windows.
+
 ### Features
 
 - Refresh the interactive menu with a color wordmark and the CLI version alongside it. The header fits narrow terminals with a single-line layout. Update the standalone SVG icon and both wordmarks to match.

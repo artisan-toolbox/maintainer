@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   tests:
-    name: Pest (${{ matrix.os }})
+    name: Pest (${{ matrix.os }})${{ matrix.php != '8.5' && format(' / PHP {0}', matrix.php) || '' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
 
@@ -25,6 +25,7 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
+        php: ['8.5', '8.6']
         include:
           - os: ubuntu-latest
             runner: ubuntu-24.04
@@ -40,7 +41,7 @@ jobs:
       - name: Set up CI dependencies
         uses: ./
         with:
-          php-version: '8.5'
+          php-version: ${{ matrix.php }}
           php-extensions: curl, dom, fileinfo, mbstring, pdo_sqlite, zip
           composer-validation: 'no-check-publish'
 

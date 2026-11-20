@@ -36,7 +36,7 @@ return [
             RunsPestCheck::class,
         ],
         'pest' => [
-            'parallel' => env('MAINTAINER_PEST_PARALLEL', true),
+            'parallel' => env('MAINTAINER_PEST_PARALLEL', PHP_OS_FAMILY !== 'Windows'),
             'processes' => 4,
         ],
         'phpstan' => [
