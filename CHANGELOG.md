@@ -6,6 +6,10 @@
 
 - Add reusable GitHub Actions CI helpers. Use `.github/workflows/ci.yml` for a job that installs dependencies and runs strict Maintainer checks. Use `.github/actions/setup-ci` within custom jobs to set up PHP and Composer, optionally install Node.js and npm dependencies, and cache public download archives. Existing jobs can keep their names, matrices, services, and project steps.
 
+### Fixes
+
+- Use the first preferred macOS language for AI release recommendation explanations when the terminal does not supply a language, including when it reports `C.UTF-8`. An explicit feedback locale takes precedence. Generated project text uses its own locale setting.
+
 ## [1.14.0] - 2026-11-20
 
 ### Features

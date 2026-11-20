@@ -68,7 +68,7 @@ The `1.x` source preview defaults OpenAI text tasks to `gpt-6.2-sol`. Override a
 Use the provider and model shown beside each AI request in the terminal to verify which configuration the command resolved.
 During release recommendations and diff summaries, use the fragment counter to see how many requests are left after the current one.
 
-The release picker explains the suggested version and the other offered versions. Treat routine docs, workflow, and development-environment changes as maintenance when they leave public behavior unchanged. Set `ai.local_feedback_locale` to a locale such as `pt_BR` for the reasons in the terminal, or leave it `null` to use the terminal locale. Set `ai.project_locale` for AI-generated commit messages, release notes, and changelog text. It defaults to `en`.
+The release picker explains the suggested version and the other offered versions. Treat routine docs, workflow, and development-environment changes as maintenance when they leave public behavior unchanged. Set `ai.local_feedback_locale` to a locale such as `pt_BR` for the reasons in the terminal, or leave it `null` to detect the language. The source preview uses the first preferred macOS language when the terminal does not specify a language, including when it reports `C.UTF-8`. Set `ai.project_locale` for AI-generated commit messages, release notes, and changelog text. It defaults to `en`.
 
 Maintainer builds Conventional Commit messages from a structured type, scope, title, and changes. It renders release notes from a title and sections of changes. Review the generated commit message and the release title at the prompts. Changelog entries use validated types and Git commit hashes.
 
