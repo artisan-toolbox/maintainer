@@ -67,6 +67,7 @@ Compatibility & impact:
 - Explain the suggested version and the other available versions. Treat routine repository maintenance as patch-level work when the diff shows no public change.
 - Configure each AI task's model and set separate languages for local feedback and project artifacts. OpenAI defaults to GPT‑6.2 Sol.
 - Show the resolved provider and model for each AI request in the commit and release workflows.
+- Show the current fragment, total, and number left during AI release recommendations and diff summaries. Interactive terminals animate the current request.
 - Compose Conventional Commit messages and GitHub release notes from structured AI output.
 
 - Ship the Maintainer CLI and project workflow skill for discovery by Laravel Boost in consuming Laravel applications.

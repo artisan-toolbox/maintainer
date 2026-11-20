@@ -220,13 +220,15 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $this->components->twoColumnDetail('Latest GitHub version', $latestVersion?->value() ?? 'No valid release found');
 
             $defaultVersion = (string) array_key_first($options);
+            $animateAiProgress = $this->input->isInteractive() && $this->output->isDecorated();
 
             if ($latestVersion !== null && $latestVersion->prerelease === null) {
                 try {
                     $provider = $configuredAiProvider->for('release_type_suggestion');
-                    $recommendation = $aiProgress->run(
+                    $recommendation = $aiProgress->runFragments(
                         $this->components,
                         'Analyzing the release diff',
+                        $animateAiProgress,
                         fn () => $releaseVersionRecommender->recommend($provider, $projectRoot, $latestVersion, $options),
                     );
                     if ($recommendation === null) {
@@ -278,9 +280,10 @@ final class CreateReleaseCommand extends Command implements SignalableCommandInt
             $changes = $git->changesSince($projectRoot, $latestVersion?->value());
             $changelogProvider = $configuredAiProvider->for('release_changelog_update');
             $operation = 'analyze release changes with AI';
-            $analyzedChanges = $aiProgress->run(
+            $analyzedChanges = $aiProgress->runFragments(
                 $this->components,
                 'Summarizing release changes',
+                $animateAiProgress,
                 fn () => $releaseChangeAnalyzer->analyze($changelogProvider, $changes),
             );
             $operation = 'generate the release changelog';

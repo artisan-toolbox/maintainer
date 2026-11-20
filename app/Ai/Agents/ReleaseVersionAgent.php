@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace App\Ai\Agents;
 
+use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Ai\Attributes\Strict;
 use Laravel\Ai\Attributes\UseCheapestModel;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasMiddleware;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Promptable;
 
 #[Strict]
 #[UseCheapestModel]
-final readonly class ReleaseVersionAgent implements Agent, HasStructuredOutput
+final readonly class ReleaseVersionAgent implements Agent, HasMiddleware, HasStructuredOutput
 {
     use Promptable;
 
@@ -26,7 +28,14 @@ final readonly class ReleaseVersionAgent implements Agent, HasStructuredOutput
         private array $eligibleVersions,
         private array $options,
         private string $locale,
+        private Closure $fragmentProgress,
     ) {}
+
+    /** @return list<Closure> */
+    public function middleware(): array
+    {
+        return [$this->fragmentProgress];
+    }
 
     public function instructions(): string
     {

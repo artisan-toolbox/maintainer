@@ -18,6 +18,7 @@ final readonly class LaravelAiReleaseChangeAnalyzer implements ReleaseChangeAnal
         private ReleaseDiffChunker $chunker,
         private ConfiguredAiModel $models,
         private AiReportLocale $locales,
+        private AiConsoleProgress $progress,
     ) {}
 
     public function analyze(string $provider, ReleaseChangeSet $changes): ReleaseChangeSet
@@ -26,11 +27,12 @@ final readonly class LaravelAiReleaseChangeAnalyzer implements ReleaseChangeAnal
         $model = $this->models->for('release_changelog_update', $provider);
         $locale = $this->locales->forProjectArtifacts();
         $summaries = [];
+        $total = count($context->chunks);
 
         foreach ($context->chunks as $index => $chunk) {
             $number = $index + 1;
-            $total = count($context->chunks);
-            $response = ReleaseDiffSummaryAgent::make()->prompt(
+            $agent = new ReleaseDiffSummaryAgent($this->progress->fragment($number, $total));
+            $response = $agent->prompt(
                 <<<PROMPT
                 Summarize release diff fragment {$number} of {$total}.
                 Write the summary in the language of project locale {$locale}.

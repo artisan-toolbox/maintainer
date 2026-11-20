@@ -62,6 +62,7 @@ When `release:create` offers to sync a tracked `package.json`, confirm to set th
 The `1.x` source preview defaults OpenAI text tasks to `gpt-6.2-sol`. Override a task under `ai.models` in `config/maintainer.php` using its key. The keys are `commit_message`, `release_type_suggestion`, `release_notes`, and `release_changelog_update`. Models for other providers use their supported IDs. An omitted override keeps that provider's Laravel AI model selection. Newer models can become available after a Maintainer release. Check your provider's current API catalog, account access, and structured output support before choosing an ID.
 
 Use the provider and model shown beside each AI request in the terminal to verify which configuration the command resolved.
+During release recommendations and diff summaries, use the fragment counter to see how many requests are left after the current one.
 
 The release picker explains the suggested version and the other offered versions. Treat routine docs, workflow, and development-environment changes as maintenance when they leave public behavior unchanged. Set `ai.local_feedback_locale` to a locale such as `pt_BR` for the reasons in the terminal, or leave it `null` to use the terminal locale. Set `ai.project_locale` for AI-generated commit messages, release notes, and changelog text. It defaults to `en`.
 

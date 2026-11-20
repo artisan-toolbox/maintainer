@@ -19,6 +19,7 @@ final readonly class LaravelAiReleaseVersionRecommender implements ReleaseVersio
         private LaravelProjectTypeDetector $projectTypeDetector,
         private ConfiguredAiModel $models,
         private AiReportLocale $locale,
+        private AiConsoleProgress $progress,
     ) {}
 
     public function recommend(
@@ -46,13 +47,13 @@ final readonly class LaravelAiReleaseVersionRecommender implements ReleaseVersio
         $menu = implode("\n", $options);
         $decisions = [];
         $selected = $patch;
+        $total = count($context->chunks);
 
         foreach ($context->chunks as $index => $chunk) {
             $path = $context->paths[$index] ?? '';
             $eligible = $this->allowsPublicChange($path, $chunk) ? $stable : [$patch];
-            $agent = new ReleaseVersionAgent($eligible, $options, $locale);
             $number = $index + 1;
-            $total = count($context->chunks);
+            $agent = new ReleaseVersionAgent($eligible, $options, $locale, $this->progress->fragment($number, $total));
             $response = $agent->prompt(
                 <<<PROMPT
                 Review release diff fragment {$number} of {$total} since {$latestVersion->value()}.

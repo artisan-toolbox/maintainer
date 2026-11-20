@@ -630,9 +630,19 @@ it('uses the structured AI recommendation as the default for a stable release', 
             ],
         ]);
         $files->put($directory.'/src/Export.php', "<?php\nfunction exportCsv(): string { return 'CSV'; }\n");
-        new Process(['git', 'add', 'src/Export.php'], $directory)->mustRun();
+        $files->append($directory.'/README.md', "\nLearn how to export CSV.\n");
+        new Process(['git', 'add', 'README.md', 'src/Export.php'], $directory)->mustRun();
         new Process(['git', 'commit', '-m', 'Add CSV exports'], $directory)->mustRun();
         ReleaseVersionAgent::fake([[
+            'recommended_version' => '1.0.1',
+            'reasons' => [
+                '1.0.1' => 'The README documents CSV export.',
+                '1.1.0' => 'The README alone adds no API.',
+                '1.1.0-alpha.1' => 'The README needs no experimental preview.',
+                '1.1.0-beta.1' => 'The README needs no beta release.',
+            ],
+            'public_change_evidence' => '',
+        ], [
             'recommended_version' => '1.1.0',
             'reasons' => [
                 '1.0.1' => 'A patch would omit the new API from the version signal.',
@@ -659,8 +669,10 @@ it('uses the structured AI recommendation as the default for a stable release', 
         expect(preg_replace('/\s+/', ' ', $output))
             ->toContain('AI recommendation', 'The diff adds a backward-compatible CSV export', 'Other release options',
                 'A patch would omit the new API', 'The export has no experimental designation', 'The export does not introduce a beta cycle');
-        expect($output)->toMatch('~Analyzing the release diff[^\n]*openai / gpt-6\.2-sol~');
-        foreach (['Summarizing release changes', 'Building the changelog', 'Writing GitHub release notes'] as $activity) {
+        expect($output)
+            ->toMatch('~Analyzing the release diff \(1/2, 1 left\)[^\n]*openai / gpt-6\.2-sol~')
+            ->toMatch('~Analyzing the release diff \(2/2, 0 left\)[^\n]*openai / gpt-6\.2-sol~');
+        foreach (['Summarizing release changes (1/1, 0 left)', 'Building the changelog', 'Writing GitHub release notes'] as $activity) {
             expect($output)->toMatch('~'.preg_quote($activity, '~').'[^\n]*openai / gpt-6\.2-sol~');
         }
 

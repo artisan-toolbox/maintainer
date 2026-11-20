@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Agents\ReleaseDiffSummaryAgent;
+use App\Support\Ai\AiConsoleProgress;
 use App\Support\Ai\AiReportLocale;
 use App\Support\Ai\ConfiguredAiModel;
 use App\Support\Ai\LaravelAiReleaseChangeAnalyzer;
@@ -49,6 +50,7 @@ it('summarizes bounded diff fragments into reusable release context', function (
         new ReleaseDiffChunker(maxCharacters: 120, maxChunks: 2),
         resolve(ConfiguredAiModel::class),
         resolve(AiReportLocale::class),
+        resolve(AiConsoleProgress::class),
     )->analyze('openai', $changes);
 
     expect($analyzed->diff)
