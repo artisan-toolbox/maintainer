@@ -43,7 +43,9 @@ php vendor/bin/maintainer quality:check --no-interaction --strict --tool=phpstan
 
 The command succeeds when PHPStan runs and passes. A missing requirement or empty selection fails the strict check. Check `quality:check --help` before using `--strict` on an installed release.
 
-For a GitHub Actions job that only runs the configured quality checks, call `artisan-toolbox/maintainer/.github/workflows/ci.yml` at a full commit SHA containing the helper. For an existing job with services, custom dependency resolution, or required check names, call `artisan-toolbox/maintainer/.github/actions/setup-ci` after checkout. Pin the action to a full SHA as well. These helpers are a source preview. The CLI installed in the consuming project must support the flags used in the check. Disable `composer-cache` for private Composer downloads and leave `npm-cache` off for private npm downloads. See the [GitHub Actions guide](https://atb.dev.br/docs/maintainer/ci#github-actions) for inputs and examples.
+The GitHub.com CI helpers that use the root action are a source preview. Pin either helper to a full Maintainer commit SHA containing the root `action.yml`. For a job that only runs the configured quality checks, call `artisan-toolbox/maintainer/.github/workflows/ci.yml@<commit-sha>`. For an existing job with services, custom dependency resolution, or required check names, call `artisan-toolbox/maintainer@<commit-sha>` after checkout.
+
+The CLI installed in the consuming project must support the flags used in the check. Disable `composer-cache` for private Composer downloads and leave `npm-cache` off for private npm downloads. See the [GitHub Actions guide](https://atb.dev.br/docs/maintainer/ci#github-actions) for inputs and examples.
 
 To verify a workflow change, lint the caller's workflow with `actionlint` and run the same project checks locally. On GitHub, inspect the run for the changed commit and confirm the intended tools ran. After changing the cache, also confirm a later run with the same inputs restores the cache and still installs dependencies. See [Verify a CI run](https://atb.dev.br/docs/maintainer/ci#verify-ci-run).
 

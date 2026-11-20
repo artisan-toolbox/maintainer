@@ -38,7 +38,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up CI dependencies
-        uses: ./.github/actions/setup-ci
+        uses: ./
         with:
           php-version: '8.5'
           php-extensions: curl, dom, fileinfo, mbstring, pdo_sqlite, zip

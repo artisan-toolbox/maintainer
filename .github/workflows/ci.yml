@@ -59,7 +59,7 @@ jobs:
           persist-credentials: false
 
       - name: Install CI dependencies
-        uses: $/.github/actions/setup-ci
+        uses: $/
         with:
           working-directory: ${{ inputs.working-directory }}
           php-version: ${{ inputs.php-version }}

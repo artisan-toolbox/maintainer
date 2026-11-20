@@ -16,7 +16,7 @@
 
 ### Features
 
-- Add reusable GitHub Actions CI helpers. Use `.github/workflows/ci.yml` for a job that installs dependencies and runs strict Maintainer checks. Use `.github/actions/setup-ci` within custom jobs to set up PHP and Composer, optionally install Node.js and npm dependencies, and cache public download archives. Existing jobs can keep their names, matrices, services, and project steps.
+- Move the CI setup action to the repository root so GitHub's source archive includes it. Replace `artisan-toolbox/maintainer/.github/actions/setup-ci` with `artisan-toolbox/maintainer` and pin the call to a full commit SHA containing the root `action.yml`. The action keeps its existing inputs. The reusable CI workflow also uses the root action at the workflow's revision.
 
 ### Fixes
 
