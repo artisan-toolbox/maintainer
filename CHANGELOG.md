@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.14.4] - 2026-11-20
+
+### Fixes
+
+- **Make the release executable report the selected version** (`e027d09`)
+  The release hook now builds the PHAR with `app:build --build-version=<next> --no-interaction` before versioning, so `maintainer --version` reports the same version as the released package without prompting during the build. The application now reads its version from `Maintainer::VERSION`; overriding the `git.version` container binding no longer changes `app.version`.
+
+CI now runs Pest and checks the same distributed PHAR on PHP 8.5 and 8.6 on Ubuntu and Windows. The composite action updates its PHP setup pin to support stable PHP 8.6 without changing its PHP version or extension inputs. Regression tests verify the executable’s exact version output from a temporary project, the pre-versioning build arguments and execution context, and unconditional test execution across all four CI combinations.
+
+`composer test` now runs Pest through Maintainer’s strict, non-interactive quality check instead of passing parallel flags directly. Pest still defaults to four workers when parallel execution is enabled, but parallel execution is now off by default on Windows and remains on elsewhere. Windows users who want the previous behavior can set `MAINTAINER_PEST_PARALLEL` explicitly. The Boost development guide now identifies the released versions that support strict checks, configurable Pest workers, multiple required release workflows, tracked `package.json` version placement, the configurable OpenAI text model default, macOS language fallback, and GitHub.com CI helpers. It also recommends pinning the published CI workflow or action to a full release commit SHA and verifying that PHP 8.6 jobs install the intended stable version.
+
 ## [1.14.3] - 2026-11-20
 
 ### Features
