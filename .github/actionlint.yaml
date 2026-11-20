@@ -1,0 +1,5 @@
+paths:
+  .github/workflows/ci.yml:
+    ignore:
+      # GitHub.com resolves this action at the called workflow revision. actionlint 1.7.12 predates this syntax.
+      - '^specifying action "\$/\.github/actions/setup-ci" in invalid format because ref is missing\.'

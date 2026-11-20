@@ -37,32 +37,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci
         with:
           php-version: '8.5'
-          extensions: curl, dom, fileinfo, mbstring, pdo_sqlite, zip
-          ini-values: error_reporting=E_ALL, display_errors=stderr
-          coverage: none
-          tools: composer:v2
-
-      - name: Validate Composer manifest and lock
-        run: composer validate --no-check-publish
-
-      - name: Locate Composer download cache
-        id: composer
-        shell: bash
-        run: echo "path=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Composer package downloads
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ steps.composer.outputs.path }}
-          key: composer-${{ runner.os }}-8.5-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-${{ runner.os }}-8.5-
-
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist
+          php-extensions: curl, dom, fileinfo, mbstring, pdo_sqlite, zip
+          composer-validation: 'no-check-publish'
 
       - name: Check formatting
         if: runner.os == 'Linux'
@@ -104,3 +84,11 @@ jobs:
             fi
             echo "::endgroup::"
           done
+
+  reusable-ci:
+    name: Reusable CI
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/ci.yml
+    with:
+      maintainer-entrypoint: maintainer
+      quality-tool: pint

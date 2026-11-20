@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- Add reusable GitHub Actions CI helpers. Use `.github/workflows/ci.yml` for a job that installs dependencies and runs strict Maintainer checks. Use `.github/actions/setup-ci` within custom jobs to set up PHP and Composer, optionally install Node.js and npm dependencies, and cache public download archives. Existing jobs can keep their names, matrices, services, and project steps.
+
 ## [1.14.0] - 2026-11-20
 
 ### Features

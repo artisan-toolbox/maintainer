@@ -43,6 +43,10 @@ php vendor/bin/maintainer quality:check --no-interaction --strict --tool=phpstan
 
 The command succeeds when PHPStan runs and passes. A missing requirement or empty selection fails the strict check. Check `quality:check --help` before using `--strict` on an installed release.
 
+For a GitHub Actions job that only runs the configured quality checks, call `artisan-toolbox/maintainer/.github/workflows/ci.yml` at a full commit SHA containing the helper. For an existing job with services, custom dependency resolution, or required check names, call `artisan-toolbox/maintainer/.github/actions/setup-ci` after checkout. Pin the action to a full SHA as well. These helpers are a source preview. The CLI installed in the consuming project must support the flags used in the check. Disable `composer-cache` for private Composer downloads and leave `npm-cache` off for private npm downloads. See the [GitHub Actions guide](https://atb.dev.br/docs/maintainer/ci#github-actions) for inputs and examples.
+
+To verify a workflow change, lint the caller's workflow with `actionlint` and run the same project checks locally. On GitHub, inspect the run for the changed commit and confirm the intended tools ran. After changing the cache, also confirm a later run with the same inputs restores the cache and still installs dependencies. See [Verify a CI run](https://atb.dev.br/docs/maintainer/ci#verify-ci-run).
+
 For parallel Pest runs in the source preview, set `quality.pest.parallel` to `true`. Set `quality.pest.processes` to a positive integer to choose the worker count, or omit it to use Pest's default count.
 
 After a successful interactive check with Git changes, confirm the commit suggestion. Choose **Commit**, the default, or **Commit and release**. The second choice starts the existing release workflow after the work commit succeeds. Use `php vendor/bin/maintainer commit --release` to enter that sequence directly and select all pending changes required for a clean release worktree.

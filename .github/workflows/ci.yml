@@ -1,0 +1,82 @@
+name: Maintainer CI
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: GitHub-hosted runner image
+        type: string
+        default: ubuntu-24.04
+      timeout-minutes:
+        description: Job timeout in minutes
+        type: number
+        default: 25
+      working-directory:
+        description: Composer project directory relative to the repository root
+        type: string
+        default: '.'
+      php-version:
+        description: PHP version to install
+        type: string
+        default: '8.5'
+      php-extensions:
+        description: Comma-separated PHP extensions to install or disable
+        type: string
+        default: ''
+      composer-cache:
+        description: Cache public Composer download archives
+        type: boolean
+        default: true
+      node-version:
+        description: Node.js version to install before running npm ci
+        type: string
+        default: ''
+      npm-cache:
+        description: Cache public npm downloads when Node.js is enabled
+        type: boolean
+        default: false
+      maintainer-entrypoint:
+        description: Maintainer PHP entry point relative to the project directory
+        type: string
+        default: vendor/bin/maintainer
+      quality-tool:
+        description: Run one configured Maintainer tool instead of the full selection
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Check quality
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install CI dependencies
+        uses: $/.github/actions/setup-ci
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          php-version: ${{ inputs.php-version }}
+          php-extensions: ${{ inputs.php-extensions }}
+          composer-cache: ${{ toJSON(inputs.composer-cache) }}
+          node-version: ${{ inputs.node-version }}
+          npm-cache: ${{ toJSON(inputs.npm-cache) }}
+
+      - name: Run Maintainer quality checks
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          MAINTAINER_ENTRYPOINT: ${{ inputs.maintainer-entrypoint }}
+          QUALITY_TOOL: ${{ inputs.quality-tool }}
+        run: |
+          arguments=(quality:check --no-interaction --strict)
+          if [[ -n "$QUALITY_TOOL" ]]; then
+            arguments+=("--tool=$QUALITY_TOOL")
+          fi
+          php -f "$MAINTAINER_ENTRYPOINT" -- "${arguments[@]}"

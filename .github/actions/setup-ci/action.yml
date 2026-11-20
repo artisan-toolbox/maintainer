@@ -1,0 +1,199 @@
+name: Set up Maintainer CI
+description: Set up PHP and Composer, optionally install Node.js, and install project dependencies.
+
+inputs:
+  working-directory:
+    description: Project directory relative to the checkout.
+    default: '.'
+  php-version:
+    description: PHP version passed to setup-php.
+    default: '8.5'
+  php-extensions:
+    description: Comma-separated PHP extensions passed to setup-php.
+    default: ''
+  php-ini-values:
+    description: Comma-separated PHP INI values passed to setup-php.
+    default: 'error_reporting=E_ALL, display_errors=stderr'
+  php-coverage:
+    description: PHP coverage driver passed to setup-php.
+    default: 'none'
+  composer-version:
+    description: Composer version passed to setup-php.
+    default: 'v2'
+  composer-mode:
+    description: Dependency mode. Use install, prefer-lowest, prefer-stable, or none.
+    default: 'install'
+  composer-validation:
+    description: Validation before dependency installation. Use none, strict, no-check-publish, or no-check-lock.
+    default: 'none'
+  composer-cache:
+    description: Cache Composer package archives. Disable for private dependencies.
+    default: 'true'
+  composer-scripts:
+    description: Run Composer scripts during dependency installation.
+    default: 'true'
+  node-version:
+    description: Node.js version passed to setup-node. Leave empty to skip Node.js setup and npm installation.
+    default: ''
+  npm-install:
+    description: Run npm ci when node-version is set.
+    default: 'true'
+  npm-cache:
+    description: Cache npm downloads when node-version is set. Enable for public dependencies only.
+    default: 'false'
+  npm-scripts:
+    description: Run npm lifecycle scripts during npm ci.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate setup inputs
+      shell: bash
+      env:
+        CI_COMPOSER_MODE: ${{ inputs.composer-mode }}
+        CI_COMPOSER_VALIDATION: ${{ inputs.composer-validation }}
+        CI_COMPOSER_CACHE: ${{ inputs.composer-cache }}
+        CI_COMPOSER_SCRIPTS: ${{ inputs.composer-scripts }}
+        CI_NPM_INSTALL: ${{ inputs.npm-install }}
+        CI_NPM_CACHE: ${{ inputs.npm-cache }}
+        CI_NPM_SCRIPTS: ${{ inputs.npm-scripts }}
+      run: |
+        case "$CI_COMPOSER_MODE" in
+          install|prefer-lowest|prefer-stable|none) ;;
+          *) echo "::error::composer-mode must be install, prefer-lowest, prefer-stable, or none."; exit 1 ;;
+        esac
+        case "$CI_COMPOSER_VALIDATION" in
+          none|strict|no-check-publish|no-check-lock) ;;
+          *) echo "::error::composer-validation must be none, strict, no-check-publish, or no-check-lock."; exit 1 ;;
+        esac
+
+        for setting in "composer-cache=$CI_COMPOSER_CACHE" "composer-scripts=$CI_COMPOSER_SCRIPTS" \
+          "npm-install=$CI_NPM_INSTALL" "npm-cache=$CI_NPM_CACHE" "npm-scripts=$CI_NPM_SCRIPTS"; do
+          case "${setting#*=}" in
+            true|false) ;;
+            *) echo "::error::${setting%%=*} must be true or false."; exit 1 ;;
+          esac
+        done
+
+    - name: Set up PHP and Composer
+      id: php
+      uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+      with:
+        php-version: ${{ inputs.php-version }}
+        extensions: ${{ inputs.php-extensions }}
+        ini-values: ${{ inputs.php-ini-values }}
+        coverage: ${{ inputs.php-coverage }}
+        tools: composer:${{ inputs.composer-version }}
+
+    - name: Set up Node.js
+      if: inputs.node-version != ''
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        package-manager-cache: 'false'
+        cache: ${{ inputs.npm-cache == 'true' && 'npm' || '' }}
+        cache-dependency-path: |
+          ${{ inputs.working-directory }}/package-lock.json
+          ${{ inputs.working-directory }}/npm-shrinkwrap.json
+
+    - name: Validate Composer manifest
+      if: inputs.composer-validation != 'none'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CI_COMPOSER_VALIDATION: ${{ inputs.composer-validation }}
+      run: |
+        case "$CI_COMPOSER_VALIDATION" in
+          strict) composer validate --strict ;;
+          no-check-publish) composer validate --no-check-publish ;;
+          no-check-lock) composer validate --strict --no-check-lock ;;
+        esac
+
+    - name: Prepare the Composer download cache
+      id: composer-cache
+      if: inputs.composer-mode != 'none' && inputs.composer-cache == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CI_PROJECT_DIRECTORY: ${{ inputs.working-directory }}
+        CI_COMPOSER_VERSION: ${{ inputs.composer-version }}
+        CI_COMPOSER_MODE: ${{ inputs.composer-mode }}
+      run: |
+        fingerprint=$(php -r '
+          $manifest = trim((string) getenv("COMPOSER"));
+          if ($manifest === "") {
+              $manifest = "composer.json";
+          }
+          if (!is_file($manifest) || !is_readable($manifest)) {
+              fwrite(STDERR, "::error::The active Composer manifest is missing or unreadable in working-directory.\n");
+              exit(1);
+          }
+
+          $lock = str_ends_with($manifest, ".json")
+              ? substr($manifest, 0, -4) . "lock"
+              : $manifest . ".lock";
+          $manifestHash = hash_file("sha256", $manifest);
+          $lockHash = is_file($lock) ? hash_file("sha256", $lock) : "";
+          if ($manifestHash === false || $lockHash === false) {
+              exit(1);
+          }
+
+          echo hash("sha256", implode("\0", [
+              getenv("CI_PROJECT_DIRECTORY"),
+              getenv("CI_COMPOSER_VERSION"),
+              getenv("CI_COMPOSER_MODE"),
+              PHP_VERSION,
+              $manifestHash,
+              $lockHash,
+          ]));
+        ')
+        runner_temp="${RUNNER_TEMP//\\//}"
+        cache_directory="$runner_temp/maintainer-ci/composer/$fingerprint"
+        printf 'fingerprint=%s\ndirectory=%s\n' "$fingerprint" "$cache_directory" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Composer package downloads
+      if: inputs.composer-mode != 'none' && inputs.composer-cache == 'true'
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ${{ steps.composer-cache.outputs.directory }}/files
+        key: maintainer-ci-composer-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.php.outputs.php-version }}-${{ inputs.composer-mode }}-${{ steps.composer-cache.outputs.fingerprint }}
+
+    - name: Install Composer dependencies
+      if: inputs.composer-mode != 'none'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CI_COMPOSER_MODE: ${{ inputs.composer-mode }}
+        CI_COMPOSER_SCRIPTS: ${{ inputs.composer-scripts }}
+        CI_COMPOSER_CACHE_DIRECTORY: ${{ steps.composer-cache.outputs.directory }}
+      run: |
+        if [[ -n "$CI_COMPOSER_CACHE_DIRECTORY" ]]; then
+          export COMPOSER_CACHE_DIR="$CI_COMPOSER_CACHE_DIRECTORY"
+          export COMPOSER_CACHE_FILES_DIR="$CI_COMPOSER_CACHE_DIRECTORY/files"
+        fi
+
+        case "$CI_COMPOSER_MODE" in
+          install) args=(install) ;;
+          prefer-lowest) args=(update --prefer-lowest --prefer-stable) ;;
+          prefer-stable) args=(update --prefer-stable) ;;
+        esac
+
+        if [[ "$CI_COMPOSER_SCRIPTS" == false ]]; then
+          args+=(--no-scripts)
+        fi
+
+        composer "${args[@]}" --no-interaction --no-progress --prefer-dist
+
+    - name: Install npm dependencies
+      if: inputs.node-version != '' && inputs.npm-install == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CI_NPM_SCRIPTS: ${{ inputs.npm-scripts }}
+      run: |
+        args=(ci)
+        if [[ "$CI_NPM_SCRIPTS" == false ]]; then
+          args+=(--ignore-scripts)
+        fi
+        npm "${args[@]}"
